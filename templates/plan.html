@@ -1,6 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
-<h3>2-Week Plan for {{ person }}</h3>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>Weekly Plan for {{ person }}</h3>
+    <div class="d-flex align-items-center">
+        <button class="btn btn-outline-secondary me-2" onclick="navigateWeek('{{ prev_week }}')">
+            <i class="bi bi-chevron-left"></i> Previous Week
+        </button>
+        <div class="input-group me-2" style="width: 200px;">
+            <input type="date" class="form-control" id="weekPicker" value="{{ week_start_date }}">
+            <button class="btn btn-outline-primary" onclick="jumpToWeek()">Go</button>
+        </div>
+        <button class="btn btn-outline-secondary" onclick="navigateWeek('{{ next_week }}')">
+            <i class="bi bi-chevron-right"></i> Next Week
+        </button>
+    </div>
+</div>
+
+<div class="alert alert-info mb-3">
+    <strong>Week: {{ week_range }}</strong>
+</div>
 
 <div class="table-responsive">
     <table class="table table-bordered">
@@ -19,25 +37,28 @@
         <tbody>
             {% for day in days %}
             <tr>
-                <td><strong>{{ day }}</strong></td>
                 <td>
-                    {% for plan in plans[day] %}
+                    <strong>{{ day.name }}</strong><br>
+                    <small class="text-muted">{{ day.display }}</small>
+                </td>
+                <td>
+                    {% for plan in plans[day.date.isoformat()] %}
                         <span class="badge bg-secondary me-1">{{ plan.meal.name }}</span>
                     {% endfor %}
-                    {% if not plans[day] %}
+                    {% if not plans[day.date.isoformat()] %}
                         <em class="text-muted">No meals</em>
                     {% endif %}
                 </td>
-                <td>{{ "%.0f"|format(daily_totals[day].calories or 0) }}</td>
-                <td>{{ "%.1f"|format(daily_totals[day].protein or 0) }}g<br><small class="text-muted">({{ daily_totals[day].protein_pct or 0 }}%)</small></td>
-                <td>{{ "%.1f"|format(daily_totals[day].carbs or 0) }}g<br><small class="text-muted">({{ daily_totals[day].carbs_pct or 0 }}%)</small></td>
-                <td>{{ "%.1f"|format(daily_totals[day].fat or 0) }}g<br><small class="text-muted">({{ daily_totals[day].fat_pct or 0 }}%)</small></td>
-                <td>{{ "%.1f"|format(daily_totals[day].net_carbs or 0) }}g</td>
+                <td>{{ "%.0f"|format(daily_totals[day.date.isoformat()].calories or 0) }}</td>
+                <td>{{ "%.1f"|format(daily_totals[day.date.isoformat()].protein or 0) }}g<br><small class="text-muted">({{ daily_totals[day.date.isoformat()].protein_pct or 0 }}%)</small></td>
+                <td>{{ "%.1f"|format(daily_totals[day.date.isoformat()].carbs or 0) }}g<br><small class="text-muted">({{ daily_totals[day.date.isoformat()].carbs_pct or 0 }}%)</small></td>
+                <td>{{ "%.1f"|format(daily_totals[day.date.isoformat()].fat or 0) }}g<br><small class="text-muted">({{ daily_totals[day.date.isoformat()].fat_pct or 0 }}%)</small></td>
+                <td>{{ "%.1f"|format(daily_totals[day.date.isoformat()].net_carbs or 0) }}g</td>
                 <td>
-                    <button class="btn btn-sm btn-primary" onclick="editDay('{{ day }}', '{{ person }}')">
+                    <button class="btn btn-sm btn-primary" onclick="editDay('{{ day.date.isoformat() }}', '{{ person }}')">
                         <i class="bi bi-pencil"></i> Edit
                     </button>
-                    <button class="btn btn-sm btn-outline-success" onclick="quickAddMeal('{{ day }}')">
+                    <button class="btn btn-sm btn-outline-success" onclick="quickAddMeal('{{ day.date.isoformat() }}')">
                         <i class="bi bi-plus"></i> Add
                     </button>
                 </td>
@@ -130,17 +151,36 @@
 let currentEditingDay = null;
 let currentEditingPerson = null;
 
+// Week navigation function
+function navigateWeek(weekStartDate) {
+    const url = new URL(window.location);
+    url.searchParams.set('week_start_date', weekStartDate);
+    window.location.href = url.toString();
+}
+
+// Jump to specific week
+function jumpToWeek() {
+    const weekPicker = document.getElementById('weekPicker');
+    const selectedDate = weekPicker.value;
+    if (selectedDate) {
+        navigateWeek(selectedDate);
+    }
+}
+
 // Quick add meal function
-function quickAddMeal(day) {
-    document.getElementById('quickAddDay').textContent = day;
-    document.getElementById('quickAddPlanDay').value = day;
+function quickAddMeal(date) {
+    // Format date for display
+    const dateObj = new Date(date);
+    const options = { weekday: 'long', month: 'short', day: 'numeric' };
+    document.getElementById('quickAddDay').textContent = dateObj.toLocaleDateString('en-US', options);
+    document.getElementById('quickAddPlanDay').value = date;
     new bootstrap.Modal(document.getElementById('quickAddMealModal')).show();
 }
 
 function submitQuickAddMeal() {
     const form = document.getElementById('quickAddMealForm');
     const formData = new FormData(form);
-    
+
     fetch('/plan/add', {
         method: 'POST',
         body: formData
@@ -160,26 +200,29 @@ function submitQuickAddMeal() {
 }
 
 // Edit day function
-async function editDay(day, person) {
-    currentEditingDay = day;
+async function editDay(date, person) {
+    currentEditingDay = date;
     currentEditingPerson = person;
-    
-    document.getElementById('editDayName').textContent = day;
+
+    // Format date for display
+    const dateObj = new Date(date);
+    const options = { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' };
+    document.getElementById('editDayName').textContent = dateObj.toLocaleDateString('en-US', options);
     document.getElementById('editDayPerson').value = person;
-    document.getElementById('editDayValue').value = day;
-    
-    // Load current meals for this day
-    await loadCurrentDayMeals(person, day);
-    
+    document.getElementById('editDayValue').value = date;
+
+    // Load current meals for this date
+    await loadCurrentDayMeals(person, date);
+
     new bootstrap.Modal(document.getElementById('editDayModal')).show();
 }
 
-// Load current meals for the day
-async function loadCurrentDayMeals(person, day) {
+// Load current meals for the date
+async function loadCurrentDayMeals(person, date) {
     try {
-        const response = await fetch(`/plan/${person}/${day}`);
+        const response = await fetch(`/plan/${person}/${date}`);
         const meals = await response.json();
-        
+
         const container = document.getElementById('currentDayMeals');
         if (meals.length === 0) {
             container.innerHTML = '<em class="text-muted">No meals planned</em>';
@@ -193,7 +236,7 @@ async function loadCurrentDayMeals(person, day) {
                 </div>
             `).join('');
         }
-        
+
         // Update nutrition preview
         updateDayNutritionPreview(meals);
     } catch (error) {

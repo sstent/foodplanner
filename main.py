@@ -68,12 +68,32 @@ class MealFood(Base):
 
 class Plan(Base):
     __tablename__ = "plans"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     person = Column(String, index=True)  # Person A or Person B
-    date = Column(String, index=True)  # Changed from Date to String to store "Day1", "Day2", etc.
+    date = Column(Date, index=True)  # Store actual calendar dates
     meal_id = Column(Integer, ForeignKey("meals.id"))
-    
+
+    meal = relationship("Meal")
+
+class Template(Base):
+    __tablename__ = "templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+
+    # Relationship to template meals
+    template_meals = relationship("TemplateMeal", back_populates="template")
+
+class TemplateMeal(Base):
+    __tablename__ = "template_meals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("templates.id"))
+    meal_id = Column(Integer, ForeignKey("meals.id"))
+    meal_time = Column(String)  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
+
+    template = relationship("Template", back_populates="template_meals")
     meal = relationship("Meal")
 
 # Pydantic models
@@ -511,39 +531,67 @@ async def delete_meals(meal_ids: dict = Body(...), db: Session = Depends(get_db)
 
 # Plan tab
 @app.get("/plan", response_class=HTMLResponse)
-async def plan_page(request: Request, person: str = "Person A", db: Session = Depends(get_db)):
-    # Create 14 days (Day1 through Day14)
-    days = [f"Day{i}" for i in range(1, 15)]
-    
-    # Get plans for the person (using day names as dates)
+async def plan_page(request: Request, person: str = "Person A", week_start_date: str = None, db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta
+
+    # If no week_start_date provided, use current week starting from Monday
+    if not week_start_date:
+        today = datetime.now().date()
+        # Find Monday of current week
+        week_start_date = (today - timedelta(days=today.weekday())).isoformat()
+    else:
+        week_start_date = datetime.fromisoformat(week_start_date).date()
+
+    # Generate 7 days starting from Monday
+    days = []
+    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    for i in range(7):
+        day_date = week_start_date + timedelta(days=i)
+        days.append({
+            'date': day_date,
+            'name': day_names[i],
+            'display': day_date.strftime('%b %d')
+        })
+
+    # Get plans for the person for this week
     plans = {}
     for day in days:
         try:
-            day_plans = db.query(Plan).filter(Plan.person == person, Plan.date == day).all()
-            plans[day] = day_plans
+            day_plans = db.query(Plan).filter(Plan.person == person, Plan.date == day['date']).all()
+            plans[day['date'].isoformat()] = day_plans
         except Exception as e:
-            print(f"Error loading plans for {day}: {e}")
-            plans[day] = []
-    
+            print(f"Error loading plans for {day['date']}: {e}")
+            plans[day['date'].isoformat()] = []
+
     # Calculate daily totals
     daily_totals = {}
     for day in days:
-        daily_totals[day] = calculate_day_nutrition(plans[day], db)
-    
+        day_key = day['date'].isoformat()
+        daily_totals[day_key] = calculate_day_nutrition(plans[day_key], db)
+
     meals = db.query(Meal).all()
-    
+
+    # Calculate previous and next week dates
+    prev_week = (week_start_date - timedelta(days=7)).isoformat()
+    next_week = (week_start_date + timedelta(days=7)).isoformat()
+
     return templates.TemplateResponse("plan.html", {
         "request": request, "person": person, "days": days,
-        "plans": plans, "daily_totals": daily_totals, "meals": meals
+        "plans": plans, "daily_totals": daily_totals, "meals": meals,
+        "week_start_date": week_start_date.isoformat(),
+        "prev_week": prev_week, "next_week": next_week,
+        "week_range": f"{days[0]['display']} - {days[-1]['display']}, {week_start_date.year}"
     })
 
 @app.post("/plan/add")
-async def add_to_plan(request: Request, person: str = Form(...), 
-                     plan_day: str = Form(...), meal_id: int = Form(...),
-                     db: Session = Depends(get_db)):
-    
+async def add_to_plan(request: Request, person: str = Form(...),
+                      plan_date: str = Form(...), meal_id: int = Form(...),
+                      db: Session = Depends(get_db)):
+
     try:
-        plan = Plan(person=person, date=plan_day, meal_id=meal_id)
+        from datetime import datetime
+        plan_date_obj = datetime.fromisoformat(plan_date).date()
+        plan = Plan(person=person, date=plan_date_obj, meal_id=meal_id)
         db.add(plan)
         db.commit()
         return {"status": "success"}
@@ -551,11 +599,13 @@ async def add_to_plan(request: Request, person: str = Form(...),
         db.rollback()
         return {"status": "error", "message": str(e)}
 
-@app.get("/plan/{person}/{day}")
-async def get_day_plan(person: str, day: str, db: Session = Depends(get_db)):
-    """Get all meals for a specific day"""
+@app.get("/plan/{person}/{date}")
+async def get_day_plan(person: str, date: str, db: Session = Depends(get_db)):
+    """Get all meals for a specific date"""
     try:
-        plans = db.query(Plan).filter(Plan.person == person, Plan.date == day).all()
+        from datetime import datetime
+        plan_date = datetime.fromisoformat(date).date()
+        plans = db.query(Plan).filter(Plan.person == person, Plan.date == plan_date).all()
         result = []
         for plan in plans:
             result.append({
@@ -569,22 +619,25 @@ async def get_day_plan(person: str, day: str, db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 @app.post("/plan/update_day")
-async def update_day_plan(request: Request, person: str = Form(...), 
-                         day: str = Form(...), meal_ids: str = Form(...),
-                         db: Session = Depends(get_db)):
-    """Replace all meals for a specific day"""
+async def update_day_plan(request: Request, person: str = Form(...),
+                          date: str = Form(...), meal_ids: str = Form(...),
+                          db: Session = Depends(get_db)):
+    """Replace all meals for a specific date"""
     try:
+        from datetime import datetime
+        plan_date = datetime.fromisoformat(date).date()
+
         # Parse meal_ids (comma-separated string)
         meal_id_list = [int(x.strip()) for x in meal_ids.split(',') if x.strip()]
-        
-        # Delete existing plans for this day
-        db.query(Plan).filter(Plan.person == person, Plan.date == day).delete()
-        
+
+        # Delete existing plans for this date
+        db.query(Plan).filter(Plan.person == person, Plan.date == plan_date).delete()
+
         # Add new plans
         for meal_id in meal_id_list:
-            plan = Plan(person=person, date=day, meal_id=meal_id)
+            plan = Plan(person=person, date=plan_date, meal_id=meal_id)
             db.add(plan)
-        
+
         db.commit()
         return {"status": "success"}
     except Exception as e:
@@ -611,8 +664,143 @@ async def detailed(request: Request):
     return templates.TemplateResponse("detailed.html", {"request": request, "title": "Detailed"})
 
 @app.get("/templates", response_class=HTMLResponse)
-async def templates_page(request: Request):
-    return templates.TemplateResponse("plans.html", {"request": request, "title": "Templates"})
+async def templates_page(request: Request, db: Session = Depends(get_db)):
+    templates_list = db.query(Template).all()
+    meals = db.query(Meal).all()
+
+    # Convert templates to dictionaries for JSON serialization
+    templates_data = []
+    for template in templates_list:
+        template_meals = db.query(TemplateMeal).filter(TemplateMeal.template_id == template.id).all()
+        template_dict = {
+            "id": template.id,
+            "name": template.name,
+            "template_meals": []
+        }
+        for tm in template_meals:
+            template_dict["template_meals"].append({
+                "meal_time": tm.meal_time,
+                "meal_id": tm.meal_id,
+                "meal": {
+                    "id": tm.meal.id,
+                    "name": tm.meal.name,
+                    "meal_type": tm.meal.meal_type
+                }
+            })
+        templates_data.append(template_dict)
+
+    return templates.TemplateResponse("plans.html", {
+        "request": request,
+        "title": "Templates",
+        "templates": templates_data,
+        "meals": meals
+    })
+
+@app.post("/templates/create")
+async def create_template(request: Request, name: str = Form(...),
+                         meal_assignments: str = Form(...), db: Session = Depends(get_db)):
+    """Create a new template with meal assignments"""
+    try:
+        # Create template
+        template = Template(name=name)
+        db.add(template)
+        db.flush()  # Get template ID
+
+        # Parse meal assignments (format: "meal_time:meal_id,meal_time:meal_id,...")
+        if meal_assignments:
+            assignments = meal_assignments.split(',')
+            for assignment in assignments:
+                if ':' in assignment:
+                    meal_time, meal_id = assignment.split(':', 1)
+                    if meal_id.strip():  # Only add if meal_id is not empty
+                        template_meal = TemplateMeal(
+                            template_id=template.id,
+                            meal_id=int(meal_id.strip()),
+                            meal_time=meal_time.strip()
+                        )
+                        db.add(template_meal)
+
+        db.commit()
+        return {"status": "success", "template_id": template.id}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.get("/templates/{template_id}")
+async def get_template(template_id: int, db: Session = Depends(get_db)):
+    """Get template details with meal assignments"""
+    try:
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            return {"status": "error", "message": "Template not found"}
+
+        template_meals = db.query(TemplateMeal).filter(TemplateMeal.template_id == template_id).all()
+        result = {
+            "id": template.id,
+            "name": template.name,
+            "meals": []
+        }
+
+        for tm in template_meals:
+            result["meals"].append({
+                "meal_time": tm.meal_time,
+                "meal_id": tm.meal_id,
+                "meal_name": tm.meal.name
+            })
+
+        return result
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/templates/{template_id}/use")
+async def use_template(template_id: int, person: str = Form(...),
+                       start_date: str = Form(...), db: Session = Depends(get_db)):
+    """Copy template meals to a person's plan starting from a specific date"""
+    try:
+        from datetime import datetime
+        start_date_obj = datetime.fromisoformat(start_date).date()
+
+        template_meals = db.query(TemplateMeal).filter(TemplateMeal.template_id == template_id).all()
+
+        print(f"DEBUG: Using template {template_id} for {person} on {start_date}")
+        print(f"DEBUG: Found {len(template_meals)} template meals")
+
+        # Check if any meals already exist for this date
+        existing_plans = db.query(Plan).filter(Plan.person == person, Plan.date == start_date_obj).count()
+        if existing_plans > 0:
+            return {"status": "confirm_overwrite", "message": f"There are already {existing_plans} meals planned for this date. Do you want to overwrite them?"}
+
+        # Copy all template meals to the specified date
+        for tm in template_meals:
+            print(f"DEBUG: Adding meal {tm.meal_id} ({tm.meal.name}) for {tm.meal_time}")
+            plan = Plan(person=person, date=start_date_obj, meal_id=tm.meal_id)
+            db.add(plan)
+
+        db.commit()
+        print(f"DEBUG: Successfully applied template")
+        return {"status": "success"}
+    except Exception as e:
+        print(f"DEBUG: Error applying template: {str(e)}")
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.delete("/templates/{template_id}")
+async def delete_template(template_id: int, db: Session = Depends(get_db)):
+    """Delete a template and its meal assignments"""
+    try:
+        # Delete template meals first
+        db.query(TemplateMeal).filter(TemplateMeal.template_id == template_id).delete()
+        # Delete template
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if template:
+            db.delete(template)
+            db.commit()
+            return {"status": "success"}
+        else:
+            return {"status": "error", "message": "Template not found"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
