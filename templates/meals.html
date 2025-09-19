@@ -1,101 +1,186 @@
+<!-- templates/meals.html -->
 {% extends "base.html" %}
 {% block content %}
 <div class="row">
     <div class="col-md-4">
-        <h3>Add New Food</h3>
-        <form action="/foods/add" method="post">
+        <h3>Bulk Import Meals</h3>
+        <form action="/meals/upload" method="post" enctype="multipart/form-data">
             <div class="mb-3">
-                <label class="form-label">Name</label>
+                <label class="form-label">CSV File</label>
+                <input type="file" class="form-control" name="file" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn btn-secondary mb-4">Upload CSV</button>
+        </form>
+
+        <h3>Create New Meal</h3>
+        <form action="/meals/add" method="post">
+            <div class="mb-3">
+                <label class="form-label">Meal Name</label>
                 <input type="text" class="form-control" name="name" required>
             </div>
-            <div class="row">
-                <div class="col-6">
-                    <label class="form-label">Serving Size</label>
-                    <input type="text" class="form-control" name="serving_size" required>
-                </div>
-                <div class="col-6">
-                    <label class="form-label">Unit</label>
-                    <input type="text" class="form-control" name="serving_unit" required>
-                </div>
+            <div class="mb-3">
+                <label class="form-label">Meal Type</label>
+                <select class="form-control" name="meal_type" required>
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                    <option value="snack">Snack</option>
+                </select>
             </div>
-            <div class="row mt-3">
-                <div class="col-6">
-                    <label class="form-label">Calories</label>
-                    <input type="number" step="0.1" class="form-control" name="calories" required>
-                </div>
-                <div class="col-6">
-                    <label class="form-label">Protein (g)</label>
-                    <input type="number" step="0.1" class="form-control" name="protein" required>
-                </div>
-            </div>
-            <div class="row mt-3">
-                <div class="col-6">
-                    <label class="form-label">Carbs (g)</label>
-                    <input type="number" step="0.1" class="form-control" name="carbs" required>
-                </div>
-                <div class="col-6">
-                    <label class="form-label">Fat (g)</label>
-                    <input type="number" step="0.1" class="form-control" name="fat" required>
-                </div>
-            </div>
-            <div class="row mt-3">
-                <div class="col-6">
-                    <label class="form-label">Fiber (g)</label>
-                    <input type="number" step="0.1" class="form-control" name="fiber" value="0">
-                </div>
-                <div class="col-6">
-                    <label class="form-label">Sugar (g)</label>
-                    <input type="number" step="0.1" class="form-control" name="sugar" value="0">
-                </div>
-            </div>
-            <div class="row mt-3">
-                <div class="col-6">
-                    <label class="form-label">Sodium (mg)</label>
-                    <input type="number" step="0.1" class="form-control" name="sodium" value="0">
-                </div>
-                <div class="col-6">
-                    <label class="form-label">Calcium (mg)</label>
-                    <input type="number" step="0.1" class="form-control" name="calcium" value="0">
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary mt-3">Add Food</button>
+            <button type="submit" class="btn btn-primary">Create Meal</button>
         </form>
+
+        <div class="mt-4">
+            <h4>Add Food to Meal</h4>
+            <form id="addFoodForm">
+                <div class="mb-3">
+                    <label class="form-label">Select Meal</label>
+                    <select class="form-control" id="mealSelect">
+                        <option value="">Choose meal...</option>
+                        {% for meal in meals %}
+                        <option value="{{ meal.id }}">{{ meal.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Select Food</label>
+                    <select class="form-control" id="foodSelect">
+                        <option value="">Choose food...</option>
+                        {% for food in foods %}
+                        <option value="{{ food.id }}">{{ food.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" step="0.1" class="form-control" id="quantity" value="1">
+                </div>
+                <button type="button" onclick="addFoodToMeal()" class="btn btn-success">Add Food</button>
+            </form>
+        </div>
     </div>
     
     <div class="col-md-8">
-        <h3>Foods Database</h3>
+        <h3>Meals</h3>
         <div class="table-responsive">
             <table class="table table-striped">
                 <thead>
                     <tr>
+                        <th><input type="checkbox" id="select-all-meals" onclick="toggleAllMeals(this)"></th>
                         <th>Name</th>
-                        <th>Serving</th>
-                        <th>Cal</th>
-                        <th>Protein</th>
-                        <th>Carbs</th>
-                        <th>Fat</th>
-                        <th>Fiber</th>
-                        <th>Sodium</th>
-                        <th>Calcium</th>
+                        <th>Type</th>
+                        <th>Food Items</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for food in foods %}
+                    {% for meal in meals %}
                     <tr>
-                        <td>{{ food.name }}</td>
-                        <td>{{ food.serving_size }} {{ food.serving_unit }}</td>
-                        <td>{{ "%.1f"|format(food.calories) }}</td>
-                        <td>{{ "%.1f"|format(food.protein) }}g</td>
-                        <td>{{ "%.1f"|format(food.carbs) }}g</td>
-                        <td>{{ "%.1f"|format(food.fat) }}g</td>
-                        <td>{{ "%.1f"|format(food.fiber) }}g</td>
-                        <td>{{ "%.1f"|format(food.sodium) }}mg</td>
-                        <td>{{ "%.1f"|format(food.calcium) }}mg</td>
+                        <td><input type="checkbox" name="selected_meals" value="{{ meal.id }}"></td>
+                        <td>{{ meal.name }}</td>
+                        <td>{{ meal.meal_type.title() }}</td>
+                        <td>
+                            {% if meal.meal_foods %}
+                                <ul class="list-unstyled">
+                                {% for meal_food in meal.meal_foods %}
+                                    <li>{{ meal_food.quantity }} × {{ meal_food.food.name }}</li>
+                                {% endfor %}
+                                </ul>
+                            {% else %}
+                                <em>No foods added</em>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </div>
+        <button class="btn btn-danger mt-3" onclick="deleteSelectedMeals()" style="margin-top: 20px !important;">
+            <i class="bi bi-trash"></i> Delete Selected Meals
+        </button>
+100|     </div>
 </div>
+
+<script>
+function toggleAllMeals(source) {
+    console.log('Toggling all meals');
+    const checkboxes = document.querySelectorAll('input[name="selected_meals"]');
+    checkboxes.forEach(checkbox => checkbox.checked = source.checked);
+}
+
+async function deleteSelectedMeals() {
+    console.log('Delete selected meals called');
+    const selected = Array.from(document.querySelectorAll('input[name="selected_meals"]:checked'))
+        .map(checkbox => checkbox.value);
+
+    if (selected.length === 0) {
+        alert('Please select meals to delete');
+        return;
+    }
+
+    if (confirm(`Delete ${selected.length} selected meals?`)) {
+        try {
+            console.log('Deleting meals:', selected);
+            const response = await fetch('/meals/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({meal_ids: selected})
+            });
+
+            const result = await response.json();
+            console.log('Delete response:', result);
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert(`Delete failed: ${result.message || response.status}`);
+            }
+        } catch (error) {
+            console.error('Delete failed:', error);
+            alert('Delete failed: ' + error.message);
+        }
+    }
+}
+
+// Meal CSV upload handling
+document.querySelector('form[action="/meals/upload"]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const resultsDiv = document.createElement('div');
+    resultsDiv.className = 'alert alert-info mt-3';
+    form.parentNode.insertBefore(resultsDiv, form.nextSibling);
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Uploading...';
+
+    try {
+        const formData = new FormData(form);
+        const response = await fetch('/meals/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const results = await response.json();
+
+        if (results.errors?.length > 0) {
+            resultsDiv.className = 'alert alert-danger';
+            resultsDiv.innerHTML = `<strong>Errors (${results.errors.length}):</strong><br>` +
+                results.errors.join('<br>');
+        } else {
+            resultsDiv.className = 'alert alert-success';
+            resultsDiv.innerHTML = `Successfully created ${results.created} meals, updated ${results.updated}`;
+        }
+
+        if (results.created || results.updated) {
+            setTimeout(() => window.location.reload(), 2000);
+        }
+    } catch (error) {
+        resultsDiv.className = 'alert alert-danger';
+        resultsDiv.textContent = `Upload failed: ${error.message}`;
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload CSV';
+    }
+});
+</script>
 {% endblock %}

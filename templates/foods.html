@@ -2,6 +2,15 @@
 {% block content %}
 <div class="row">
     <div class="col-md-4">
+        <h3>Bulk Import</h3>
+        <form action="/foods/upload" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label class="form-label">CSV File</label>
+                <input type="file" class="form-control" name="file" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn btn-secondary mb-4">Upload CSV</button>
+        </form>
+
         <h3>Add New Food</h3>
         <form action="/foods/add" method="post">
             <div class="mb-3">
@@ -62,6 +71,15 @@
         </form>
     </div>
     
+    <div class="col-md-8" id="upload-results" style="display: none;">
+        <div class="alert alert-success">
+            <strong>Upload Results:</strong>
+            <span id="created-count"></span> created,
+            <span id="updated-count"></span> updated
+            <div id="error-list" class="mt-2 text-danger"></div>
+        </div>
+    </div>
+    
     <div class="col-md-8">
         <h3>Foods Database</h3>
         <div class="table-responsive">
@@ -82,15 +100,16 @@
                 <tbody>
                     {% for food in foods %}
                     <tr>
+                        <td><input type="checkbox" name="selected_foods" value="{{ food.id }}"></td>
                         <td>{{ food.name }}</td>
                         <td>{{ food.serving_size }} {{ food.serving_unit }}</td>
-                        <td>{{ "%.1f"|format(food.calories) }}</td>
-                        <td>{{ "%.1f"|format(food.protein) }}g</td>
-                        <td>{{ "%.1f"|format(food.carbs) }}g</td>
-                        <td>{{ "%.1f"|format(food.fat) }}g</td>
-                        <td>{{ "%.1f"|format(food.fiber) }}g</td>
-                        <td>{{ "%.1f"|format(food.sodium) }}mg</td>
-                        <td>{{ "%.1f"|format(food.calcium) }}mg</td>
+                        <td>{{ "%.2f"|format(food.calories) }}</td>
+                        <td>{{ "%.2f"|format(food.protein) }}g</td>
+                        <td>{{ "%.2f"|format(food.carbs) }}g</td>
+                        <td>{{ "%.2f"|format(food.fat) }}g</td>
+                        <td>{{ "%.2f"|format(food.fiber) }}g</td>
+                        <td>{{ "%.2f"|format(food.sodium) }}mg</td>
+                        <td>{{ "%.2f"|format(food.calcium) }}mg</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -98,4 +117,52 @@
         </div>
     </div>
 </div>
+
+<script>
+document.querySelector('form[action="/foods/upload"]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const resultsDiv = document.getElementById('upload-results');
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Uploading...';
+    
+    try {
+        const formData = new FormData(form);
+        const response = await fetch('/foods/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const results = await response.json();
+
+        // Always show results div even if no changes
+        resultsDiv.style.display = 'block';
+        document.getElementById('created-count').textContent = results.created || 0;
+        document.getElementById('updated-count').textContent = results.updated || 0;
+
+        if (results.errors?.length > 0) {
+            document.getElementById('error-list').innerHTML =
+                `<strong>Errors (${results.errors.length}):</strong><br>` + results.errors.join('<br>');
+        } else {
+            document.getElementById('error-list').innerHTML = '';
+        }
+
+        if (results.created || results.updated) {
+            setTimeout(() => window.location.reload(), 2000);
+        }
+    } catch (error) {
+        resultsDiv.style.display = 'block';
+        resultsDiv.querySelector('.alert').className = 'alert alert-danger';
+        document.getElementById('error-list').innerHTML =
+            `<strong>Upload Failed:</strong> ${error.message}`;
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload CSV';
+    }
+});
+</script>
 {% endblock %}
