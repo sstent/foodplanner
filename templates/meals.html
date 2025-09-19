@@ -1,22 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="row">
-    <div class="col-md-4">
-        <h3>Bulk Import Meals</h3>
-        <form action="/meals/upload" method="post" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label class="form-label">CSV File</label>
-                <input type="file" class="form-control" name="file" accept=".csv" required>
-            </div>
-            <button type="submit" class="btn btn-secondary mb-4">Upload CSV</button>
-        </form>
-
-        <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#addMealModal">
+    <div class="col-md-12">
+        <button type="button" class="btn btn-primary btn-lg mb-4" data-bs-toggle="modal" data-bs-target="#addMealModal">
             <i class="bi bi-plus-circle"></i> Create New Meal
         </button>
-    </div>
-    
-    <div class="col-md-8">
+        
         <h3>Meals</h3>
         <div class="table-responsive">
             <table class="table table-striped">
@@ -336,46 +325,5 @@ async function deleteSelectedMeals() {
     }
 }
 
-// Meal CSV upload handling
-document.querySelector('form[action="/meals/upload"]').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const resultsDiv = document.createElement('div');
-    resultsDiv.className = 'alert alert-info mt-3';
-    form.parentNode.insertBefore(resultsDiv, form.nextSibling);
-
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Uploading...';
-
-    try {
-        const formData = new FormData(form);
-        const response = await fetch('/meals/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        const results = await response.json();
-
-        if (results.errors?.length > 0) {
-            resultsDiv.className = 'alert alert-danger';
-            resultsDiv.innerHTML = `<strong>Errors (${results.errors.length}):</strong><br>` +
-                results.errors.join('<br>');
-        } else {
-            resultsDiv.className = 'alert alert-success';
-            resultsDiv.innerHTML = `Successfully created ${results.created} meals, updated ${results.updated}`;
-        }
-
-        if (results.created || results.updated) {
-            setTimeout(() => window.location.reload(), 2000);
-        }
-    } catch (error) {
-        resultsDiv.className = 'alert alert-danger';
-        resultsDiv.textContent = `Upload failed: ${error.message}`;
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Upload CSV';
-    }
-});
 </script>
 {% endblock %}

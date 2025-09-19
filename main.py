@@ -192,6 +192,11 @@ def calculate_day_nutrition(plans, db: Session):
 async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+# Imports tab
+@app.get("/imports", response_class=HTMLResponse)
+async def imports_page(request: Request):
+    return templates.TemplateResponse("imports.html", {"request": request})
+
 # Foods tab
 @app.get("/foods", response_class=HTMLResponse)
 async def foods_page(request: Request, db: Session = Depends(get_db)):
@@ -601,37 +606,13 @@ async def remove_from_plan(plan_id: int, db: Session = Depends(get_db)):
         db.rollback()
         return {"status": "error", "message": str(e)}
 
-# Detailed planner tab
 @app.get("/detailed", response_class=HTMLResponse)
-async def detailed_page(request: Request, person: str = "Person A", 
-                       plan_day: str = None, db: Session = Depends(get_db)):
-    
-    if not plan_day:
-        plan_day = "Day1"
-    
-    # Get all plans for the selected day
-    plans = db.query(Plan).filter(Plan.person == person, Plan.date == plan_day).all()
-    
-    # Group by meal type and calculate nutrition
-    meal_details = []
-    for plan in plans:
-        meal_nutrition = calculate_meal_nutrition(plan.meal, db)
-        meal_details.append({
-            'plan': plan,
-            'nutrition': meal_nutrition,
-            'foods': plan.meal.meal_foods
-        })
-    
-    # Calculate day totals
-    day_totals = calculate_day_nutrition(plans, db)
-    
-    # Create list of all days for the selector
-    days = [f"Day{i}" for i in range(1, 15)]
-    
-    return templates.TemplateResponse("detailed.html", {
-        "request": request, "person": person, "selected_day": plan_day,
-        "meal_details": meal_details, "day_totals": day_totals, "days": days
-    })
+async def detailed(request: Request):
+    return templates.TemplateResponse("detailed.html", {"request": request, "title": "Detailed"})
+
+@app.get("/templates", response_class=HTMLResponse)
+async def templates_page(request: Request):
+    return templates.TemplateResponse("plans.html", {"request": request, "title": "Templates"})
 
 if __name__ == "__main__":
     import uvicorn

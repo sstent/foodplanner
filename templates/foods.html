@@ -1,31 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="row">
-    <div class="col-md-4">
-        <h3>Bulk Import</h3>
-        <form action="/foods/upload" method="post" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label class="form-label">CSV File</label>
-                <input type="file" class="form-control" name="file" accept=".csv" required>
-            </div>
-            <button type="submit" class="btn btn-secondary mb-4">Upload CSV</button>
-        </form>
-
-        <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#addFoodModal">
+    <div class="col-md-12">
+        <button type="button" class="btn btn-primary btn-lg mb-4" data-bs-toggle="modal" data-bs-target="#addFoodModal">
             <i class="bi bi-plus-circle"></i> Add New Food
         </button>
-    </div>
-    
-    <div class="col-md-8" id="upload-results" style="display: none;">
-        <div class="alert alert-success">
-            <strong>Upload Results:</strong>
-            <span id="created-count"></span> created,
-            <span id="updated-count"></span> updated
-            <div id="error-list" class="mt-2 text-danger"></div>
-        </div>
-    </div>
-    
-    <div class="col-md-8">
+        
         <h3>Foods Database</h3>
         <div class="table-responsive">
             <table class="table table-striped">
@@ -59,7 +39,7 @@
                         <td>{{ "%.2f"|format(food.calcium) }}mg</td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary" 
-                                    onclick="editFood({{ food.id }}, '{{ food.name }}', '{{ food.serving_size }}', '{{ food.serving_unit }}', {{ food.calories }}, {{ food.protein }}, {{ food.carbs }}, {{ food.fat }}, {{ food.fiber }}, {{ food.sugar }}, {{ food.sodium }}, {{ food.calcium }})">
+                                    onclick="editFood({{ food.id }})">
                                 <i class="bi bi-pencil"></i> Edit
                             </button>
                         </td>
@@ -229,21 +209,10 @@
 
 <script>
 // Edit food function
-function editFood(id, name, serving_size, serving_unit, calories, protein, carbs, fat, fiber, sugar, sodium, calcium) {
-    document.getElementById('edit_food_id').value = id;
-    document.getElementById('edit_name').value = name;
-    document.getElementById('edit_serving_size').value = serving_size;
-    document.getElementById('edit_serving_unit').value = serving_unit;
-    document.getElementById('edit_calories').value = calories;
-    document.getElementById('edit_protein').value = protein;
-    document.getElementById('edit_carbs').value = carbs;
-    document.getElementById('edit_fat').value = fat;
-    document.getElementById('edit_fiber').value = fiber;
-    document.getElementById('edit_sugar').value = sugar;
-    document.getElementById('edit_sodium').value = sodium;
-    document.getElementById('edit_calcium').value = calcium;
-    
-    new bootstrap.Modal(document.getElementById('editFoodModal')).show();
+function editFood(foodId) {
+    // This function will be implemented after page load using the food data
+    // For now, we'll use a placeholder that will be replaced by the actual implementation
+    console.log("Edit food called for ID:", foodId);
 }
 
 // Submit food form (add or edit)
@@ -302,50 +271,46 @@ async function deleteSelectedFoods() {
     }
 }
 
-// CSV upload handling
-document.querySelector('form[action="/foods/upload"]').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const resultsDiv = document.getElementById('upload-results');
-    
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Uploading...';
-    
-    try {
-        const formData = new FormData(form);
-        const response = await fetch('/foods/upload', {
-            method: 'POST',
-            body: formData
-        });
+// Initialize editFood function after page load
+document.addEventListener('DOMContentLoaded', function() {
+    const foodsData = {
+        {% for food in foods %}
+        {{ food.id }}: {
+            name: '{{ food.name | replace("'", "\\'") }}',
+            serving_size: '{{ food.serving_size | replace("'", "\\'") }}',
+            serving_unit: '{{ food.serving_unit | replace("'", "\\'") }}',
+            calories: {{ food.calories }},
+            protein: {{ food.protein }},
+            carbs: {{ food.carbs }},
+            fat: {{ food.fat }},
+            fiber: {{ food.fiber }},
+            sugar: {{ food.sugar }},
+            sodium: {{ food.sodium }},
+            calcium: {{ food.calcium }}
+        },
+        {% endfor %}
+    };
 
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    // Implement the actual editFood function
+    window.editFood = function(foodId) {
+        const food = foodsData[foodId];
+        if (!food) return;
         
-        const results = await response.json();
-
-        resultsDiv.style.display = 'block';
-        document.getElementById('created-count').textContent = results.created || 0;
-        document.getElementById('updated-count').textContent = results.updated || 0;
-
-        if (results.errors?.length > 0) {
-            document.getElementById('error-list').innerHTML =
-                `<strong>Errors (${results.errors.length}):</strong><br>` + results.errors.join('<br>');
-        } else {
-            document.getElementById('error-list').innerHTML = '';
-        }
-
-        if (results.created || results.updated) {
-            setTimeout(() => window.location.reload(), 2000);
-        }
-    } catch (error) {
-        resultsDiv.style.display = 'block';
-        resultsDiv.querySelector('.alert').className = 'alert alert-danger';
-        document.getElementById('error-list').innerHTML =
-            `<strong>Upload Failed:</strong> ${error.message}`;
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Upload CSV';
-    }
+        document.getElementById('edit_food_id').value = foodId;
+        document.getElementById('edit_name').value = food.name;
+        document.getElementById('edit_serving_size').value = food.serving_size;
+        document.getElementById('edit_serving_unit').value = food.serving_unit;
+        document.getElementById('edit_calories').value = food.calories;
+        document.getElementById('edit_protein').value = food.protein;
+        document.getElementById('edit_carbs').value = food.carbs;
+        document.getElementById('edit_fat').value = food.fat;
+        document.getElementById('edit_fiber').value = food.fiber;
+        document.getElementById('edit_sugar').value = food.sugar;
+        document.getElementById('edit_sodium').value = food.sodium;
+        document.getElementById('edit_calcium').value = food.calcium;
+        
+        new bootstrap.Modal(document.getElementById('editFoodModal')).show();
+    };
 });
 </script>
 {% endblock %}
