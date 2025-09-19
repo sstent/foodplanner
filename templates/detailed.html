@@ -3,17 +3,39 @@
 <div class="row mb-3">
     <div class="col-md-6">
         <h3>Detailed View for {{ person }}</h3>
-        <form method="get" class="d-flex">
-            <input type="hidden" name="person" value="{{ person }}">
-            <select class="form-control me-2" name="plan_day">
-                {% for day in days %}
-                <option value="{{ day }}" {% if day == selected_day %}selected{% endif %}>{{ day }}</option>
-                {% endfor %}
-            </select>
-            <button class="btn btn-primary" type="submit">
-                <i class="bi bi-search"></i> View
-            </button>
-        </form>
+        <div class="mb-3">
+            <div class="btn-group" role="group">
+                <input type="radio" class="btn-check" name="viewMode" id="dayView" autocomplete="off" {% if view_mode == 'day' or not view_mode %}checked{% endif %}>
+                <label class="btn btn-outline-primary" for="dayView">View Planned Day</label>
+                <input type="radio" class="btn-check" name="viewMode" id="templateView" autocomplete="off" {% if view_mode == 'template' %}checked{% endif %}>
+                <label class="btn btn-outline-primary" for="templateView">View Template</label>
+            </div>
+        </div>
+
+        <div id="daySelector" {% if view_mode == 'template' %}style="display: none;"{% endif %}>
+            <form method="get" class="d-flex">
+                <input type="hidden" name="person" value="{{ person }}">
+                <input type="date" class="form-control me-2" name="plan_date" value="{% if view_mode == 'day' %}{{ plan_date }}{% else %}{{ today|default('') }}{% endif %}" required>
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-search"></i> View Day
+                </button>
+            </form>
+        </div>
+
+        <div id="templateSelector" {% if view_mode != 'template' %}style="display: none;"{% endif %}>
+            <form method="get" class="d-flex">
+                <input type="hidden" name="person" value="{{ person }}">
+                <select class="form-control me-2" name="template_id" required>
+                    <option value="">Select Template...</option>
+                    {% for template in templates %}
+                    <option value="{{ template.id }}" {% if template_id == template.id %}selected{% endif %}>{{ template.name }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-search"></i> View Template
+                </button>
+            </form>
+        </div>
     </div>
     <div class="col-md-6 text-end">
         <h4 class="mb-0">{{ selected_day }}</h4>
@@ -259,8 +281,43 @@
 
 {% if not meal_details %}
 <div class="alert alert-info">
-    <i class="bi bi-info-circle"></i> No meals planned for this date. Go to the Plan tab to add meals.
+    <i class="bi bi-info-circle"></i>
+    {% if view_mode == 'template' %}
+        No template selected. Please select a template to view.
+    {% else %}
+        No meals planned for this date. Go to the Plan tab to add meals.
+    {% endif %}
 </div>
 {% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle view mode switching
+    const dayViewRadio = document.getElementById('dayView');
+    const templateViewRadio = document.getElementById('templateView');
+    const daySelector = document.getElementById('daySelector');
+    const templateSelector = document.getElementById('templateSelector');
+
+    function switchViewMode() {
+        if (dayViewRadio.checked) {
+            daySelector.style.display = 'block';
+            templateSelector.style.display = 'none';
+        } else {
+            daySelector.style.display = 'none';
+            templateSelector.style.display = 'block';
+        }
+    }
+
+    dayViewRadio.addEventListener('change', switchViewMode);
+    templateViewRadio.addEventListener('change', switchViewMode);
+
+    // Set default date to today if no date is selected
+    const dateInput = document.querySelector('input[name="plan_date"]');
+    if (dateInput && !dateInput.value) {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+    }
+});
+</script>
 
 {% endblock %}

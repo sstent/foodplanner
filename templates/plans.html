@@ -289,6 +289,10 @@ function createTemplate() {
 
 function useTemplateModal(templateId) {
     currentTemplateId = templateId;
+    // Set default date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('startDate').value = today;
+    document.getElementById('overwriteWarning').style.display = 'none';
     new bootstrap.Modal(document.getElementById('useTemplateModal')).show();
 }
 
@@ -298,7 +302,46 @@ function useTemplate() {
 
     const data = {
         person: formData.get('person'),
-        start_day: formData.get('start_day')
+        start_date: formData.get('start_date')
+    };
+
+    fetch(`/templates/${currentTemplateId}/use`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'confirm_overwrite') {
+            // Show overwrite warning
+            document.getElementById('overwriteWarning').style.display = 'block';
+            // Change button text to confirm overwrite
+            const submitBtn = document.querySelector('#useTemplateForm button[type="submit"]');
+            submitBtn.textContent = 'Overwrite Existing Meals';
+            submitBtn.onclick = () => confirmOverwrite(data);
+        } else if (data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('useTemplateModal')).hide();
+            alert('Template applied to your plan successfully!');
+        } else {
+            alert('Error using template: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error using template');
+    });
+}
+
+function confirmOverwrite(overwriteData) {
+    const form = document.getElementById('useTemplateForm');
+    const formData = new FormData(form);
+
+    const data = {
+        person: formData.get('person'),
+        start_date: formData.get('start_date'),
+        confirm_overwrite: 'true'
     };
 
     fetch(`/templates/${currentTemplateId}/use`, {

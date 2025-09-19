@@ -538,15 +538,15 @@ async def plan_page(request: Request, person: str = "Person A", week_start_date:
     if not week_start_date:
         today = datetime.now().date()
         # Find Monday of current week
-        week_start_date = (today - timedelta(days=today.weekday())).isoformat()
+        week_start_date_obj = (today - timedelta(days=today.weekday()))
     else:
-        week_start_date = datetime.fromisoformat(week_start_date).date()
+        week_start_date_obj = datetime.fromisoformat(week_start_date).date()
 
     # Generate 7 days starting from Monday
     days = []
     day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     for i in range(7):
-        day_date = week_start_date + timedelta(days=i)
+        day_date = week_start_date_obj + timedelta(days=i)
         days.append({
             'date': day_date,
             'name': day_names[i],
@@ -572,15 +572,19 @@ async def plan_page(request: Request, person: str = "Person A", week_start_date:
     meals = db.query(Meal).all()
 
     # Calculate previous and next week dates
-    prev_week = (week_start_date - timedelta(days=7)).isoformat()
-    next_week = (week_start_date + timedelta(days=7)).isoformat()
+    prev_week = (week_start_date_obj - timedelta(days=7)).isoformat()
+    next_week = (week_start_date_obj + timedelta(days=7)).isoformat()
+
+    # Debug logging
+    print(f"DEBUG: days structure: {days}")
+    print(f"DEBUG: first day: {days[0] if days else 'No days'}")
 
     return templates.TemplateResponse("plan.html", {
         "request": request, "person": person, "days": days,
         "plans": plans, "daily_totals": daily_totals, "meals": meals,
-        "week_start_date": week_start_date.isoformat(),
+        "week_start_date": week_start_date_obj.isoformat(),
         "prev_week": prev_week, "next_week": next_week,
-        "week_range": f"{days[0]['display']} - {days[-1]['display']}, {week_start_date.year}"
+        "week_range": f"{days[0]['display']} - {days[-1]['display']}, {week_start_date_obj.year}"
     })
 
 @app.post("/plan/add")
@@ -660,8 +664,110 @@ async def remove_from_plan(plan_id: int, db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 @app.get("/detailed", response_class=HTMLResponse)
-async def detailed(request: Request):
-    return templates.TemplateResponse("detailed.html", {"request": request, "title": "Detailed"})
+async def detailed(request: Request, person: str = "Person A", plan_date: str = None, template_id: int = None, db: Session = Depends(get_db)):
+    from datetime import datetime
+
+    if template_id:
+        # Show template details
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            return templates.TemplateResponse("detailed.html", {
+                "request": request, "title": "Template Not Found",
+                "error": "Template not found"
+            })
+
+        template_meals = db.query(TemplateMeal).filter(TemplateMeal.template_id == template_id).all()
+
+        # Calculate template nutrition
+        template_nutrition = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0, 'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0}
+
+        meal_details = []
+        for tm in template_meals:
+            meal_nutrition = calculate_meal_nutrition(tm.meal, db)
+            meal_details.append({
+                'plan': {'meal': tm.meal},
+                'nutrition': meal_nutrition,
+                'foods': []  # Template view doesn't show individual foods
+            })
+
+            for key in template_nutrition:
+                if key in meal_nutrition:
+                    template_nutrition[key] += meal_nutrition[key]
+
+        # Calculate percentages
+        total_cals = template_nutrition['calories']
+        if total_cals > 0:
+            template_nutrition['protein_pct'] = round((template_nutrition['protein'] * 4 / total_cals) * 100, 1)
+            template_nutrition['carbs_pct'] = round((template_nutrition['carbs'] * 4 / total_cals) * 100, 1)
+            template_nutrition['fat_pct'] = round((template_nutrition['fat'] * 9 / total_cals) * 100, 1)
+            template_nutrition['net_carbs'] = template_nutrition['carbs'] - template_nutrition['fiber']
+
+        return templates.TemplateResponse("detailed.html", {
+            "request": request, "title": f"Template: {template.name}",
+            "person": person, "meal_details": meal_details, "day_totals": template_nutrition,
+            "selected_day": template.name, "view_mode": "template"
+        })
+
+    elif plan_date:
+        # Show planned day details
+        plan_date_obj = datetime.fromisoformat(plan_date).date()
+        plans = db.query(Plan).filter(Plan.person == person, Plan.date == plan_date_obj).all()
+
+        meal_details = []
+        day_totals = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0, 'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0}
+
+        for plan in plans:
+            meal_nutrition = calculate_meal_nutrition(plan.meal, db)
+
+            # Get meal foods for detailed breakdown
+            meal_foods = []
+            for meal_food in plan.meal.meal_foods:
+                meal_foods.append({
+                    'food': meal_food.food,
+                    'quantity': meal_food.quantity
+                })
+
+            meal_details.append({
+                'plan': plan,
+                'nutrition': meal_nutrition,
+                'foods': meal_foods
+            })
+
+            for key in day_totals:
+                if key in meal_nutrition:
+                    day_totals[key] += meal_nutrition[key]
+
+        # Calculate percentages
+        total_cals = day_totals['calories']
+        if total_cals > 0:
+            day_totals['protein_pct'] = round((day_totals['protein'] * 4 / total_cals) * 100, 1)
+            day_totals['carbs_pct'] = round((day_totals['carbs'] * 4 / total_cals) * 100, 1)
+            day_totals['fat_pct'] = round((day_totals['fat'] * 9 / total_cals) * 100, 1)
+            day_totals['net_carbs'] = day_totals['carbs'] - day_totals['fiber']
+
+        selected_day = plan_date_obj.strftime('%A, %B %d, %Y')
+
+        return templates.TemplateResponse("detailed.html", {
+            "request": request, "title": f"Detailed View - {selected_day}",
+            "person": person, "meal_details": meal_details, "day_totals": day_totals,
+            "selected_day": selected_day, "view_mode": "day"
+        })
+
+    else:
+        # Default view - show current week
+        templates_list = db.query(Template).all()
+        context = {
+            "request": request, "title": "Detailed View",
+            "person": person, "view_mode": "select", "templates": templates_list,
+            "meal_details": [],  # Empty list for default view
+            "day_totals": {  # Default empty nutrition totals
+                'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
+                'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0,
+                'protein_pct': 0, 'carbs_pct': 0, 'fat_pct': 0, 'net_carbs': 0
+            },
+            "selected_day": "Select a date or template above"
+        }
+        return templates.TemplateResponse("detailed.html", context)
 
 @app.get("/templates", response_class=HTMLResponse)
 async def templates_page(request: Request, db: Session = Depends(get_db)):
