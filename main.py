@@ -15,6 +15,7 @@ from datetime import date, datetime
 import os
 import csv
 from fastapi import File, UploadFile
+
 # Database setup - Use SQLite for easier setup
 DATABASE_URL = "sqlite:///./meal_planner.db"
 # For production, use PostgreSQL: DATABASE_URL = "postgresql://username:password@localhost/meal_planner"
@@ -49,7 +50,7 @@ class Meal(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    meal_type = Column(String)  # breakfast, lunch, dinner, snack
+    meal_type = Column(String)  # breakfast, lunch, dinner, snack, custom
     
     # Relationship to meal foods
     meal_foods = relationship("MealFood", back_populates="meal")
@@ -70,7 +71,7 @@ class Plan(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     person = Column(String, index=True)  # Person A or Person B
-    date = Column(Date, index=True)
+    date = Column(String, index=True)  # Changed from Date to String to store "Day1", "Day2", etc.
     meal_id = Column(Integer, ForeignKey("meals.id"))
     
     meal = relationship("Meal")
@@ -138,10 +139,10 @@ def calculate_meal_nutrition(meal, db: Session):
         totals['protein'] += food.protein * quantity
         totals['carbs'] += food.carbs * quantity
         totals['fat'] += food.fat * quantity
-        totals['fiber'] += food.fiber * quantity
-        totals['sugar'] += food.sugar * quantity
-        totals['sodium'] += food.sodium * quantity
-        totals['calcium'] += food.calcium * quantity
+        totals['fiber'] += (food.fiber or 0) * quantity
+        totals['sugar'] += (food.sugar or 0) * quantity
+        totals['sodium'] += (food.sodium or 0) * quantity
+        totals['calcium'] += (food.calcium or 0) * quantity
     
     # Calculate percentages
     total_cals = totals['calories']
@@ -150,6 +151,11 @@ def calculate_meal_nutrition(meal, db: Session):
         totals['carbs_pct'] = round((totals['carbs'] * 4 / total_cals) * 100, 1)
         totals['fat_pct'] = round((totals['fat'] * 9 / total_cals) * 100, 1)
         totals['net_carbs'] = totals['carbs'] - totals['fiber']
+    else:
+        totals['protein_pct'] = 0
+        totals['carbs_pct'] = 0
+        totals['fat_pct'] = 0
+        totals['net_carbs'] = 0
     
     return totals
 
@@ -173,6 +179,11 @@ def calculate_day_nutrition(plans, db: Session):
         day_totals['carbs_pct'] = round((day_totals['carbs'] * 4 / total_cals) * 100, 1)
         day_totals['fat_pct'] = round((day_totals['fat'] * 9 / total_cals) * 100, 1)
         day_totals['net_carbs'] = day_totals['carbs'] - day_totals['fiber']
+    else:
+        day_totals['protein_pct'] = 0
+        day_totals['carbs_pct'] = 0
+        day_totals['fat_pct'] = 0
+        day_totals['net_carbs'] = 0
     
     return day_totals
 
@@ -237,6 +248,79 @@ async def bulk_upload_foods(file: UploadFile = File(...), db: Session = Depends(
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
+
+@app.post("/foods/add")
+async def add_food(request: Request, db: Session = Depends(get_db),
+                  name: str = Form(...), serving_size: str = Form(...),
+                  serving_unit: str = Form(...), calories: float = Form(...),
+                  protein: float = Form(...), carbs: float = Form(...),
+                  fat: float = Form(...), fiber: float = Form(0),
+                  sugar: float = Form(0), sodium: float = Form(0),
+                  calcium: float = Form(0)):
+    
+    try:
+        food = Food(
+            name=name, serving_size=serving_size, serving_unit=serving_unit,
+            calories=calories, protein=protein, carbs=carbs, fat=fat,
+            fiber=fiber, sugar=sugar, sodium=sodium, calcium=calcium
+        )
+        db.add(food)
+        db.commit()
+        return {"status": "success", "message": "Food added successfully"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/foods/edit")
+async def edit_food(request: Request, db: Session = Depends(get_db),
+                   food_id: int = Form(...), name: str = Form(...), 
+                   serving_size: str = Form(...), serving_unit: str = Form(...), 
+                   calories: float = Form(...), protein: float = Form(...), 
+                   carbs: float = Form(...), fat: float = Form(...), 
+                   fiber: float = Form(0), sugar: float = Form(0), 
+                   sodium: float = Form(0), calcium: float = Form(0)):
+    
+    try:
+        food = db.query(Food).filter(Food.id == food_id).first()
+        if not food:
+            return {"status": "error", "message": "Food not found"}
+        
+        food.name = name
+        food.serving_size = serving_size
+        food.serving_unit = serving_unit
+        food.calories = calories
+        food.protein = protein
+        food.carbs = carbs
+        food.fat = fat
+        food.fiber = fiber
+        food.sugar = sugar
+        food.sodium = sodium
+        food.calcium = calcium
+        
+        db.commit()
+        return {"status": "success", "message": "Food updated successfully"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/foods/delete")
+async def delete_foods(food_ids: dict = Body(...), db: Session = Depends(get_db)):
+    try:
+        # Delete foods
+        db.query(Food).filter(Food.id.in_(food_ids["food_ids"])).delete(synchronize_session=False)
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+# Meals tab
+@app.get("/meals", response_class=HTMLResponse)
+async def meals_page(request: Request, db: Session = Depends(get_db)):
+    meals = db.query(Meal).all()
+    foods = db.query(Food).all()
+    return templates.TemplateResponse("meals.html", 
+                                    {"request": request, "meals": meals, "foods": foods})
 
 @app.post("/meals/upload")
 async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -329,50 +413,83 @@ async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(
         db.rollback()
         return {"status": "error", "message": str(e)}
 
-@app.post("/foods/add")
-async def add_food(request: Request, db: Session = Depends(get_db),
-                  name: str = Form(...), serving_size: str = Form(...),
-                  serving_unit: str = Form(...), calories: float = Form(...),
-                  protein: float = Form(...), carbs: float = Form(...),
-                  fat: float = Form(...), fiber: float = Form(0),
-                  sugar: float = Form(0), sodium: float = Form(0),
-                  calcium: float = Form(0)):
-    
-    food = Food(
-        name=name, serving_size=serving_size, serving_unit=serving_unit,
-        calories=calories, protein=protein, carbs=carbs, fat=fat,
-        fiber=fiber, sugar=sugar, sodium=sodium, calcium=calcium
-    )
-    db.add(food)
-    db.commit()
-    return {"status": "success", "message": "Food added successfully"}
-
-# Meals tab
-@app.get("/meals", response_class=HTMLResponse)
-async def meals_page(request: Request, db: Session = Depends(get_db)):
-    meals = db.query(Meal).all()
-    foods = db.query(Food).all()
-    return templates.TemplateResponse("meals.html", 
-                                    {"request": request, "meals": meals, "foods": foods})
-
 @app.post("/meals/add")
 async def add_meal(request: Request, db: Session = Depends(get_db),
                   name: str = Form(...), meal_type: str = Form(...)):
     
-    meal = Meal(name=name, meal_type=meal_type)
-    db.add(meal)
-    db.commit()
-    db.refresh(meal)
-    return {"status": "success", "meal_id": meal.id}
+    try:
+        meal = Meal(name=name, meal_type=meal_type)
+        db.add(meal)
+        db.commit()
+        db.refresh(meal)
+        return {"status": "success", "meal_id": meal.id}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/meals/edit")
+async def edit_meal(request: Request, db: Session = Depends(get_db),
+                   meal_id: int = Form(...), name: str = Form(...), 
+                   meal_type: str = Form(...)):
+    
+    try:
+        meal = db.query(Meal).filter(Meal.id == meal_id).first()
+        if not meal:
+            return {"status": "error", "message": "Meal not found"}
+        
+        meal.name = name
+        meal.meal_type = meal_type
+        
+        db.commit()
+        return {"status": "success", "message": "Meal updated successfully"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.get("/meals/{meal_id}/foods")
+async def get_meal_foods(meal_id: int, db: Session = Depends(get_db)):
+    """Get all foods in a meal"""
+    try:
+        meal_foods = db.query(MealFood).filter(MealFood.meal_id == meal_id).all()
+        result = []
+        for mf in meal_foods:
+            result.append({
+                "id": mf.id,
+                "food_id": mf.food_id,
+                "food_name": mf.food.name,
+                "quantity": mf.quantity
+            })
+        return result
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.post("/meals/{meal_id}/add_food")
 async def add_food_to_meal(meal_id: int, food_id: int = Form(...), 
                           quantity: float = Form(...), db: Session = Depends(get_db)):
     
-    meal_food = MealFood(meal_id=meal_id, food_id=food_id, quantity=quantity)
-    db.add(meal_food)
-    db.commit()
-    return {"status": "success"}
+    try:
+        meal_food = MealFood(meal_id=meal_id, food_id=food_id, quantity=quantity)
+        db.add(meal_food)
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.delete("/meals/remove_food/{meal_food_id}")
+async def remove_food_from_meal(meal_food_id: int, db: Session = Depends(get_db)):
+    """Remove a food from a meal"""
+    try:
+        meal_food = db.query(MealFood).filter(MealFood.id == meal_food_id).first()
+        if not meal_food:
+            return {"status": "error", "message": "Meal food not found"}
+        
+        db.delete(meal_food)
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
 
 @app.post("/meals/delete")
 async def delete_meals(meal_ids: dict = Body(...), db: Session = Depends(get_db)):
@@ -390,52 +507,110 @@ async def delete_meals(meal_ids: dict = Body(...), db: Session = Depends(get_db)
 # Plan tab
 @app.get("/plan", response_class=HTMLResponse)
 async def plan_page(request: Request, person: str = "Person A", db: Session = Depends(get_db)):
-    from datetime import date, timedelta
+    # Create 14 days (Day1 through Day14)
+    days = [f"Day{i}" for i in range(1, 15)]
     
-    # Get 2 weeks starting from today
-    start_date = date.today()
-    dates = [start_date + timedelta(days=i) for i in range(14)]
-    
-    # Get plans for the person
+    # Get plans for the person (using day names as dates)
     plans = {}
-    for d in dates:
-        day_plans = db.query(Plan).filter(Plan.person == person, Plan.date == d).all()
-        plans[d] = day_plans
+    for day in days:
+        try:
+            day_plans = db.query(Plan).filter(Plan.person == person, Plan.date == day).all()
+            plans[day] = day_plans
+        except Exception as e:
+            print(f"Error loading plans for {day}: {e}")
+            plans[day] = []
     
     # Calculate daily totals
     daily_totals = {}
-    for d in dates:
-        daily_totals[d] = calculate_day_nutrition(plans[d], db)
+    for day in days:
+        daily_totals[day] = calculate_day_nutrition(plans[day], db)
     
     meals = db.query(Meal).all()
     
     return templates.TemplateResponse("plan.html", {
-        "request": request, "person": person, "dates": dates,
+        "request": request, "person": person, "days": days,
         "plans": plans, "daily_totals": daily_totals, "meals": meals
     })
 
 @app.post("/plan/add")
 async def add_to_plan(request: Request, person: str = Form(...), 
-                     plan_date: str = Form(...), meal_id: int = Form(...),
+                     plan_day: str = Form(...), meal_id: int = Form(...),
                      db: Session = Depends(get_db)):
     
-    plan = Plan(person=person, date=datetime.strptime(plan_date, "%Y-%m-%d").date(), meal_id=meal_id)
-    db.add(plan)
-    db.commit()
-    return {"status": "success"}
+    try:
+        plan = Plan(person=person, date=plan_day, meal_id=meal_id)
+        db.add(plan)
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.get("/plan/{person}/{day}")
+async def get_day_plan(person: str, day: str, db: Session = Depends(get_db)):
+    """Get all meals for a specific day"""
+    try:
+        plans = db.query(Plan).filter(Plan.person == person, Plan.date == day).all()
+        result = []
+        for plan in plans:
+            result.append({
+                "id": plan.id,
+                "meal_id": plan.meal_id,
+                "meal_name": plan.meal.name,
+                "meal_type": plan.meal.meal_type
+            })
+        return result
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/plan/update_day")
+async def update_day_plan(request: Request, person: str = Form(...), 
+                         day: str = Form(...), meal_ids: str = Form(...),
+                         db: Session = Depends(get_db)):
+    """Replace all meals for a specific day"""
+    try:
+        # Parse meal_ids (comma-separated string)
+        meal_id_list = [int(x.strip()) for x in meal_ids.split(',') if x.strip()]
+        
+        # Delete existing plans for this day
+        db.query(Plan).filter(Plan.person == person, Plan.date == day).delete()
+        
+        # Add new plans
+        for meal_id in meal_id_list:
+            plan = Plan(person=person, date=day, meal_id=meal_id)
+            db.add(plan)
+        
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.delete("/plan/{plan_id}")
+async def remove_from_plan(plan_id: int, db: Session = Depends(get_db)):
+    """Remove a specific meal from a plan"""
+    try:
+        plan = db.query(Plan).filter(Plan.id == plan_id).first()
+        if not plan:
+            return {"status": "error", "message": "Plan not found"}
+        
+        db.delete(plan)
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
 
 # Detailed planner tab
 @app.get("/detailed", response_class=HTMLResponse)
 async def detailed_page(request: Request, person: str = "Person A", 
-                       plan_date: str = None, db: Session = Depends(get_db)):
+                       plan_day: str = None, db: Session = Depends(get_db)):
     
-    if not plan_date:
-        plan_date = date.today().strftime("%Y-%m-%d")
-    
-    selected_date = datetime.strptime(plan_date, "%Y-%m-%d").date()
+    if not plan_day:
+        plan_day = "Day1"
     
     # Get all plans for the selected day
-    plans = db.query(Plan).filter(Plan.person == person, Plan.date == selected_date).all()
+    plans = db.query(Plan).filter(Plan.person == person, Plan.date == plan_day).all()
     
     # Group by meal type and calculate nutrition
     meal_details = []
@@ -450,9 +625,12 @@ async def detailed_page(request: Request, person: str = "Person A",
     # Calculate day totals
     day_totals = calculate_day_nutrition(plans, db)
     
+    # Create list of all days for the selector
+    days = [f"Day{i}" for i in range(1, 15)]
+    
     return templates.TemplateResponse("detailed.html", {
-        "request": request, "person": person, "selected_date": selected_date,
-        "meal_details": meal_details, "day_totals": day_totals
+        "request": request, "person": person, "selected_day": plan_day,
+        "meal_details": meal_details, "day_totals": day_totals, "days": days
     })
 
 if __name__ == "__main__":

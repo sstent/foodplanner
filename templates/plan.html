@@ -6,36 +6,40 @@
     <table class="table table-bordered">
         <thead>
             <tr>
-                <th>Date</th>
-                <th>Meals</th>
-                <th>Calories</th>
-                <th>Protein</th>
-                <th>Carbs</th>
-                <th>Fat</th>
-                <th>Net Carbs</th>
-                <th>Calcium</th>
-                <th>Sodium</th>
-                <th>Actions</th>
+                <th style="width: 10%;">Day</th>
+                <th style="width: 25%;">Meals</th>
+                <th style="width: 10%;">Calories</th>
+                <th style="width: 12%;">Protein</th>
+                <th style="width: 12%;">Carbs</th>
+                <th style="width: 12%;">Fat</th>
+                <th style="width: 9%;">Net Carbs</th>
+                <th style="width: 10%;">Actions</th>
             </tr>
         </thead>
         <tbody>
-            {% for date in dates %}
+            {% for day in days %}
             <tr>
-                <td>{{ date.strftime('%m/%d') }}</td>
+                <td><strong>{{ day }}</strong></td>
                 <td>
-                    {% for plan in plans[date] %}
+                    {% for plan in plans[day] %}
                         <span class="badge bg-secondary me-1">{{ plan.meal.name }}</span>
                     {% endfor %}
+                    {% if not plans[day] %}
+                        <em class="text-muted">No meals</em>
+                    {% endif %}
                 </td>
-                <td>{{ "%.0f"|format(daily_totals[date].calories or 0) }}</td>
-                <td>{{ "%.1f"|format(daily_totals[date].protein or 0) }}g ({{ daily_totals[date].protein_pct or 0 }}%)</td>
-                <td>{{ "%.1f"|format(daily_totals[date].carbs or 0) }}g ({{ daily_totals[date].carbs_pct or 0 }}%)</td>
-                <td>{{ "%.1f"|format(daily_totals[date].fat or 0) }}g ({{ daily_totals[date].fat_pct or 0 }}%)</td>
-                <td>{{ "%.1f"|format(daily_totals[date].net_carbs or 0) }}g</td>
-                <td>{{ "%.0f"|format(daily_totals[date].calcium or 0) }}mg</td>
-                <td>{{ "%.0f"|format(daily_totals[date].sodium or 0) }}mg</td>
+                <td>{{ "%.0f"|format(daily_totals[day].calories or 0) }}</td>
+                <td>{{ "%.1f"|format(daily_totals[day].protein or 0) }}g<br><small class="text-muted">({{ daily_totals[day].protein_pct or 0 }}%)</small></td>
+                <td>{{ "%.1f"|format(daily_totals[day].carbs or 0) }}g<br><small class="text-muted">({{ daily_totals[day].carbs_pct or 0 }}%)</small></td>
+                <td>{{ "%.1f"|format(daily_totals[day].fat or 0) }}g<br><small class="text-muted">({{ daily_totals[day].fat_pct or 0 }}%)</small></td>
+                <td>{{ "%.1f"|format(daily_totals[day].net_carbs or 0) }}g</td>
                 <td>
-                    <button class="btn btn-sm btn-primary" onclick="addMealToDay('{{ date }}')">Add Meal</button>
+                    <button class="btn btn-sm btn-primary" onclick="editDay('{{ day }}', '{{ person }}')">
+                        <i class="bi bi-pencil"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="quickAddMeal('{{ day }}')">
+                        <i class="bi bi-plus"></i> Add
+                    </button>
                 </td>
             </tr>
             {% endfor %}
@@ -43,17 +47,17 @@
     </table>
 </div>
 
-<!-- Add Meal Modal -->
-<div class="modal fade" id="addMealModal" tabindex="-1">
+<!-- Quick Add Meal Modal -->
+<div class="modal fade" id="quickAddMealModal" tabindex="-1" aria-labelledby="quickAddMealModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add Meal to Plan</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="quickAddMealModalLabel">Add Meal to <span id="quickAddDay"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="addMealForm">
-                    <input type="hidden" id="planDate" name="plan_date">
+                <form id="quickAddMealForm">
+                    <input type="hidden" id="quickAddPlanDay" name="plan_day">
                     <input type="hidden" name="person" value="{{ person }}">
                     <div class="mb-3">
                         <label class="form-label">Select Meal</label>
@@ -68,20 +72,73 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitMealToPlan()">Add Meal</button>
+                <button type="button" class="btn btn-primary" onclick="submitQuickAddMeal()">Add Meal</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Day Modal -->
+<div class="modal fade" id="editDayModal" tabindex="-1" aria-labelledby="editDayModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editDayModalLabel">Edit Meals for <span id="editDayName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-list"></i> Current Meals</h6>
+                        <div id="currentDayMeals" class="mb-3">
+                            <!-- This will be populated dynamically -->
+                        </div>
+                        
+                        <h6><i class="bi bi-plus-circle"></i> Add Meal</h6>
+                        <form id="addMealToDayForm">
+                            <input type="hidden" id="editDayPerson" name="person">
+                            <input type="hidden" id="editDayValue" name="plan_day">
+                            <div class="mb-3">
+                                <select class="form-control" id="mealSelectForDay" name="meal_id" required>
+                                    <option value="">Choose meal...</option>
+                                    {% for meal in meals %}
+                                    <option value="{{ meal.id }}">{{ meal.name }} ({{ meal.meal_type }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-success btn-sm" onclick="addMealToCurrentDay()">
+                                <i class="bi bi-plus"></i> Add Selected Meal
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-calculator"></i> Day Preview</h6>
+                        <div id="dayNutritionPreview" class="p-3 bg-light rounded">
+                            <!-- This will show live nutrition totals -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-function addMealToDay(date) {
-    document.getElementById('planDate').value = date;
-    new bootstrap.Modal(document.getElementById('addMealModal')).show();
+let currentEditingDay = null;
+let currentEditingPerson = null;
+
+// Quick add meal function
+function quickAddMeal(day) {
+    document.getElementById('quickAddDay').textContent = day;
+    document.getElementById('quickAddPlanDay').value = day;
+    new bootstrap.Modal(document.getElementById('quickAddMealModal')).show();
 }
 
-function submitMealToPlan() {
-    const form = document.getElementById('addMealForm');
+function submitQuickAddMeal() {
+    const form = document.getElementById('quickAddMealForm');
     const formData = new FormData(form);
     
     fetch('/plan/add', {
@@ -91,9 +148,126 @@ function submitMealToPlan() {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('quickAddMealModal')).hide();
             location.reload();
+        } else {
+            alert('Error: ' + data.message);
         }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
     });
 }
+
+// Edit day function
+async function editDay(day, person) {
+    currentEditingDay = day;
+    currentEditingPerson = person;
+    
+    document.getElementById('editDayName').textContent = day;
+    document.getElementById('editDayPerson').value = person;
+    document.getElementById('editDayValue').value = day;
+    
+    // Load current meals for this day
+    await loadCurrentDayMeals(person, day);
+    
+    new bootstrap.Modal(document.getElementById('editDayModal')).show();
+}
+
+// Load current meals for the day
+async function loadCurrentDayMeals(person, day) {
+    try {
+        const response = await fetch(`/plan/${person}/${day}`);
+        const meals = await response.json();
+        
+        const container = document.getElementById('currentDayMeals');
+        if (meals.length === 0) {
+            container.innerHTML = '<em class="text-muted">No meals planned</em>';
+        } else {
+            container.innerHTML = meals.map(meal => `
+                <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                    <span><strong>${meal.meal_name}</strong> <small class="text-muted">(${meal.meal_type})</small></span>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeMealFromDay(${meal.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+        
+        // Update nutrition preview
+        updateDayNutritionPreview(meals);
+    } catch (error) {
+        console.error('Error loading day meals:', error);
+    }
+}
+
+// Add meal to current day
+async function addMealToCurrentDay() {
+    const form = document.getElementById('addMealToDayForm');
+    const formData = new FormData(form);
+    
+    try {
+        const response = await fetch('/plan/add', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            // Reset meal selector
+            document.getElementById('mealSelectForDay').value = '';
+            
+            // Reload current meals
+            await loadCurrentDayMeals(currentEditingPerson, currentEditingDay);
+        } else {
+            alert('Error adding meal: ' + result.message);
+        }
+    } catch (error) {
+        alert('Error adding meal: ' + error.message);
+    }
+}
+
+// Remove meal from day
+async function removeMealFromDay(planId) {
+    if (confirm('Remove this meal from the day?')) {
+        try {
+            const response = await fetch(`/plan/${planId}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                await loadCurrentDayMeals(currentEditingPerson, currentEditingDay);
+            } else {
+                alert('Error removing meal: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error removing meal: ' + error.message);
+        }
+    }
+}
+
+// Update nutrition preview (simplified - you could enhance this with actual calculations)
+function updateDayNutritionPreview(meals) {
+    const preview = document.getElementById('dayNutritionPreview');
+    preview.innerHTML = `
+        <div class="text-center">
+            <div class="mb-2">
+                <strong>${meals.length}</strong> meals planned
+            </div>
+            <small class="text-muted">
+                Nutrition totals will be calculated when page reloads
+            </small>
+        </div>
+    `;
+}
+
+// Handle modal cleanup
+document.getElementById('editDayModal').addEventListener('hidden.bs.modal', function () {
+    // Reload the page to refresh all totals
+    location.reload();
+});
 </script>
 {% endblock %}

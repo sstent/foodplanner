@@ -1,4 +1,3 @@
-<!-- templates/meals.html -->
 {% extends "base.html" %}
 {% block content %}
 <div class="row">
@@ -12,52 +11,9 @@
             <button type="submit" class="btn btn-secondary mb-4">Upload CSV</button>
         </form>
 
-        <h3>Create New Meal</h3>
-        <form action="/meals/add" method="post">
-            <div class="mb-3">
-                <label class="form-label">Meal Name</label>
-                <input type="text" class="form-control" name="name" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Meal Type</label>
-                <select class="form-control" name="meal_type" required>
-                    <option value="breakfast">Breakfast</option>
-                    <option value="lunch">Lunch</option>
-                    <option value="dinner">Dinner</option>
-                    <option value="snack">Snack</option>
-                </select>
-            </div>
-            <button type="submit" class="btn btn-primary">Create Meal</button>
-        </form>
-
-        <div class="mt-4">
-            <h4>Add Food to Meal</h4>
-            <form id="addFoodForm">
-                <div class="mb-3">
-                    <label class="form-label">Select Meal</label>
-                    <select class="form-control" id="mealSelect">
-                        <option value="">Choose meal...</option>
-                        {% for meal in meals %}
-                        <option value="{{ meal.id }}">{{ meal.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Select Food</label>
-                    <select class="form-control" id="foodSelect">
-                        <option value="">Choose food...</option>
-                        {% for food in foods %}
-                        <option value="{{ food.id }}">{{ food.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Quantity</label>
-                    <input type="number" step="0.1" class="form-control" id="quantity" value="1">
-                </div>
-                <button type="button" onclick="addFoodToMeal()" class="btn btn-success">Add Food</button>
-            </form>
-        </div>
+        <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#addMealModal">
+            <i class="bi bi-plus-circle"></i> Create New Meal
+        </button>
     </div>
     
     <div class="col-md-8">
@@ -70,6 +26,7 @@
                         <th>Name</th>
                         <th>Type</th>
                         <th>Food Items</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -89,26 +46,267 @@
                                 <em>No foods added</em>
                             {% endif %}
                         </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary" 
+                                    onclick="editMeal({{ meal.id }}, '{{ meal.name }}', '{{ meal.meal_type }}')">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success" 
+                                    onclick="manageMealFoods({{ meal.id }}, '{{ meal.name }}')">
+                                <i class="bi bi-list"></i> Foods
+                            </button>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        <button class="btn btn-danger mt-3" onclick="deleteSelectedMeals()" style="margin-top: 20px !important;">
+        <button class="btn btn-danger mt-3" onclick="deleteSelectedMeals()">
             <i class="bi bi-trash"></i> Delete Selected Meals
         </button>
-100|     </div>
+    </div>
+</div>
+
+<!-- Add Meal Modal -->
+<div class="modal fade" id="addMealModal" tabindex="-1" aria-labelledby="addMealModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addMealModalLabel">Create New Meal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addMealForm" action="/meals/add" method="post">
+                    <div class="mb-3">
+                        <label class="form-label">Meal Name</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Meal Type</label>
+                        <select class="form-control" name="meal_type" required>
+                            <option value="breakfast">Breakfast</option>
+                            <option value="lunch">Lunch</option>
+                            <option value="dinner">Dinner</option>
+                            <option value="snack">Snack</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitMealForm('add')">Create Meal</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Meal Modal -->
+<div class="modal fade" id="editMealModal" tabindex="-1" aria-labelledby="editMealModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editMealModalLabel">Edit Meal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editMealForm" action="/meals/edit" method="post">
+                    <input type="hidden" name="meal_id" id="edit_meal_id">
+                    <div class="mb-3">
+                        <label class="form-label">Meal Name</label>
+                        <input type="text" class="form-control" name="name" id="edit_meal_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Meal Type</label>
+                        <select class="form-control" name="meal_type" id="edit_meal_type" required>
+                            <option value="breakfast">Breakfast</option>
+                            <option value="lunch">Lunch</option>
+                            <option value="dinner">Dinner</option>
+                            <option value="snack">Snack</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitMealForm('edit')">Update Meal</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Meal Foods Modal -->
+<div class="modal fade" id="manageMealFoodsModal" tabindex="-1" aria-labelledby="manageMealFoodsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="manageMealFoodsModalLabel">Manage Foods for Meal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Add Food to Meal</h6>
+                        <form id="addFoodToMealForm">
+                            <input type="hidden" id="meal_id_for_food" name="meal_id">
+                            <div class="mb-3">
+                                <label class="form-label">Select Food</label>
+                                <select class="form-control" id="foodSelect" name="food_id" required>
+                                    <option value="">Choose food...</option>
+                                    {% for food in foods %}
+                                    <option value="{{ food.id }}">{{ food.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Quantity</label>
+                                <input type="number" step="0.01" class="form-control" name="quantity" value="1" required>
+                            </div>
+                            <button type="button" class="btn btn-success" onclick="addFoodToMeal()">Add Food</button>
+                        </form>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Current Foods</h6>
+                        <div id="currentMealFoods">
+                            <!-- This will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
 function toggleAllMeals(source) {
-    console.log('Toggling all meals');
     const checkboxes = document.querySelectorAll('input[name="selected_meals"]');
     checkboxes.forEach(checkbox => checkbox.checked = source.checked);
 }
 
+// Edit meal function
+function editMeal(id, name, meal_type) {
+    document.getElementById('edit_meal_id').value = id;
+    document.getElementById('edit_meal_name').value = name;
+    document.getElementById('edit_meal_type').value = meal_type;
+    
+    new bootstrap.Modal(document.getElementById('editMealModal')).show();
+}
+
+// Manage meal foods function
+async function manageMealFoods(mealId, mealName) {
+    document.getElementById('meal_id_for_food').value = mealId;
+    document.getElementById('manageMealFoodsModalLabel').textContent = `Manage Foods for: ${mealName}`;
+    
+    // Load current meal foods
+    await loadCurrentMealFoods(mealId);
+    
+    new bootstrap.Modal(document.getElementById('manageMealFoodsModal')).show();
+}
+
+// Load current meal foods
+async function loadCurrentMealFoods(mealId) {
+    try {
+        const response = await fetch(`/meals/${mealId}/foods`);
+        const foods = await response.json();
+        
+        const container = document.getElementById('currentMealFoods');
+        if (foods.length === 0) {
+            container.innerHTML = '<em>No foods added yet</em>';
+        } else {
+            container.innerHTML = foods.map(mf => `
+                <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                    <span>${mf.quantity} × ${mf.food_name}</span>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeFoodFromMeal(${mf.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error loading meal foods:', error);
+    }
+}
+
+// Add food to meal
+async function addFoodToMeal() {
+    const form = document.getElementById('addFoodToMealForm');
+    const formData = new FormData(form);
+    const mealId = formData.get('meal_id');
+    
+    try {
+        const response = await fetch(`/meals/${mealId}/add_food`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            // Reset form and reload current foods
+            form.reset();
+            document.getElementById('meal_id_for_food').value = mealId;
+            await loadCurrentMealFoods(mealId);
+        } else {
+            alert('Error adding food: ' + result.message);
+        }
+    } catch (error) {
+        alert('Error adding food: ' + error.message);
+    }
+}
+
+// Remove food from meal
+async function removeFoodFromMeal(mealFoodId) {
+    if (confirm('Remove this food from the meal?')) {
+        try {
+            const response = await fetch(`/meals/remove_food/${mealFoodId}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                const mealId = document.getElementById('meal_id_for_food').value;
+                await loadCurrentMealFoods(mealId);
+            } else {
+                alert('Error removing food: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error removing food: ' + error.message);
+        }
+    }
+}
+
+// Submit meal form (add or edit)
+async function submitMealForm(action) {
+    const form = document.getElementById(action + 'MealForm');
+    const formData = new FormData(form);
+    
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            // Close modal and reload page
+            bootstrap.Modal.getInstance(document.getElementById(action + 'MealModal')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        alert('Error submitting form: ' + error.message);
+    }
+}
+
+// Delete selected meals
 async function deleteSelectedMeals() {
-    console.log('Delete selected meals called');
     const selected = Array.from(document.querySelectorAll('input[name="selected_meals"]:checked'))
         .map(checkbox => checkbox.value);
 
@@ -119,7 +317,6 @@ async function deleteSelectedMeals() {
 
     if (confirm(`Delete ${selected.length} selected meals?`)) {
         try {
-            console.log('Deleting meals:', selected);
             const response = await fetch('/meals/delete', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -127,7 +324,6 @@ async function deleteSelectedMeals() {
             });
 
             const result = await response.json();
-            console.log('Delete response:', result);
 
             if (response.ok) {
                 window.location.reload();
@@ -135,7 +331,6 @@ async function deleteSelectedMeals() {
                 alert(`Delete failed: ${result.message || response.status}`);
             }
         } catch (error) {
-            console.error('Delete failed:', error);
             alert('Delete failed: ' + error.message);
         }
     }
