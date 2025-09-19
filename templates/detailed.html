@@ -1,0 +1,113 @@
+<!-- templates/detailed.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <h3>Detailed View for {{ person }}</h3>
+        <form method="get">
+            <input type="hidden" name="person" value="{{ person }}">
+            <div class="input-group mb-3">
+                <input type="date" class="form-control" name="plan_date" value="{{ selected_date }}">
+                <button class="btn btn-primary" type="submit">View Date</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<h4>{{ selected_date.strftime('%A, %B %d, %Y') }}</h4>
+
+{% for meal_detail in meal_details %}
+<div class="card mb-3">
+    <div class="card-header">
+        <strong>{{ meal_detail.plan.meal.name }}</strong> - {{ meal_detail.plan.meal.meal_type.title() }}
+    </div>
+    <div class="card-body">
+        <h6>Foods:</h6>
+        <ul>
+            {% for meal_food in meal_detail.foods %}
+            <li>{{ meal_food.quantity }} × {{ meal_food.food.name }} 
+                ({{ meal_food.food.serving_size }} {{ meal_food.food.serving_unit }})
+            </li>
+            {% endfor %}
+        </ul>
+        
+        <div class="nutrition-grid">
+            <div class="nutrition-item">
+                <strong>{{ "%.0f"|format(meal_detail.nutrition.calories) }}</strong><br>
+                <small>Calories</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.1f"|format(meal_detail.nutrition.protein) }}g</strong><br>
+                <small>Protein ({{ meal_detail.nutrition.protein_pct or 0 }}%)</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.1f"|format(meal_detail.nutrition.carbs) }}g</strong><br>
+                <small>Carbs ({{ meal_detail.nutrition.carbs_pct or 0 }}%)</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.1f"|format(meal_detail.nutrition.fat) }}g</strong><br>
+                <small>Fat ({{ meal_detail.nutrition.fat_pct or 0 }}%)</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.1f"|format(meal_detail.nutrition.net_carbs or 0) }}g</strong><br>
+                <small>Net Carbs</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.0f"|format(meal_detail.nutrition.calcium) }}mg</strong><br>
+                <small>Calcium</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.0f"|format(meal_detail.nutrition.sodium) }}mg</strong><br>
+                <small>Sodium</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Day Totals -->
+<div class="card bg-light">
+    <div class="card-header">
+        <strong>Daily Totals</strong>
+    </div>
+    <div class="card-body">
+        <div class="nutrition-grid">
+            <div class="nutrition-item">
+                <strong>{{ "%.0f"|format(day_totals.calories) }}</strong><br>
+                <small>Total Calories</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.1f"|format(day_totals.protein) }}g</strong><br>
+                <small>Protein ({{ day_totals.protein_pct or 0 }}%)</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.1f"|format(day_totals.carbs) }}g</strong><br>
+                <small>Carbs ({{ day_totals.carbs_pct or 0 }}%)</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.1f"|format(day_totals.fat) }}g</strong><br>
+                <small>Fat ({{ day_totals.fat_pct or 0 }}%)</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.1f"|format(day_totals.net_carbs or 0) }}g</strong><br>
+                <small>Net Carbs</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.0f"|format(day_totals.calcium) }}mg</strong><br>
+                <small>Total Calcium</small>
+            </div>
+            <div class="nutrition-item">
+                <strong>{{ "%.0f"|format(day_totals.sodium) }}mg</strong><br>
+                <small>Total Sodium</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if not meal_details %}
+<div class="alert alert-info">
+    No meals planned for this date. Go to the Plan A tab to add meals.
+</div>
+{% endif %}
+
+{% endblock %}

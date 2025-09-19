@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>2-Week Plan for {{ person }}</h3>
+
+<div class="table-responsive">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Meals</th>
+                <th>Calories</th>
+                <th>Protein</th>
+                <th>Carbs</th>
+                <th>Fat</th>
+                <th>Net Carbs</th>
+                <th>Calcium</th>
+                <th>Sodium</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for date in dates %}
+            <tr>
+                <td>{{ date.strftime('%m/%d') }}</td>
+                <td>
+                    {% for plan in plans[date] %}
+                        <span class="badge bg-secondary me-1">{{ plan.meal.name }}</span>
+                    {% endfor %}
+                </td>
+                <td>{{ "%.0f"|format(daily_totals[date].calories or 0) }}</td>
+                <td>{{ "%.1f"|format(daily_totals[date].protein or 0) }}g ({{ daily_totals[date].protein_pct or 0 }}%)</td>
+                <td>{{ "%.1f"|format(daily_totals[date].carbs or 0) }}g ({{ daily_totals[date].carbs_pct or 0 }}%)</td>
+                <td>{{ "%.1f"|format(daily_totals[date].fat or 0) }}g ({{ daily_totals[date].fat_pct or 0 }}%)</td>
+                <td>{{ "%.1f"|format(daily_totals[date].net_carbs or 0) }}g</td>
+                <td>{{ "%.0f"|format(daily_totals[date].calcium or 0) }}mg</td>
+                <td>{{ "%.0f"|format(daily_totals[date].sodium or 0) }}mg</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="addMealToDay('{{ date }}')">Add Meal</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add Meal Modal -->
+<div class="modal fade" id="addMealModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Meal to Plan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addMealForm">
+                    <input type="hidden" id="planDate" name="plan_date">
+                    <input type="hidden" name="person" value="{{ person }}">
+                    <div class="mb-3">
+                        <label class="form-label">Select Meal</label>
+                        <select class="form-control" name="meal_id" required>
+                            <option value="">Choose meal...</option>
+                            {% for meal in meals %}
+                            <option value="{{ meal.id }}">{{ meal.name }} ({{ meal.meal_type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitMealToPlan()">Add Meal</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function addMealToDay(date) {
+    document.getElementById('planDate').value = date;
+    new bootstrap.Modal(document.getElementById('addMealModal')).show();
+}
+
+function submitMealToPlan() {
+    const form = document.getElementById('addMealForm');
+    const formData = new FormData(form);
+    
+    fetch('/plan/add', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        }
+    });
+}
+</script>
+{% endblock %}
