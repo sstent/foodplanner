@@ -145,6 +145,9 @@
     <div class="meal-header">
         <span>
             <i class="bi bi-egg-fried"></i> {{ meal_detail.plan.meal.name }} - {{ meal_detail.plan.meal.meal_type.title() }}
+            {% if meal_detail.plan.meal_time %}
+                <small class="text-muted">({{ meal_detail.plan.meal_time }})</small>
+            {% endif %}
         </span>
         <span class="badge bg-light text-dark">{{ "%.0f"|format(meal_detail.nutrition.calories) }} cal</span>
     </div>

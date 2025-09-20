@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="row">
-    <div class="col-md-6">
+    <div class="col-md-4">
         <h3>Food Import</h3>
         <form action="/foods/upload" method="post" enctype="multipart/form-data">
             <div class="mb-3">
@@ -11,8 +11,22 @@
             <button type="submit" class="btn btn-secondary mb-4">Upload Foods CSV</button>
         </form>
     </div>
-    
-    <div class="col-md-6">
+
+    <div class="col-md-4">
+        <h3>OpenFoodFacts Search</h3>
+        <div class="mb-3">
+            <label class="form-label">Search for Food</label>
+            <input type="text" class="form-control" id="offSearch" placeholder="e.g., apple, banana, pizza">
+        </div>
+        <button type="button" class="btn btn-primary mb-4" onclick="searchOpenFoodFacts()">Search</button>
+
+        <div id="offResults" class="mt-3" style="display: none;">
+            <h6>Search Results:</h6>
+            <div id="offResultsList" class="list-group"></div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
         <h3>Meal Import</h3>
         <form action="/meals/upload" method="post" enctype="multipart/form-data">
             <div class="mb-3">
@@ -40,10 +54,10 @@ document.querySelectorAll('form').forEach(form => {
         e.preventDefault();
         const submitBtn = form.querySelector('button[type="submit"]');
         const resultsDiv = document.getElementById('upload-results');
-        
+
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Uploading...';
-        
+
         try {
             const formData = new FormData(form);
             const response = await fetch(form.action, {
@@ -52,7 +66,7 @@ document.querySelectorAll('form').forEach(form => {
             });
 
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            
+
             const results = await response.json();
             resultsDiv.style.display = 'block';
             document.getElementById('created-count').textContent = results.created || 0;
@@ -78,6 +92,108 @@ document.querySelectorAll('form').forEach(form => {
             submitBtn.textContent = submitBtn.textContent.replace('Uploading...', 'Upload CSV');
         }
     });
+});
+
+// OpenFoodFacts search functionality
+async function searchOpenFoodFacts() {
+    const query = document.getElementById('offSearch').value.trim();
+    if (!query) {
+        alert('Please enter a search term');
+        return;
+    }
+
+    const resultsDiv = document.getElementById('offResults');
+    const resultsList = document.getElementById('offResultsList');
+
+    // Show loading
+    resultsDiv.style.display = 'block';
+    resultsList.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div> Searching...</div>';
+
+    try {
+        const response = await fetch(`/foods/search_openfoodfacts?query=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            displayOpenFoodFactsResults(data.results);
+        } else {
+            resultsList.innerHTML = `<div class="alert alert-danger">Error: ${data.message}</div>`;
+        }
+    } catch (error) {
+        resultsList.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+    }
+}
+
+function displayOpenFoodFactsResults(results) {
+    const resultsList = document.getElementById('offResultsList');
+
+    if (results.length === 0) {
+        resultsList.innerHTML = '<div class="alert alert-info">No results found</div>';
+        return;
+    }
+
+    let html = '';
+    results.forEach((food, index) => {
+        html += `
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1">${food.name}</h6>
+                        <p class="mb-1 text-muted small">
+                            ${food.serving_size}${food.serving_unit} |
+                            ${food.calories} cal |
+                            P: ${food.protein}g, C: ${food.carbs}g, F: ${food.fat}g
+                        </p>
+                        ${food.brand ? `<small class="text-muted">Brand: ${food.brand}</small>` : ''}
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="addOpenFoodFactsFood(${index})">
+                        <i class="bi bi-plus-circle"></i> Add
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    resultsList.innerHTML = html;
+
+    // Store results for later use
+    window.offSearchResults = results;
+}
+
+async function addOpenFoodFactsFood(index) {
+    const food = window.offSearchResults[index];
+    if (!food) return;
+
+    try {
+        const formData = new FormData();
+        Object.keys(food).forEach(key => {
+            if (key !== 'image_url' && key !== 'openfoodfacts_id' && key !== 'brand') {
+                formData.append(key, food[key]);
+            }
+        });
+
+        const response = await fetch('/foods/add_openfoodfacts', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            alert('Food added successfully!');
+            // Optionally reload the page or update UI
+        } else {
+            alert('Error adding food: ' + result.message);
+        }
+    } catch (error) {
+        alert('Error adding food: ' + error.message);
+    }
+}
+
+// Allow Enter key to trigger search
+document.getElementById('offSearch').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        searchOpenFoodFacts();
+    }
 });
 </script>
 {% endblock %}

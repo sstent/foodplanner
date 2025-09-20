@@ -14,7 +14,9 @@ from typing import List, Optional
 from datetime import date, datetime
 import os
 import csv
+import requests
 from fastapi import File, UploadFile
+import openfoodfacts
 
 # Database setup - Use SQLite for easier setup
 DATABASE_URL = "sqlite:///./meal_planner.db"
@@ -31,7 +33,7 @@ templates = Jinja2Templates(directory="templates")
 # Database Models
 class Food(Base):
     __tablename__ = "foods"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
     serving_size = Column(String)
@@ -44,6 +46,7 @@ class Food(Base):
     sugar = Column(Float, default=0)
     sodium = Column(Float, default=0)
     calcium = Column(Float, default=0)
+    source = Column(String, default="manual")  # manual, csv, openfoodfacts
 
 class Meal(Base):
     __tablename__ = "meals"
@@ -73,6 +76,7 @@ class Plan(Base):
     person = Column(String, index=True)  # Person A or Person B
     date = Column(Date, index=True)  # Store actual calendar dates
     meal_id = Column(Integer, ForeignKey("meals.id"))
+    meal_time = Column(String, default="Breakfast")  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
 
     meal = relationship("Meal")
 
@@ -109,6 +113,7 @@ class FoodCreate(BaseModel):
     sugar: float = 0
     sodium: float = 0
     calcium: float = 0
+    source: str = "manual"
 
 class FoodResponse(BaseModel):
     id: int
@@ -123,6 +128,7 @@ class FoodResponse(BaseModel):
     sugar: float
     sodium: float
     calcium: float
+    source: str
 
     class Config:
         from_attributes = True
@@ -257,9 +263,13 @@ async def bulk_upload_foods(file: UploadFile = File(...), db: Session = Depends(
                     # Update existing food
                     for key, value in food_data.items():
                         setattr(existing, key, value)
+                    # Ensure source is set for existing foods
+                    if not existing.source:
+                        existing.source = "csv"
                     stats['updated'] += 1
                 else:
                     # Create new food
+                    food_data['source'] = "csv"
                     food = Food(**food_data)
                     db.add(food)
                     stats['created'] += 1
@@ -281,13 +291,14 @@ async def add_food(request: Request, db: Session = Depends(get_db),
                   protein: float = Form(...), carbs: float = Form(...),
                   fat: float = Form(...), fiber: float = Form(0),
                   sugar: float = Form(0), sodium: float = Form(0),
-                  calcium: float = Form(0)):
-    
+                  calcium: float = Form(0), source: str = Form("manual")):
+
     try:
         food = Food(
             name=name, serving_size=serving_size, serving_unit=serving_unit,
             calories=calories, protein=protein, carbs=carbs, fat=fat,
-            fiber=fiber, sugar=sugar, sodium=sodium, calcium=calcium
+            fiber=fiber, sugar=sugar, sodium=sodium, calcium=calcium,
+            source=source
         )
         db.add(food)
         db.commit()
@@ -298,18 +309,19 @@ async def add_food(request: Request, db: Session = Depends(get_db),
 
 @app.post("/foods/edit")
 async def edit_food(request: Request, db: Session = Depends(get_db),
-                   food_id: int = Form(...), name: str = Form(...), 
-                   serving_size: str = Form(...), serving_unit: str = Form(...), 
-                   calories: float = Form(...), protein: float = Form(...), 
-                   carbs: float = Form(...), fat: float = Form(...), 
-                   fiber: float = Form(0), sugar: float = Form(0), 
-                   sodium: float = Form(0), calcium: float = Form(0)):
-    
+                   food_id: int = Form(...), name: str = Form(...),
+                   serving_size: str = Form(...), serving_unit: str = Form(...),
+                   calories: float = Form(...), protein: float = Form(...),
+                   carbs: float = Form(...), fat: float = Form(...),
+                   fiber: float = Form(0), sugar: float = Form(0),
+                   sodium: float = Form(0), calcium: float = Form(0),
+                   source: str = Form("manual")):
+
     try:
         food = db.query(Food).filter(Food.id == food_id).first()
         if not food:
             return {"status": "error", "message": "Food not found"}
-        
+
         food.name = name
         food.serving_size = serving_size
         food.serving_unit = serving_unit
@@ -321,7 +333,8 @@ async def edit_food(request: Request, db: Session = Depends(get_db),
         food.sugar = sugar
         food.sodium = sodium
         food.calcium = calcium
-        
+        food.source = source
+
         db.commit()
         return {"status": "success", "message": "Food updated successfully"}
     except Exception as e:
@@ -335,6 +348,110 @@ async def delete_foods(food_ids: dict = Body(...), db: Session = Depends(get_db)
         db.query(Food).filter(Food.id.in_(food_ids["food_ids"])).delete(synchronize_session=False)
         db.commit()
         return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.get("/foods/search_openfoodfacts")
+async def search_openfoodfacts(query: str, limit: int = 10):
+    """Search OpenFoodFacts database for foods using the official SDK"""
+    try:
+        # Initialize OpenFoodFacts API with User-Agent
+        api = openfoodfacts.API(user_agent="FoodPlanner/1.0")
+
+        # Perform text search
+        search_result = api.product.text_search(query, page_size=limit)
+
+        results = []
+
+        if search_result and 'products' in search_result:
+            for product in search_result['products']:
+                # Extract nutritional information
+                nutriments = product.get('nutriments', {})
+
+                # Get serving size
+                serving_size = product.get('serving_size', '100g')
+                if not serving_size or serving_size == '':
+                    serving_size = '100g'
+
+                # Extract serving quantity and unit
+                serving_quantity = 100  # default to 100g
+                serving_unit = 'g'
+
+                try:
+                    # Try to parse serving size (e.g., "30g", "1 cup")
+                    import re
+                    match = re.match(r'(\d+(?:\.\d+)?)\s*([a-zA-Z]+)', serving_size)
+                    if match:
+                        serving_quantity = float(match.group(1))
+                        serving_unit = match.group(2)
+                    else:
+                        # If no match, assume 100g
+                        serving_quantity = 100
+                        serving_unit = 'g'
+                except:
+                    serving_quantity = 100
+                    serving_unit = 'g'
+
+                # Calculate per serving values (SDK returns per 100g values)
+                def get_nutrient_value(key, default=0):
+                    value = nutriments.get(key, default)
+                    if value:
+                        try:
+                            # Convert to float if it's a string or other type
+                            numeric_value = float(value)
+                            if serving_quantity != 100:
+                                # Convert to per serving
+                                numeric_value = (numeric_value * serving_quantity) / 100
+                            return round(numeric_value, 2)
+                        except (ValueError, TypeError):
+                            return default
+                    return default
+
+                food_data = {
+                    'name': product.get('product_name', product.get('product_name_en', 'Unknown Product')),
+                    'serving_size': str(serving_quantity),
+                    'serving_unit': serving_unit,
+                    'calories': get_nutrient_value('energy-kcal_100g', 0),
+                    'protein': get_nutrient_value('proteins_100g', 0),
+                    'carbs': get_nutrient_value('carbohydrates_100g', 0),
+                    'fat': get_nutrient_value('fat_100g', 0),
+                    'fiber': get_nutrient_value('fiber_100g', 0),
+                    'sugar': get_nutrient_value('sugars_100g', 0),
+                    'sodium': get_nutrient_value('sodium_100g', 0),
+                    'calcium': get_nutrient_value('calcium_100g', 0),
+                    'source': 'openfoodfacts',
+                    'openfoodfacts_id': product.get('code', ''),
+                    'brand': product.get('brands', ''),
+                    'image_url': product.get('image_url', '')
+                }
+
+                results.append(food_data)
+
+        return {"status": "success", "results": results}
+
+    except Exception as e:
+        return {"status": "error", "message": f"OpenFoodFacts search failed: {str(e)}"}
+
+@app.post("/foods/add_openfoodfacts")
+async def add_openfoodfacts_food(request: Request, db: Session = Depends(get_db),
+                                name: str = Form(...), serving_size: str = Form(...),
+                                serving_unit: str = Form(...), calories: float = Form(...),
+                                protein: float = Form(...), carbs: float = Form(...),
+                                fat: float = Form(...), fiber: float = Form(0),
+                                sugar: float = Form(0), sodium: float = Form(0),
+                                calcium: float = Form(0), openfoodfacts_id: str = Form("")):
+
+    try:
+        food = Food(
+            name=name, serving_size=serving_size, serving_unit=serving_unit,
+            calories=calories, protein=protein, carbs=carbs, fat=fat,
+            fiber=fiber, sugar=sugar, sodium=sodium, calcium=calcium,
+            source="openfoodfacts"
+        )
+        db.add(food)
+        db.commit()
+        return {"status": "success", "message": "Food added from OpenFoodFacts successfully"}
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
@@ -590,12 +707,12 @@ async def plan_page(request: Request, person: str = "Person A", week_start_date:
 @app.post("/plan/add")
 async def add_to_plan(request: Request, person: str = Form(...),
                       plan_date: str = Form(...), meal_id: int = Form(...),
-                      db: Session = Depends(get_db)):
+                      meal_time: str = Form("Breakfast"), db: Session = Depends(get_db)):
 
     try:
         from datetime import datetime
         plan_date_obj = datetime.fromisoformat(plan_date).date()
-        plan = Plan(person=person, date=plan_date_obj, meal_id=meal_id)
+        plan = Plan(person=person, date=plan_date_obj, meal_id=meal_id, meal_time=meal_time)
         db.add(plan)
         db.commit()
         return {"status": "success"}
@@ -616,7 +733,8 @@ async def get_day_plan(person: str, date: str, db: Session = Depends(get_db)):
                 "id": plan.id,
                 "meal_id": plan.meal_id,
                 "meal_name": plan.meal.name,
-                "meal_type": plan.meal.meal_type
+                "meal_type": plan.meal.meal_type,
+                "meal_time": plan.meal_time
             })
         return result
     except Exception as e:
@@ -639,7 +757,7 @@ async def update_day_plan(request: Request, person: str = Form(...),
 
         # Add new plans
         for meal_id in meal_id_list:
-            plan = Plan(person=person, date=plan_date, meal_id=meal_id)
+            plan = Plan(person=person, date=plan_date, meal_id=meal_id, meal_time="Breakfast")
             db.add(plan)
 
         db.commit()

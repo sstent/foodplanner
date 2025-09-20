@@ -43,7 +43,9 @@
                 </td>
                 <td>
                     {% for plan in plans[day.date.isoformat()] %}
-                        <span class="badge bg-secondary me-1">{{ plan.meal.name }}</span>
+                        <span class="badge bg-secondary me-1" title="{{ plan.meal_time }}">
+                            <small>{{ plan.meal_time }}:</small> {{ plan.meal.name }}
+                        </span>
                     {% endfor %}
                     {% if not plans[day.date.isoformat()] %}
                         <em class="text-muted">No meals</em>
@@ -89,6 +91,18 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Meal Time</label>
+                        <select class="form-control" name="meal_time" required>
+                            <option value="Breakfast">Breakfast</option>
+                            <option value="Lunch">Lunch</option>
+                            <option value="Dinner">Dinner</option>
+                            <option value="Snack 1">Snack 1</option>
+                            <option value="Snack 2">Snack 2</option>
+                            <option value="Beverage 1">Beverage 1</option>
+                            <option value="Beverage 2">Beverage 2</option>
+                        </select>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -125,6 +139,18 @@
                                     {% for meal in meals %}
                                     <option value="{{ meal.id }}">{{ meal.name }} ({{ meal.meal_type }})</option>
                                     {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Meal Time</label>
+                                <select class="form-control" id="mealTimeSelectForDay" name="meal_time" required>
+                                    <option value="Breakfast">Breakfast</option>
+                                    <option value="Lunch">Lunch</option>
+                                    <option value="Dinner">Dinner</option>
+                                    <option value="Snack 1">Snack 1</option>
+                                    <option value="Snack 2">Snack 2</option>
+                                    <option value="Beverage 1">Beverage 1</option>
+                                    <option value="Beverage 2">Beverage 2</option>
                                 </select>
                             </div>
                             <button type="button" class="btn btn-success btn-sm" onclick="addMealToCurrentDay()">
