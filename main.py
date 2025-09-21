@@ -16,7 +16,6 @@ import os
 import csv
 import requests
 from fastapi import File, UploadFile
-import openfoodfacts
 
 # Database setup - Use SQLite for easier setup
 DATABASE_URL = "sqlite:///./meal_planner.db"
@@ -356,82 +355,265 @@ async def delete_foods(food_ids: dict = Body(...), db: Session = Depends(get_db)
 async def search_openfoodfacts(query: str, limit: int = 10):
     """Search OpenFoodFacts database for foods using the official SDK"""
     try:
-        # Initialize OpenFoodFacts API with User-Agent
-        api = openfoodfacts.API(user_agent="FoodPlanner/1.0")
+        from openfoodfacts import API, APIVersion, Country, Environment, Flavor
+
+        # Initialize the API client
+        api = API(
+            user_agent="MealPlanner/1.0",
+            country=Country.world,
+            flavor=Flavor.off,
+            version=APIVersion.v2,
+            environment=Environment.org
+        )
 
         # Perform text search
-        search_result = api.product.text_search(query, page_size=limit)
+        search_result = api.product.text_search(query)
 
         results = []
 
         if search_result and 'products' in search_result:
-            for product in search_result['products']:
-                # Extract nutritional information
+            for product in search_result['products'][:limit]:  # Limit results
+                # Skip products without basic information
+                if not product.get('product_name') and not product.get('product_name_en'):
+                    continue
+
+                # Extract nutritional information (OpenFoodFacts provides per 100g values)
                 nutriments = product.get('nutriments', {})
 
-                # Get serving size
+                # Get serving size information
                 serving_size = product.get('serving_size', '100g')
                 if not serving_size or serving_size == '':
                     serving_size = '100g'
 
-                # Extract serving quantity and unit
+                # Parse serving size to extract quantity and unit
                 serving_quantity = 100  # default to 100g
                 serving_unit = 'g'
 
                 try:
-                    # Try to parse serving size (e.g., "30g", "1 cup")
                     import re
-                    match = re.match(r'(\d+(?:\.\d+)?)\s*([a-zA-Z]+)', serving_size)
+                    # Try to parse serving size (e.g., "30g", "1 cup", "250ml")
+                    match = re.match(r'(\d+(?:\.\d+)?)\s*([a-zA-Z]+)', str(serving_size))
                     if match:
                         serving_quantity = float(match.group(1))
                         serving_unit = match.group(2)
                     else:
-                        # If no match, assume 100g
+                        # If no clear match, use 100g as default
                         serving_quantity = 100
                         serving_unit = 'g'
                 except:
                     serving_quantity = 100
                     serving_unit = 'g'
 
-                # Calculate per serving values (SDK returns per 100g values)
-                def get_nutrient_value(key, default=0):
-                    value = nutriments.get(key, default)
-                    if value:
-                        try:
-                            # Convert to float if it's a string or other type
-                            numeric_value = float(value)
-                            if serving_quantity != 100:
-                                # Convert to per serving
-                                numeric_value = (numeric_value * serving_quantity) / 100
-                            return round(numeric_value, 2)
-                        except (ValueError, TypeError):
-                            return default
-                    return default
+                # Helper function to safely extract and convert nutrient values
+                def get_nutrient_per_serving(nutrient_key, default=0):
+                    """Extract nutrient value and convert from per 100g to per serving"""
+                    value = nutriments.get(nutrient_key, nutriments.get(nutrient_key.replace('_100g', ''), default))
+                    if value is None or value == '':
+                        return default
+                    
+                    try:
+                        # Convert to float
+                        numeric_value = float(str(value).replace(',', '.'))  # Handle European decimal format
+                        
+                        # If the nutrient key contains '_100g', it's already per 100g
+                        # Convert to per serving size
+                        if '_100g' in nutrient_key and serving_quantity != 100:
+                            numeric_value = (numeric_value * serving_quantity) / 100
+                        
+                        return round(numeric_value, 2)
+                    except (ValueError, TypeError):
+                        return default
 
+                # Extract product name (try multiple fields)
+                product_name = (product.get('product_name') or 
+                              product.get('product_name_en') or 
+                              product.get('abbreviated_product_name') or 
+                              'Unknown Product')
+
+                # Add brand information if available
+                brands = product.get('brands', '')
+                if brands and brands not in product_name:
+                    product_name = f"{product_name} ({brands})"
+
+                # Build the food data structure
                 food_data = {
-                    'name': product.get('product_name', product.get('product_name_en', 'Unknown Product')),
+                    'name': product_name[:100],  # Limit name length
                     'serving_size': str(serving_quantity),
                     'serving_unit': serving_unit,
-                    'calories': get_nutrient_value('energy-kcal_100g', 0),
-                    'protein': get_nutrient_value('proteins_100g', 0),
-                    'carbs': get_nutrient_value('carbohydrates_100g', 0),
-                    'fat': get_nutrient_value('fat_100g', 0),
-                    'fiber': get_nutrient_value('fiber_100g', 0),
-                    'sugar': get_nutrient_value('sugars_100g', 0),
-                    'sodium': get_nutrient_value('sodium_100g', 0),
-                    'calcium': get_nutrient_value('calcium_100g', 0),
+                    'calories': get_nutrient_per_serving('energy-kcal_100g', 0),
+                    'protein': get_nutrient_per_serving('proteins_100g', 0),
+                    'carbs': get_nutrient_per_serving('carbohydrates_100g', 0),
+                    'fat': get_nutrient_per_serving('fat_100g', 0),
+                    'fiber': get_nutrient_per_serving('fiber_100g', 0),
+                    'sugar': get_nutrient_per_serving('sugars_100g', 0),
+                    'sodium': get_nutrient_per_serving('sodium_100g', 0),  # in mg
+                    'calcium': get_nutrient_per_serving('calcium_100g', 0),  # in mg
                     'source': 'openfoodfacts',
                     'openfoodfacts_id': product.get('code', ''),
-                    'brand': product.get('brands', ''),
-                    'image_url': product.get('image_url', '')
+                    'brand': brands,
+                    'image_url': product.get('image_url', ''),
+                    'categories': product.get('categories', ''),
+                    'ingredients_text': product.get('ingredients_text_en', product.get('ingredients_text', ''))
                 }
 
-                results.append(food_data)
+                # Only add products that have at least calorie information
+                if food_data['calories'] > 0:
+                    results.append(food_data)
 
         return {"status": "success", "results": results}
 
+    except ImportError:
+        return {"status": "error", "message": "OpenFoodFacts module not installed. Please install with: pip install openfoodfacts"}
     except Exception as e:
         return {"status": "error", "message": f"OpenFoodFacts search failed: {str(e)}"}
+
+@app.get("/foods/get_openfoodfacts_product/{barcode}")
+async def get_openfoodfacts_product(barcode: str):
+    """Get a specific product by barcode from OpenFoodFacts"""
+    try:
+        from openfoodfacts import API, APIVersion, Country, Environment, Flavor
+
+        # Initialize the API client
+        api = API(
+            user_agent="MealPlanner/1.0",
+            country=Country.world,
+            flavor=Flavor.off,
+            version=APIVersion.v2,
+            environment=Environment.org
+        )
+
+        # Get product by barcode
+        product_data = api.product.get(barcode)
+
+        if not product_data or not product_data.get('product'):
+            return {"status": "error", "message": "Product not found"}
+
+        product = product_data['product']
+        nutriments = product.get('nutriments', {})
+
+        # Extract serving information
+        serving_size = product.get('serving_size', '100g')
+        serving_quantity = 100
+        serving_unit = 'g'
+
+        try:
+            import re
+            match = re.match(r'(\d+(?:\.\d+)?)\s*([a-zA-Z]+)', str(serving_size))
+            if match:
+                serving_quantity = float(match.group(1))
+                serving_unit = match.group(2)
+        except:
+            pass
+
+        # Helper function for nutrient extraction
+        def get_nutrient_per_serving(nutrient_key, default=0):
+            value = nutriments.get(nutrient_key, nutriments.get(nutrient_key.replace('_100g', ''), default))
+            if value is None or value == '':
+                return default
+            
+            try:
+                numeric_value = float(str(value).replace(',', '.'))
+                if '_100g' in nutrient_key and serving_quantity != 100:
+                    numeric_value = (numeric_value * serving_quantity) / 100
+                return round(numeric_value, 2)
+            except (ValueError, TypeError):
+                return default
+
+        # Build product name
+        product_name = (product.get('product_name') or 
+                       product.get('product_name_en') or 
+                       'Unknown Product')
+        
+        brands = product.get('brands', '')
+        if brands and brands not in product_name:
+            product_name = f"{product_name} ({brands})"
+
+        food_data = {
+            'name': product_name[:100],
+            'serving_size': str(serving_quantity),
+            'serving_unit': serving_unit,
+            'calories': get_nutrient_per_serving('energy-kcal_100g', 0),
+            'protein': get_nutrient_per_serving('proteins_100g', 0),
+            'carbs': get_nutrient_per_serving('carbohydrates_100g', 0),
+            'fat': get_nutrient_per_serving('fat_100g', 0),
+            'fiber': get_nutrient_per_serving('fiber_100g', 0),
+            'sugar': get_nutrient_per_serving('sugars_100g', 0),
+            'sodium': get_nutrient_per_serving('sodium_100g', 0),
+            'calcium': get_nutrient_per_serving('calcium_100g', 0),
+            'source': 'openfoodfacts',
+            'openfoodfacts_id': barcode,
+            'brand': brands,
+            'image_url': product.get('image_url', ''),
+            'categories': product.get('categories', ''),
+            'ingredients_text': product.get('ingredients_text_en', product.get('ingredients_text', ''))
+        }
+
+        return {"status": "success", "product": food_data}
+
+    except ImportError:
+        return {"status": "error", "message": "OpenFoodFacts module not installed"}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to get product: {str(e)}"}
+
+@app.get("/foods/openfoodfacts_by_category")
+async def get_openfoodfacts_by_category(category: str, limit: int = 20):
+    """Get products from OpenFoodFacts filtered by category"""
+    try:
+        from openfoodfacts import API, APIVersion, Country, Environment, Flavor
+
+        # Initialize the API client
+        api = API(
+            user_agent="MealPlanner/1.0",
+            country=Country.world,
+            flavor=Flavor.off,
+            version=APIVersion.v2,
+            environment=Environment.org
+        )
+
+        # Search by category (you can also combine with text search)
+        search_result = api.product.text_search("", 
+                                               categories_tags=category,
+                                               page_size=limit,
+                                               sort_by="popularity")
+
+        results = []
+        if search_result and 'products' in search_result:
+            for product in search_result['products'][:limit]:
+                if not product.get('product_name') and not product.get('product_name_en'):
+                    continue
+
+                nutriments = product.get('nutriments', {})
+                
+                # Only include products with nutritional data
+                if not nutriments.get('energy-kcal_100g'):
+                    continue
+
+                product_name = (product.get('product_name') or 
+                               product.get('product_name_en') or 
+                               'Unknown Product')
+                
+                brands = product.get('brands', '')
+                if brands and brands not in product_name:
+                    product_name = f"{product_name} ({brands})"
+
+                # Simplified data for category browsing
+                suggestion = {
+                    'name': product_name[:100],
+                    'barcode': product.get('code', ''),
+                    'brands': brands,
+                    'categories': product.get('categories', ''),
+                    'image_url': product.get('image_url', ''),
+                    'calories_per_100g': nutriments.get('energy-kcal_100g', 0)
+                }
+
+                results.append(suggestion)
+
+        return {"status": "success", "products": results}
+
+    except ImportError:
+        return {"status": "error", "message": "OpenFoodFacts module not installed"}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to get category products: {str(e)}"}
 
 @app.post("/foods/add_openfoodfacts")
 async def add_openfoodfacts_food(request: Request, db: Session = Depends(get_db),
@@ -440,13 +622,27 @@ async def add_openfoodfacts_food(request: Request, db: Session = Depends(get_db)
                                 protein: float = Form(...), carbs: float = Form(...),
                                 fat: float = Form(...), fiber: float = Form(0),
                                 sugar: float = Form(0), sodium: float = Form(0),
-                                calcium: float = Form(0), openfoodfacts_id: str = Form("")):
+                                calcium: float = Form(0), openfoodfacts_id: str = Form(""),
+                                brand: str = Form(""), categories: str = Form("")):
 
     try:
+        # Create a more descriptive name if brand is provided
+        display_name = name
+        if brand and brand not in name:
+            display_name = f"{name} ({brand})"
+            
         food = Food(
-            name=name, serving_size=serving_size, serving_unit=serving_unit,
-            calories=calories, protein=protein, carbs=carbs, fat=fat,
-            fiber=fiber, sugar=sugar, sodium=sodium, calcium=calcium,
+            name=display_name, 
+            serving_size=serving_size, 
+            serving_unit=serving_unit,
+            calories=calories, 
+            protein=protein, 
+            carbs=carbs, 
+            fat=fat,
+            fiber=fiber, 
+            sugar=sugar, 
+            sodium=sodium, 
+            calcium=calcium,
             source="openfoodfacts"
         )
         db.add(food)
