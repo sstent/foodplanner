@@ -13,7 +13,6 @@
                     <tr>
                         <th><input type="checkbox" id="select-all-meals" onclick="toggleAllMeals(this)"></th>
                         <th>Name</th>
-                        <th>Type</th>
                         <th>Food Items</th>
                         <th>Actions</th>
                     </tr>
@@ -23,7 +22,6 @@
                     <tr>
                         <td><input type="checkbox" name="selected_meals" value="{{ meal.id }}"></td>
                         <td>{{ meal.name }}</td>
-                        <td>{{ meal.meal_type.title() }}</td>
                         <td>
                             {% if meal.meal_foods %}
                                 <ul class="list-unstyled">
@@ -37,11 +35,11 @@
                         </td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary" 
-                                    onclick="editMeal({{ meal.id }}, '{{ meal.name }}', '{{ meal.meal_type }}')">
+                                    onclick="editMeal({{ meal.id }})">
                                 <i class="bi bi-pencil"></i> Edit
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-success" 
-                                    onclick="manageMealFoods({{ meal.id }}, '{{ meal.name }}')">
+                                    onclick="manageMealFoods({{ meal.id }})">
                                 <i class="bi bi-list"></i> Foods
                             </button>
                         </td>
@@ -71,13 +69,16 @@
                         <input type="text" class="form-control" name="name" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Meal Type</label>
-                        <select class="form-control" name="meal_type" required>
-                            <option value="breakfast">Breakfast</option>
-                            <option value="lunch">Lunch</option>
-                            <option value="dinner">Dinner</option>
-                            <option value="snack">Snack</option>
-                            <option value="custom">Custom</option>
+                        <label class="form-label">Meal Time</label>
+                        <select class="form-control" name="meal_time" required>
+                            <option value="Breakfast">Breakfast</option>
+                            <option value="Lunch">Lunch</option>
+                            <option value="Dinner">Dinner</option>
+                            <option value="Snack 1">Snack 1</option>
+                            <option value="Snack 2">Snack 2</option>
+                            <option value="Beverage 1">Beverage 1</option>
+                            <option value="Beverage 2">Beverage 2</option>
+                            <option value="Custom">Custom</option>
                         </select>
                     </div>
                 </form>
@@ -106,13 +107,16 @@
                         <input type="text" class="form-control" name="name" id="edit_meal_name" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Meal Type</label>
-                        <select class="form-control" name="meal_type" id="edit_meal_type" required>
-                            <option value="breakfast">Breakfast</option>
-                            <option value="lunch">Lunch</option>
-                            <option value="dinner">Dinner</option>
-                            <option value="snack">Snack</option>
-                            <option value="custom">Custom</option>
+                        <label class="form-label">Meal Time</label>
+                        <select class="form-control" name="meal_time" id="edit_meal_time" required>
+                            <option value="Breakfast">Breakfast</option>
+                            <option value="Lunch">Lunch</option>
+                            <option value="Dinner">Dinner</option>
+                            <option value="Snack 1">Snack 1</option>
+                            <option value="Snack 2">Snack 2</option>
+                            <option value="Beverage 1">Beverage 1</option>
+                            <option value="Beverage 2">Beverage 2</option>
+                            <option value="Custom">Custom</option>
                         </select>
                     </div>
                 </form>
@@ -177,23 +181,44 @@ function toggleAllMeals(source) {
 }
 
 // Edit meal function
-function editMeal(id, name, meal_type) {
+async function editMeal(id) {
     document.getElementById('edit_meal_id').value = id;
-    document.getElementById('edit_meal_name').value = name;
-    document.getElementById('edit_meal_type').value = meal_type;
-    
-    new bootstrap.Modal(document.getElementById('editMealModal')).show();
+
+    try {
+        const response = await fetch(`/meals/${id}`); // Assuming an endpoint /meals/{id} exists to get meal details
+        const meal = await response.json();
+
+        if (meal.status === 'success') {
+            document.getElementById('edit_meal_name').value = meal.name;
+            document.getElementById('edit_meal_time').value = meal.meal_time;
+            new bootstrap.Modal(document.getElementById('editMealModal')).show();
+        } else {
+            alert('Error fetching meal details: ' + meal.message);
+        }
+    } catch (error) {
+        alert('Error fetching meal details: ' + error.message);
+    }
 }
 
 // Manage meal foods function
-async function manageMealFoods(mealId, mealName) {
+async function manageMealFoods(mealId) {
     document.getElementById('meal_id_for_food').value = mealId;
-    document.getElementById('manageMealFoodsModalLabel').textContent = `Manage Foods for: ${mealName}`;
-    
-    // Load current meal foods
-    await loadCurrentMealFoods(mealId);
-    
-    new bootstrap.Modal(document.getElementById('manageMealFoodsModal')).show();
+
+    try {
+        const response = await fetch(`/meals/${mealId}`); // Assuming an endpoint /meals/{id} exists to get meal details
+        const meal = await response.json();
+
+        if (meal.status === 'success') {
+            document.getElementById('manageMealFoodsModalLabel').textContent = `Manage Foods for: ${meal.name}`;
+            // Load current meal foods
+            await loadCurrentMealFoods(mealId);
+            new bootstrap.Modal(document.getElementById('manageMealFoodsModal')).show();
+        } else {
+            alert('Error fetching meal details: ' + meal.message);
+        }
+    } catch (error) {
+        alert('Error fetching meal details: ' + error.message);
+    }
 }
 
 // Load current meal foods

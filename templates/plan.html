@@ -42,10 +42,25 @@
                     <small class="text-muted">{{ day.display }}</small>
                 </td>
                 <td>
+                    {% set meals_by_time = {} %}
                     {% for plan in plans[day.date.isoformat()] %}
-                        <span class="badge bg-secondary me-1" title="{{ plan.meal_time }}">
-                            <small>{{ plan.meal_time }}:</small> {{ plan.meal.name }}
-                        </span>
+                        {% if plan.meal_time not in meals_by_time %}
+                            {% set _ = meals_by_time.update({plan.meal_time: []}) %}
+                        {% endif %}
+                        {% set _ = meals_by_time[plan.meal_time].append(plan) %}
+                    {% endfor %}
+
+                    {% for meal_time in ["Breakfast", "Lunch", "Dinner", "Snack 1", "Snack 2", "Beverage 1", "Beverage 2"] %}
+                        <div class="mb-1">
+                            <strong>{{ meal_time }}:</strong>
+                            {% if meals_by_time[meal_time] %}
+                                {% for plan in meals_by_time[meal_time] %}
+                                    <span class="badge bg-info me-1">{{ plan.meal.name }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <em class="text-muted">No meals</em>
+                            {% endif %}
+                        </div>
                     {% endfor %}
                     {% if not plans[day.date.isoformat()] %}
                         <em class="text-muted">No meals</em>
@@ -80,14 +95,14 @@
             </div>
             <div class="modal-body">
                 <form id="quickAddMealForm">
-                    <input type="hidden" id="quickAddPlanDay" name="plan_day">
+                    <input type="hidden" id="quickAddPlanDay" name="plan_date">
                     <input type="hidden" name="person" value="{{ person }}">
                     <div class="mb-3">
                         <label class="form-label">Select Meal</label>
                         <select class="form-control" name="meal_id" required>
                             <option value="">Choose meal...</option>
                             {% for meal in meals %}
-                            <option value="{{ meal.id }}">{{ meal.name }} ({{ meal.meal_type }})</option>
+                            <option value="{{ meal.id }}">{{ meal.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -132,12 +147,12 @@
                         <h6><i class="bi bi-plus-circle"></i> Add Meal</h6>
                         <form id="addMealToDayForm">
                             <input type="hidden" id="editDayPerson" name="person">
-                            <input type="hidden" id="editDayValue" name="plan_day">
+                            <input type="hidden" id="editDayValue" name="plan_date">
                             <div class="mb-3">
                                 <select class="form-control" id="mealSelectForDay" name="meal_id" required>
                                     <option value="">Choose meal...</option>
                                     {% for meal in meals %}
-                                    <option value="{{ meal.id }}">{{ meal.name }} ({{ meal.meal_type }})</option>
+                                    <option value="{{ meal.id }}">{{ meal.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -247,7 +262,9 @@ async function editDay(date, person) {
 async function loadCurrentDayMeals(person, date) {
     try {
         const response = await fetch(`/plan/${person}/${date}`);
-        const meals = await response.json();
+        const data = await response.json(); // Now data contains both meals and day_totals
+        const meals = data.meals;
+        const dayTotals = data.day_totals;
 
         const container = document.getElementById('currentDayMeals');
         if (meals.length === 0) {
@@ -255,7 +272,7 @@ async function loadCurrentDayMeals(person, date) {
         } else {
             container.innerHTML = meals.map(meal => `
                 <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
-                    <span><strong>${meal.meal_name}</strong> <small class="text-muted">(${meal.meal_type})</small></span>
+                    <span><strong>${meal.meal_time}:</strong> ${meal.meal_name}</span>
                     <button class="btn btn-sm btn-outline-danger" onclick="removeMealFromDay(${meal.id})">
                         <i class="bi bi-trash"></i>
                     </button>
@@ -263,8 +280,8 @@ async function loadCurrentDayMeals(person, date) {
             `).join('');
         }
 
-        // Update nutrition preview
-        updateDayNutritionPreview(meals);
+        // Update nutrition preview with actual totals
+        updateDayNutritionPreview(dayTotals);
     } catch (error) {
         console.error('Error loading day meals:', error);
     }
@@ -319,16 +336,29 @@ async function removeMealFromDay(planId) {
 }
 
 // Update nutrition preview (simplified - you could enhance this with actual calculations)
-function updateDayNutritionPreview(meals) {
+function updateDayNutritionPreview(dayTotals) {
     const preview = document.getElementById('dayNutritionPreview');
     preview.innerHTML = `
-        <div class="text-center">
-            <div class="mb-2">
-                <strong>${meals.length}</strong> meals planned
+        <div class="row text-center">
+            <div class="col-6 mb-2">
+                <strong>${dayTotals.calories ? dayTotals.calories.toFixed(0) : 0}</strong><br>
+                <small>Calories</small>
             </div>
-            <small class="text-muted">
-                Nutrition totals will be calculated when page reloads
-            </small>
+            <div class="col-6 mb-2">
+                <strong>${dayTotals.protein ? dayTotals.protein.toFixed(1) : 0}g</strong><br>
+                <small>Protein (${dayTotals.protein_pct ? dayTotals.protein_pct.toFixed(1) : 0}%)</small>
+            </div>
+            <div class="col-6 mb-2">
+                <strong>${dayTotals.carbs ? dayTotals.carbs.toFixed(1) : 0}g</strong><br>
+                <small>Carbs (${dayTotals.carbs_pct ? dayTotals.carbs_pct.toFixed(1) : 0}%)</small>
+            </div>
+            <div class="col-6 mb-2">
+                <strong>${dayTotals.fat ? dayTotals.fat.toFixed(1) : 0}g</strong><br>
+                <small>Fat (${dayTotals.fat_pct ? dayTotals.fat_pct.toFixed(1) : 0}%)</small>
+            </div>
+            <div class="col-12">
+                <strong>Net Carbs:</strong> ${dayTotals.net_carbs ? dayTotals.net_carbs.toFixed(1) : 0}g
+            </div>
         </div>
     `;
 }

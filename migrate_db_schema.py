@@ -26,6 +26,16 @@ def migrate_database():
             cursor.execute("ALTER TABLE foods ADD COLUMN source TEXT DEFAULT 'manual'")
             print("✓ Added source column to foods table")
 
+        # Check if meal_time column exists in meals table
+        cursor.execute("PRAGMA table_info(meals)")
+        columns = cursor.fetchall()
+        column_names = [col[1] for col in columns]
+
+        if 'meal_time' not in column_names:
+            print("Adding 'meal_time' column to meals table...")
+            cursor.execute("ALTER TABLE meals ADD COLUMN meal_time TEXT DEFAULT 'Breakfast'")
+            print("✓ Added meal_time column to meals table")
+
         # Check if meal_time column exists in plans table
         cursor.execute("PRAGMA table_info(plans)")
         columns = cursor.fetchall()

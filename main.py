@@ -46,6 +46,7 @@ class Food(Base):
     sodium = Column(Float, default=0)
     calcium = Column(Float, default=0)
     source = Column(String, default="manual")  # manual, csv, openfoodfacts
+    brand = Column(String, default="") # Brand name for the food
 
 class Meal(Base):
     __tablename__ = "meals"
@@ -53,6 +54,7 @@ class Meal(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     meal_type = Column(String)  # breakfast, lunch, dinner, snack, custom
+    meal_time = Column(String, default="Breakfast") # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
     
     # Relationship to meal foods
     meal_foods = relationship("MealFood", back_populates="meal")
@@ -75,7 +77,7 @@ class Plan(Base):
     person = Column(String, index=True)  # Person A or Person B
     date = Column(Date, index=True)  # Store actual calendar dates
     meal_id = Column(Integer, ForeignKey("meals.id"))
-    meal_time = Column(String, default="Breakfast")  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
+    meal_time = Column(String)  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
 
     meal = relationship("Meal")
 
@@ -113,6 +115,7 @@ class FoodCreate(BaseModel):
     sodium: float = 0
     calcium: float = 0
     source: str = "manual"
+    brand: Optional[str] = ""
 
 class FoodResponse(BaseModel):
     id: int
@@ -128,6 +131,7 @@ class FoodResponse(BaseModel):
     sodium: float
     calcium: float
     source: str
+    brand: str
 
     class Config:
         from_attributes = True
@@ -135,6 +139,7 @@ class FoodResponse(BaseModel):
 class MealCreate(BaseModel):
     name: str
     meal_type: str
+    meal_time: str
     foods: List[dict]  # [{"food_id": 1, "quantity": 1.5}]
 
 # Database dependency
@@ -252,7 +257,8 @@ async def bulk_upload_foods(file: UploadFile = File(...), db: Session = Depends(
                     'fiber': round(float(row.get('Fiber (g)', 0)), 2),
                     'sugar': round(float(row.get('Sugar (g)', 0)), 2),
                     'sodium': round(float(row.get('Sodium (mg)', 0)), 2),
-                    'calcium': round(float(row.get('Calcium (mg)', 0)), 2)
+                    'calcium': round(float(row.get('Calcium (mg)', 0)), 2),
+                    'brand': row.get('Brand', '') # Add brand from CSV
                 }
 
                 # Check for existing food
@@ -290,14 +296,15 @@ async def add_food(request: Request, db: Session = Depends(get_db),
                   protein: float = Form(...), carbs: float = Form(...),
                   fat: float = Form(...), fiber: float = Form(0),
                   sugar: float = Form(0), sodium: float = Form(0),
-                  calcium: float = Form(0), source: str = Form("manual")):
+                  calcium: float = Form(0), source: str = Form("manual"),
+                  brand: str = Form("")):
 
     try:
         food = Food(
             name=name, serving_size=serving_size, serving_unit=serving_unit,
             calories=calories, protein=protein, carbs=carbs, fat=fat,
             fiber=fiber, sugar=sugar, sodium=sodium, calcium=calcium,
-            source=source
+            source=source, brand=brand
         )
         db.add(food)
         db.commit()
@@ -314,7 +321,7 @@ async def edit_food(request: Request, db: Session = Depends(get_db),
                    carbs: float = Form(...), fat: float = Form(...),
                    fiber: float = Form(0), sugar: float = Form(0),
                    sodium: float = Form(0), calcium: float = Form(0),
-                   source: str = Form("manual")):
+                   source: str = Form("manual"), brand: str = Form("")):
 
     try:
         food = db.query(Food).filter(Food.id == food_id).first()
@@ -333,6 +340,7 @@ async def edit_food(request: Request, db: Session = Depends(get_db),
         food.sodium = sodium
         food.calcium = calcium
         food.source = source
+        food.brand = brand
 
         db.commit()
         return {"status": "success", "message": "Food updated successfully"}
@@ -450,7 +458,7 @@ async def search_openfoodfacts(query: str, limit: int = 10):
                     'calcium': get_nutrient_per_serving('calcium_100g', 0),  # in mg
                     'source': 'openfoodfacts',
                     'openfoodfacts_id': product.get('code', ''),
-                    'brand': brands,
+                    'brand': brands, # Brand is already extracted
                     'image_url': product.get('image_url', ''),
                     'categories': product.get('categories', ''),
                     'ingredients_text': product.get('ingredients_text_en', product.get('ingredients_text', ''))
@@ -542,7 +550,7 @@ async def get_openfoodfacts_product(barcode: str):
             'calcium': get_nutrient_per_serving('calcium_100g', 0),
             'source': 'openfoodfacts',
             'openfoodfacts_id': barcode,
-            'brand': brands,
+            'brand': brands, # Brand is already extracted
             'image_url': product.get('image_url', ''),
             'categories': product.get('categories', ''),
             'ingredients_text': product.get('ingredients_text_en', product.get('ingredients_text', ''))
@@ -635,15 +643,16 @@ async def add_openfoodfacts_food(request: Request, db: Session = Depends(get_db)
             name=display_name, 
             serving_size=serving_size, 
             serving_unit=serving_unit,
-            calories=calories, 
-            protein=protein, 
-            carbs=carbs, 
+            calories=calories,
+            protein=protein,
+            carbs=carbs,
             fat=fat,
-            fiber=fiber, 
-            sugar=sugar, 
-            sodium=sodium, 
+            fiber=fiber,
+            sugar=sugar,
+            sodium=sodium,
             calcium=calcium,
-            source="openfoodfacts"
+            source="openfoodfacts",
+            brand=brand # Add brand here
         )
         db.add(food)
         db.commit()
@@ -753,10 +762,11 @@ async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(
 
 @app.post("/meals/add")
 async def add_meal(request: Request, db: Session = Depends(get_db),
-                  name: str = Form(...), meal_type: str = Form(...)):
+                  name: str = Form(...), meal_type: str = Form(...),
+                  meal_time: str = Form(...)):
     
     try:
-        meal = Meal(name=name, meal_type=meal_type)
+        meal = Meal(name=name, meal_type=meal_type, meal_time=meal_time)
         db.add(meal)
         db.commit()
         db.refresh(meal)
@@ -767,8 +777,8 @@ async def add_meal(request: Request, db: Session = Depends(get_db),
 
 @app.post("/meals/edit")
 async def edit_meal(request: Request, db: Session = Depends(get_db),
-                   meal_id: int = Form(...), name: str = Form(...), 
-                   meal_type: str = Form(...)):
+                   meal_id: int = Form(...), name: str = Form(...),
+                   meal_type: str = Form(...), meal_time: str = Form(...)):
     
     try:
         meal = db.query(Meal).filter(Meal.id == meal_id).first()
@@ -777,11 +787,30 @@ async def edit_meal(request: Request, db: Session = Depends(get_db),
         
         meal.name = name
         meal.meal_type = meal_type
+        meal.meal_time = meal_time # Update meal_time
         
         db.commit()
         return {"status": "success", "message": "Meal updated successfully"}
     except Exception as e:
         db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.get("/meals/{meal_id}")
+async def get_meal_details(meal_id: int, db: Session = Depends(get_db)):
+    """Get details for a single meal"""
+    try:
+        meal = db.query(Meal).filter(Meal.id == meal_id).first()
+        if not meal:
+            return {"status": "error", "message": "Meal not found"}
+        
+        return {
+            "status": "success",
+            "id": meal.id,
+            "name": meal.name,
+            "meal_type": meal.meal_type,
+            "meal_time": meal.meal_time
+        }
+    except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @app.get("/meals/{meal_id}/foods")
@@ -901,18 +930,45 @@ async def plan_page(request: Request, person: str = "Person A", week_start_date:
     })
 
 @app.post("/plan/add")
-async def add_to_plan(request: Request, person: str = Form(...),
-                      plan_date: str = Form(...), meal_id: int = Form(...),
-                      meal_time: str = Form("Breakfast"), db: Session = Depends(get_db)):
+async def add_to_plan(request: Request, person: str = Form(None),
+                      plan_date: str = Form(None), meal_id: str = Form(None),
+                      meal_time: str = Form(None), db: Session = Depends(get_db)):
+
+    print(f"DEBUG: add_to_plan called with person={person}, plan_date={plan_date}, meal_id={meal_id}, meal_time={meal_time}")
+
+    # Validate required fields
+    if not person or not plan_date or not meal_id or not meal_time:
+        missing = []
+        if not person: missing.append("person")
+        if not plan_date: missing.append("plan_date")
+        if not meal_id: missing.append("meal_id")
+        if not meal_time: missing.append("meal_time")
+        print(f"DEBUG: Missing required fields: {missing}")
+        return {"status": "error", "message": f"Missing required fields: {', '.join(missing)}"}
 
     try:
         from datetime import datetime
         plan_date_obj = datetime.fromisoformat(plan_date).date()
-        plan = Plan(person=person, date=plan_date_obj, meal_id=meal_id, meal_time=meal_time)
+        print(f"DEBUG: parsed plan_date_obj={plan_date_obj}")
+
+        meal_id_int = int(meal_id)
+
+        # Check if meal exists
+        meal = db.query(Meal).filter(Meal.id == meal_id_int).first()
+        if not meal:
+            print(f"DEBUG: Meal with id {meal_id_int} not found")
+            return {"status": "error", "message": f"Meal with id {meal_id_int} not found"}
+
+        plan = Plan(person=person, date=plan_date_obj, meal_id=meal_id_int, meal_time=meal_time)
         db.add(plan)
         db.commit()
+        print(f"DEBUG: Successfully added plan")
         return {"status": "success"}
+    except ValueError as e:
+        print(f"DEBUG: ValueError: {str(e)}")
+        return {"status": "error", "message": f"Invalid data: {str(e)}"}
     except Exception as e:
+        print(f"DEBUG: Exception in add_to_plan: {str(e)}")
         db.rollback()
         return {"status": "error", "message": str(e)}
 
@@ -923,16 +979,21 @@ async def get_day_plan(person: str, date: str, db: Session = Depends(get_db)):
         from datetime import datetime
         plan_date = datetime.fromisoformat(date).date()
         plans = db.query(Plan).filter(Plan.person == person, Plan.date == plan_date).all()
-        result = []
+        
+        meal_details = []
         for plan in plans:
-            result.append({
+            meal_details.append({
                 "id": plan.id,
                 "meal_id": plan.meal_id,
                 "meal_name": plan.meal.name,
                 "meal_type": plan.meal.meal_type,
                 "meal_time": plan.meal_time
             })
-        return result
+        
+        # Calculate daily totals using the same logic as plan_page
+        day_totals = calculate_day_nutrition(plans, db)
+
+        return {"meals": meal_details, "day_totals": day_totals}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -953,6 +1014,7 @@ async def update_day_plan(request: Request, person: str = Form(...),
 
         # Add new plans
         for meal_id in meal_id_list:
+            # For now, assign a default meal_time. This will be refined later.
             plan = Plan(person=person, date=plan_date, meal_id=meal_id, meal_time="Breakfast")
             db.add(plan)
 
@@ -1193,7 +1255,7 @@ async def use_template(template_id: int, person: str = Form(...),
         # Copy all template meals to the specified date
         for tm in template_meals:
             print(f"DEBUG: Adding meal {tm.meal_id} ({tm.meal.name}) for {tm.meal_time}")
-            plan = Plan(person=person, date=start_date_obj, meal_id=tm.meal_id)
+            plan = Plan(person=person, date=start_date_obj, meal_id=tm.meal_id, meal_time=tm.meal_time) # Use meal_time from template
             db.add(plan)
 
         db.commit()
