@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <!-- Date Navigation -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <button class="btn btn-outline-secondary" onclick="navigateDate('{{ prev_date }}')">
+                <i class="bi bi-chevron-left"></i> Yesterday
+            </button>
+            <div class="text-center">
+                <h3>{{ current_date.strftime('%A, %B %d, %Y') }}</h3>
+                {% if is_modified %}
+                <span class="badge bg-warning text-dark">Custom</span>
+                {% else %}
+                <span class="badge bg-success">As Planned</span>
+                {% endif %}
+            </div>
+            <button class="btn btn-outline-secondary" onclick="navigateDate('{{ next_date }}')">
+                Tomorrow <i class="bi bi-chevron-right"></i>
+            </button>
+        </div>
+
+        <!-- Reset to Plan Button (only show if modified) -->
+        {% if is_modified %}
+        <div class="d-flex justify-content-center mb-4">
+            <button class="btn btn-outline-primary" onclick="resetToPlan()">
+                <i class="bi bi-arrow-counterclockwise"></i> Reset to Plan
+            </button>
+        </div>
+        {% endif %}
+
+        <!-- Template Actions -->
+        <div class="d-flex gap-2 mb-4">
+            <button class="btn btn-success" onclick="saveAsTemplate()">
+                <i class="bi bi-save"></i> Save as Template
+            </button>
+            <button class="btn btn-primary" onclick="applyTemplate()">
+                <i class="bi bi-upload"></i> Apply Template
+            </button>
+        </div>
+
+        <!-- Meal Times -->
+        {% set meal_times = ["Breakfast", "Lunch", "Dinner", "Snack 1", "Snack 2", "Beverage 1", "Beverage 2"] %}
+        {% for meal_time in meal_times %}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0">{{ meal_time }}</h5>
+            </div>
+            <div class="card-body">
+                <div id="meals-{{ meal_time|lower|replace(' ', '-') }}">
+                    {% set meals_for_time = [] %}
+                    {% for tracked_meal in tracked_meals %}
+                        {% if tracked_meal.meal_time == meal_time %}
+                            {% set _ = meals_for_time.append(tracked_meal) %}
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if meals_for_time %}
+                        {% for tracked_meal in meals_for_time %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                            <div>
+                                <strong>{{ tracked_meal.meal.name }}</strong>
+                                {% if tracked_meal.quantity != 1.0 %}
+                                <span class="text-muted">({{ "%.1f"|format(tracked_meal.quantity) }}x)</span>
+                                {% endif %}
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" onclick="removeMeal({{ tracked_meal.id }})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted mb-0">No meals tracked</p>
+                    {% endif %}
+                </div>
+
+                <!-- Add Meal Button -->
+                <button class="btn btn-sm btn-outline-success mt-2" onclick="addMealToTime('{{ meal_time }}')">
+                    <i class="bi bi-plus"></i> Add Meal
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Right Column - Nutrition Totals -->
+    <div class="col-md-4">
+        <div class="card sticky-top" style="top: 20px;">
+            <div class="card-header">
+                <h5 class="mb-0">Daily Totals</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <strong class="h4 text-primary">{{ "%.0f"|format(day_totals.calories) }}</strong>
+                            <div class="small text-muted">Calories</div>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <strong class="h4 text-success">{{ "%.1f"|format(day_totals.protein) }}g</strong>
+                            <div class="small text-muted">Protein ({{ day_totals.protein_pct }}%)</div>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <strong class="h4 text-warning">{{ "%.1f"|format(day_totals.carbs) }}g</strong>
+                            <div class="small text-muted">Carbs ({{ day_totals.carbs_pct }}%)</div>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <strong class="h4 text-danger">{{ "%.1f"|format(day_totals.fat) }}g</strong>
+                            <div class="small text-muted">Fat ({{ day_totals.fat_pct }}%)</div>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <strong>{{ "%.1f"|format(day_totals.fiber) }}g</strong>
+                            <div class="small text-muted">Fiber</div>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <strong>{{ "%.1f"|format(day_totals.net_carbs) }}g</strong>
+                            <div class="small text-muted">Net Carbs</div>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <strong>{{ "%.0f"|format(day_totals.sugar) }}g</strong>
+                            <div class="small text-muted">Sugar</div>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <strong>{{ "%.0f"|format(day_totals.sodium) }}mg</strong>
+                            <div class="small text-muted">Sodium</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Meal Modal -->
+<div class="modal fade" id="addMealModal" tabindex="-1" aria-labelledby="addMealModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addMealModalLabel">Add Meal to <span id="mealTimeDisplay"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addMealForm">
+                    <input type="hidden" id="addMealTime" name="meal_time">
+                    <input type="hidden" name="person" value="{{ person }}">
+                    <input type="hidden" name="date" value="{{ current_date.isoformat() }}">
+                    <div class="mb-3">
+                        <label class="form-label">Select Meal</label>
+                        <select class="form-control" name="meal_id" required>
+                            <option value="">Choose meal...</option>
+                            {% for meal in meals %}
+                            <option value="{{ meal.id }}">{{ meal.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Quantity (multiplier)</label>
+                        <input type="number" step="0.1" class="form-control" name="quantity" value="1.0" min="0.1">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddMeal()">Add Meal</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Template Modal -->
+<div class="modal fade" id="saveTemplateModal" tabindex="-1" aria-labelledby="saveTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="saveTemplateModalLabel">Save Day as Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="saveTemplateForm">
+                    <input type="hidden" name="person" value="{{ person }}">
+                    <input type="hidden" name="date" value="{{ current_date.isoformat() }}">
+                    <div class="mb-3">
+                        <label class="form-label">Template Name</label>
+                        <input type="text" class="form-control" name="template_name" required placeholder="e.g., High Protein Day">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="submitSaveTemplate()">Save Template</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Apply Template Modal -->
+<div class="modal fade" id="applyTemplateModal" tabindex="-1" aria-labelledby="applyTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="applyTemplateModalLabel">Apply Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="applyTemplateForm">
+                    <input type="hidden" name="person" value="{{ person }}">
+                    <input type="hidden" name="date" value="{{ current_date.isoformat() }}">
+                    <div class="mb-3">
+                        <label class="form-label">Select Template</label>
+                        <select class="form-control" name="template_id" required>
+                            <option value="">Choose template...</option>
+                            {% for template in templates %}
+                            <option value="{{ template.id }}">{{ template.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> This will replace all meals currently tracked for this day.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitApplyTemplate()">Apply Template</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Date navigation
+function navigateDate(date) {
+    const url = new URL(window.location);
+    url.searchParams.set('date', date);
+    window.location.href = url.toString();
+}
+
+// Add meal to specific time
+function addMealToTime(mealTime) {
+    document.getElementById('mealTimeDisplay').textContent = mealTime;
+    document.getElementById('addMealTime').value = mealTime;
+    new bootstrap.Modal(document.getElementById('addMealModal')).show();
+}
+
+// Submit add meal form
+async function submitAddMeal() {
+    const form = document.getElementById('addMealForm');
+    const formData = new FormData(form);
+
+    try {
+        const response = await fetch('/tracker/add_meal', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('addMealModal')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Remove meal
+async function removeMeal(trackedMealId) {
+    if (confirm('Remove this meal from the tracker?')) {
+        try {
+            const response = await fetch(`/tracker/remove_meal/${trackedMealId}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                location.reload();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+}
+
+// Save as template
+function saveAsTemplate() {
+    new bootstrap.Modal(document.getElementById('saveTemplateModal')).show();
+}
+
+// Submit save template
+async function submitSaveTemplate() {
+    const form = document.getElementById('saveTemplateForm');
+    const formData = new FormData(form);
+
+    try {
+        const response = await fetch('/tracker/save_template', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('saveTemplateModal')).hide();
+            alert('Template saved successfully!');
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Apply template
+function applyTemplate() {
+    new bootstrap.Modal(document.getElementById('applyTemplateModal')).show();
+}
+
+// Submit apply template
+async function submitApplyTemplate() {
+    const form = document.getElementById('applyTemplateForm');
+    const formData = new FormData(form);
+
+    try {
+        const response = await fetch('/tracker/apply_template', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('applyTemplateModal')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Reset to plan
+async function resetToPlan() {
+    if (confirm('Reset this day back to the original plan? All custom changes will be lost.')) {
+        const formData = new FormData();
+        formData.append('person', '{{ person }}');
+        formData.append('date', '{{ current_date.isoformat() }}');
+
+        try {
+            const response = await fetch('/tracker/reset_to_plan', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                location.reload();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+}
+</script>
+{% endblock %}

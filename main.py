@@ -5,7 +5,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request, Form, Body
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, Date
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, Date, Boolean
 from sqlalchemy import or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
@@ -101,6 +101,51 @@ class TemplateMeal(Base):
     template = relationship("Template", back_populates="template_meals")
     meal = relationship("Meal")
 
+class WeeklyMenu(Base):
+    __tablename__ = "weekly_menus"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+
+    # Relationship to weekly menu days
+    weekly_menu_days = relationship("WeeklyMenuDay", back_populates="weekly_menu")
+
+class WeeklyMenuDay(Base):
+    __tablename__ = "weekly_menu_days"
+
+    id = Column(Integer, primary_key=True, index=True)
+    weekly_menu_id = Column(Integer, ForeignKey("weekly_menus.id"))
+    day_of_week = Column(Integer)  # 0=Monday, 1=Tuesday, ..., 6=Sunday
+    template_id = Column(Integer, ForeignKey("templates.id"))
+
+    weekly_menu = relationship("WeeklyMenu", back_populates="weekly_menu_days")
+    template = relationship("Template")
+
+class TrackedDay(Base):
+    """Represents a day being tracked (separate from planned days)"""
+    __tablename__ = "tracked_days"
+
+    id = Column(Integer, primary_key=True, index=True)
+    person = Column(String, index=True)  # Person A or Person B
+    date = Column(Date, index=True)  # Date being tracked
+    is_modified = Column(Boolean, default=False)  # Whether this day has been modified from original plan
+
+    # Relationship to tracked meals
+    tracked_meals = relationship("TrackedMeal", back_populates="tracked_day")
+
+class TrackedMeal(Base):
+    """Represents a meal tracked for a specific day"""
+    __tablename__ = "tracked_meals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tracked_day_id = Column(Integer, ForeignKey("tracked_days.id"))
+    meal_id = Column(Integer, ForeignKey("meals.id"))
+    meal_time = Column(String)  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
+    quantity = Column(Float, default=1.0)  # Quantity multiplier (e.g., 1.5 for 1.5 servings)
+
+    tracked_day = relationship("TrackedDay", back_populates="tracked_meals")
+    meal = relationship("Meal")
+
 # Pydantic models
 class FoodCreate(BaseModel):
     name: str
@@ -141,6 +186,15 @@ class MealCreate(BaseModel):
     meal_type: str
     meal_time: str
     foods: List[dict]  # [{"food_id": 1, "quantity": 1.5}]
+
+class TrackedDayCreate(BaseModel):
+    person: str
+    date: str  # ISO date string
+
+class TrackedMealCreate(BaseModel):
+    meal_id: int
+    meal_time: str
+    quantity: float = 1.0
 
 # Database dependency
 def get_db():
@@ -220,7 +274,8 @@ def calculate_day_nutrition(plans, db: Session):
 # Routes
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/tracker", status_code=302)
 
 # Imports tab
 @app.get("/imports", response_class=HTMLResponse)
@@ -1280,6 +1335,410 @@ async def delete_template(template_id: int, db: Session = Depends(get_db)):
             return {"status": "success"}
         else:
             return {"status": "error", "message": "Template not found"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+# Weekly Menu tab
+@app.get("/weeklymenu", response_class=HTMLResponse)
+async def weeklymenu_page(request: Request, db: Session = Depends(get_db)):
+    weekly_menus = db.query(WeeklyMenu).all()
+    templates_list = db.query(Template).all()
+
+    # Convert weekly menus to dictionaries for JSON serialization
+    weekly_menus_data = []
+    for weekly_menu in weekly_menus:
+        weekly_menu_days = db.query(WeeklyMenuDay).filter(WeeklyMenuDay.weekly_menu_id == weekly_menu.id).all()
+        weekly_menu_dict = {
+            "id": weekly_menu.id,
+            "name": weekly_menu.name,
+            "weekly_menu_days": []
+        }
+        for wmd in weekly_menu_days:
+            weekly_menu_dict["weekly_menu_days"].append({
+                "day_of_week": wmd.day_of_week,
+                "template_id": wmd.template_id,
+                "template": {
+                    "id": wmd.template.id,
+                    "name": wmd.template.name
+                }
+            })
+        weekly_menus_data.append(weekly_menu_dict)
+
+    return templates.TemplateResponse("weeklymenu.html", {
+        "request": request,
+        "weekly_menus": weekly_menus_data,
+        "templates": templates_list
+    })
+
+@app.post("/weeklymenu/create")
+async def create_weekly_menu(request: Request, name: str = Form(...),
+                           template_assignments: str = Form(...), db: Session = Depends(get_db)):
+    """Create a new weekly menu with template assignments"""
+    try:
+        # Create weekly menu
+        weekly_menu = WeeklyMenu(name=name)
+        db.add(weekly_menu)
+        db.flush()  # Get weekly menu ID
+
+        # Parse template assignments (format: "day_of_week:template_id,day_of_week:template_id,...")
+        if template_assignments:
+            assignments = template_assignments.split(',')
+            for assignment in assignments:
+                if ':' in assignment:
+                    day_of_week, template_id = assignment.split(':', 1)
+                    if template_id.strip():  # Only add if template_id is not empty
+                        weekly_menu_day = WeeklyMenuDay(
+                            weekly_menu_id=weekly_menu.id,
+                            day_of_week=int(day_of_week.strip()),
+                            template_id=int(template_id.strip())
+                        )
+                        db.add(weekly_menu_day)
+
+        db.commit()
+        return {"status": "success", "weekly_menu_id": weekly_menu.id}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/weeklymenu/{weekly_menu_id}/apply")
+async def apply_weekly_menu(weekly_menu_id: int, person: str = Form(...),
+                          week_start_date: str = Form(...), db: Session = Depends(get_db)):
+    """Apply a weekly menu to a person's plan for a specific week"""
+    try:
+        from datetime import datetime, timedelta
+        week_start_date_obj = datetime.fromisoformat(week_start_date).date()
+
+        weekly_menu_days = db.query(WeeklyMenuDay).filter(WeeklyMenuDay.weekly_menu_id == weekly_menu_id).all()
+
+        # Check if any meals already exist for this week
+        existing_plans_count = 0
+        for i in range(7):
+            day_date = week_start_date_obj + timedelta(days=i)
+            existing_plans_count += db.query(Plan).filter(Plan.person == person, Plan.date == day_date).count()
+
+        if existing_plans_count > 0:
+            return {"status": "confirm_overwrite", "message": f"There are already {existing_plans_count} meals planned for this week. Do you want to overwrite them?"}
+
+        # Apply weekly menu to each day
+        for weekly_menu_day in weekly_menu_days:
+            day_date = week_start_date_obj + timedelta(days=weekly_menu_day.day_of_week)
+
+            # Get template meals for this day
+            template_meals = db.query(TemplateMeal).filter(TemplateMeal.template_id == weekly_menu_day.template_id).all()
+
+            # Add template meals to plan
+            for tm in template_meals:
+                plan = Plan(person=person, date=day_date, meal_id=tm.meal_id, meal_time=tm.meal_time)
+                db.add(plan)
+
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.delete("/weeklymenu/{weekly_menu_id}")
+async def delete_weekly_menu(weekly_menu_id: int, db: Session = Depends(get_db)):
+    """Delete a weekly menu and its day assignments"""
+    try:
+        # Delete weekly menu days first
+        db.query(WeeklyMenuDay).filter(WeeklyMenuDay.weekly_menu_id == weekly_menu_id).delete()
+        # Delete weekly menu
+        weekly_menu = db.query(WeeklyMenu).filter(WeeklyMenu.id == weekly_menu_id).first()
+        if weekly_menu:
+            db.delete(weekly_menu)
+            db.commit()
+            return {"status": "success"}
+        else:
+            return {"status": "error", "message": "Weekly menu not found"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+# Tracker tab
+@app.get("/tracker", response_class=HTMLResponse)
+async def tracker_page(request: Request, person: str = "Person A", date: str = None, db: Session = Depends(get_db)):
+    from datetime import datetime, date as date_type
+
+    # If no date provided, use today
+    if not date:
+        current_date = date_type.today()
+    else:
+        current_date = datetime.fromisoformat(date).date()
+
+    # Get or create tracked day for this date
+    tracked_day = db.query(TrackedDay).filter(
+        TrackedDay.person == person,
+        TrackedDay.date == current_date
+    ).first()
+
+    if not tracked_day:
+        tracked_day = TrackedDay(person=person, date=current_date)
+        db.add(tracked_day)
+        db.commit()
+        db.refresh(tracked_day)
+
+    # Get tracked meals for this day
+    tracked_meals = db.query(TrackedMeal).filter(TrackedMeal.tracked_day_id == tracked_day.id).all()
+
+    # If no tracked meals exist, pre-populate with planned meals
+    if not tracked_meals:
+        copy_plan_to_tracked(db, person, current_date, tracked_day.id)
+        # Re-fetch tracked meals after copying
+        tracked_meals = db.query(TrackedMeal).filter(TrackedMeal.tracked_day_id == tracked_day.id).all()
+
+    # Calculate nutrition totals
+    day_totals = calculate_tracked_day_nutrition(tracked_meals, db)
+
+    # Get all meals for selection
+    meals = db.query(Meal).all()
+
+    # Get existing templates for apply template functionality
+    templates_list = db.query(Template).all()
+
+    # Calculate previous and next dates
+    prev_date = current_date
+    next_date = current_date
+
+    return templates.TemplateResponse("tracker.html", {
+        "request": request,
+        "person": person,
+        "current_date": current_date,
+        "tracked_meals": tracked_meals,
+        "day_totals": day_totals,
+        "meals": meals,
+        "templates": templates_list,
+        "is_modified": tracked_day.is_modified if tracked_day else False,
+        "prev_date": prev_date.isoformat(),
+        "next_date": next_date.isoformat()
+    })
+
+def copy_plan_to_tracked(db: Session, person: str, date, tracked_day_id: int):
+    """Copy planned meals to tracked meals for a specific date"""
+    plans = db.query(Plan).filter(Plan.person == person, Plan.date == date).all()
+
+    for plan in plans:
+        # Check if this meal is already tracked
+        existing_tracked = db.query(TrackedMeal).filter(
+            TrackedMeal.tracked_day_id == tracked_day_id,
+            TrackedMeal.meal_id == plan.meal_id,
+            TrackedMeal.meal_time == plan.meal_time
+        ).first()
+
+        if not existing_tracked:
+            tracked_meal = TrackedMeal(
+                tracked_day_id=tracked_day_id,
+                meal_id=plan.meal_id,
+                meal_time=plan.meal_time,
+                quantity=1.0
+            )
+            db.add(tracked_meal)
+
+    # Mark the tracked day as not modified (it's now matching the plan)
+    tracked_day = db.query(TrackedDay).filter(TrackedDay.id == tracked_day_id).first()
+    if tracked_day:
+        tracked_day.is_modified = False
+
+    db.commit()
+
+def calculate_tracked_day_nutrition(tracked_meals, db: Session):
+    """Calculate total nutrition for tracked meals"""
+    day_totals = {
+        'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
+        'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
+    }
+
+    for tracked_meal in tracked_meals:
+        meal_nutrition = calculate_meal_nutrition(tracked_meal.meal, db)
+        for key in day_totals:
+            if key in meal_nutrition:
+                day_totals[key] += meal_nutrition[key] * tracked_meal.quantity
+
+    # Calculate percentages
+    total_cals = day_totals['calories']
+    if total_cals > 0:
+        day_totals['protein_pct'] = round((day_totals['protein'] * 4 / total_cals) * 100, 1)
+        day_totals['carbs_pct'] = round((day_totals['carbs'] * 4 / total_cals) * 100, 1)
+        day_totals['fat_pct'] = round((day_totals['fat'] * 9 / total_cals) * 100, 1)
+        day_totals['net_carbs'] = day_totals['carbs'] - day_totals['fiber']
+    else:
+        day_totals['protein_pct'] = 0
+        day_totals['carbs_pct'] = 0
+        day_totals['fat_pct'] = 0
+        day_totals['net_carbs'] = 0
+
+    return day_totals
+
+@app.post("/tracker/add_meal")
+async def add_tracked_meal(request: Request, person: str = Form(...),
+                          date: str = Form(...), meal_id: int = Form(...),
+                          meal_time: str = Form(...), quantity: float = Form(1.0),
+                          db: Session = Depends(get_db)):
+    """Add a meal to the tracker"""
+    try:
+        from datetime import datetime
+        track_date = datetime.fromisoformat(date).date()
+
+        # Get or create tracked day
+        tracked_day = db.query(TrackedDay).filter(
+            TrackedDay.person == person,
+            TrackedDay.date == track_date
+        ).first()
+
+        if not tracked_day:
+            tracked_day = TrackedDay(person=person, date=track_date)
+            db.add(tracked_day)
+            db.commit()
+            db.refresh(tracked_day)
+
+        # Add the tracked meal
+        tracked_meal = TrackedMeal(
+            tracked_day_id=tracked_day.id,
+            meal_id=meal_id,
+            meal_time=meal_time,
+            quantity=quantity
+        )
+        db.add(tracked_meal)
+
+        # Mark as modified since we're adding a meal
+        tracked_day.is_modified = True
+
+        db.commit()
+
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.delete("/tracker/remove_meal/{tracked_meal_id}")
+async def remove_tracked_meal(tracked_meal_id: int, db: Session = Depends(get_db)):
+    """Remove a meal from the tracker"""
+    try:
+        tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.id == tracked_meal_id).first()
+        if not tracked_meal:
+            return {"status": "error", "message": "Tracked meal not found"}
+
+        # Mark as modified since we're removing a meal
+        tracked_day = db.query(TrackedDay).filter(TrackedDay.id == tracked_meal.tracked_day_id).first()
+        if tracked_day:
+            tracked_day.is_modified = True
+
+        db.delete(tracked_meal)
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/tracker/save_template")
+async def save_tracked_day_as_template(request: Request, person: str = Form(...),
+                                     date: str = Form(...), template_name: str = Form(...),
+                                     db: Session = Depends(get_db)):
+    """Save the current tracked day as a template"""
+    try:
+        from datetime import datetime
+        track_date = datetime.fromisoformat(date).date()
+
+        # Get tracked day
+        tracked_day = db.query(TrackedDay).filter(
+            TrackedDay.person == person,
+            TrackedDay.date == track_date
+        ).first()
+
+        if not tracked_day:
+            return {"status": "error", "message": "No tracked day found"}
+
+        # Create new template
+        template = Template(name=template_name)
+        db.add(template)
+        db.commit()
+        db.refresh(template)
+
+        # Add all tracked meals to template
+        tracked_meals = db.query(TrackedMeal).filter(TrackedMeal.tracked_day_id == tracked_day.id).all()
+        for tracked_meal in tracked_meals:
+            template_meal = TemplateMeal(
+                template_id=template.id,
+                meal_id=tracked_meal.meal_id,
+                meal_time=tracked_meal.meal_time
+            )
+            db.add(template_meal)
+
+        db.commit()
+        return {"status": "success", "template_id": template.id}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/tracker/apply_template")
+async def apply_template_to_tracked_day(request: Request, person: str = Form(...),
+                                       date: str = Form(...), template_id: int = Form(...),
+                                       db: Session = Depends(get_db)):
+    """Apply a template to the current tracked day"""
+    try:
+        from datetime import datetime
+        track_date = datetime.fromisoformat(date).date()
+
+        # Get or create tracked day
+        tracked_day = db.query(TrackedDay).filter(
+            TrackedDay.person == person,
+            TrackedDay.date == track_date
+        ).first()
+
+        if not tracked_day:
+            tracked_day = TrackedDay(person=person, date=track_date)
+            db.add(tracked_day)
+            db.commit()
+            db.refresh(tracked_day)
+
+        # Remove existing tracked meals
+        db.query(TrackedMeal).filter(TrackedMeal.tracked_day_id == tracked_day.id).delete()
+
+        # Apply template meals
+        template_meals = db.query(TemplateMeal).filter(TemplateMeal.template_id == template_id).all()
+        for template_meal in template_meals:
+            tracked_meal = TrackedMeal(
+                tracked_day_id=tracked_day.id,
+                meal_id=template_meal.meal_id,
+                meal_time=template_meal.meal_time,
+                quantity=1.0
+            )
+            db.add(tracked_meal)
+
+        # Mark as modified since we're applying a template (not the original plan)
+        tracked_day.is_modified = True
+
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/tracker/reset_to_plan")
+async def reset_to_plan(request: Request, person: str = Form(...),
+                       date: str = Form(...), db: Session = Depends(get_db)):
+    """Reset the tracked day back to the original plan"""
+    try:
+        from datetime import datetime
+        track_date = datetime.fromisoformat(date).date()
+
+        # Get tracked day
+        tracked_day = db.query(TrackedDay).filter(
+            TrackedDay.person == person,
+            TrackedDay.date == track_date
+        ).first()
+
+        if not tracked_day:
+            return {"status": "error", "message": "No tracked day found"}
+
+        # Remove existing tracked meals
+        db.query(TrackedMeal).filter(TrackedMeal.tracked_day_id == tracked_day.id).delete()
+
+        # Copy plan meals back
+        copy_plan_to_tracked(db, person, track_date, tracked_day.id)
+
+        return {"status": "success"}
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}

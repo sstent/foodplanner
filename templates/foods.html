@@ -13,6 +13,7 @@
                     <tr>
                         <th>Select</th>
                         <th>Name</th>
+                        <th>Brand</th>
                         <th>Serving</th>
                         <th>Cal</th>
                         <th>Protein</th>
@@ -29,6 +30,7 @@
                     <tr>
                         <td><input type="checkbox" name="selected_foods" value="{{ food.id }}"></td>
                         <td>{{ food.name }}</td>
+                        <td>{{ food.brand or '' }}</td>
                         <td>{{ food.serving_size }} {{ food.serving_unit }}</td>
                         <td>{{ "%.2f"|format(food.calories) }}</td>
                         <td>{{ "%.2f"|format(food.protein) }}g</td>
@@ -38,7 +40,7 @@
                         <td>{{ "%.2f"|format(food.sodium) }}mg</td>
                         <td>{{ "%.2f"|format(food.calcium) }}mg</td>
                         <td>
-                            <button type="button" class="btn btn-sm btn-outline-primary" 
+                            <button type="button" class="btn btn-sm btn-outline-primary"
                                     onclick="editFood({{ food.id }})">
                                 <i class="bi bi-pencil"></i> Edit
                             </button>
@@ -65,9 +67,13 @@
             <div class="modal-body">
                 <form id="addFoodForm" action="/foods/add" method="post">
                     <div class="row">
-                        <div class="col-12 mb-3">
+                        <div class="col-8 mb-3">
                             <label class="form-label">Name</label>
                             <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label">Brand</label>
+                            <input type="text" class="form-control" name="brand" placeholder="Optional">
                         </div>
                     </div>
                     <div class="row">
@@ -142,9 +148,13 @@
                 <form id="editFoodForm" action="/foods/edit" method="post">
                     <input type="hidden" name="food_id" id="edit_food_id">
                     <div class="row">
-                        <div class="col-12 mb-3">
+                        <div class="col-8 mb-3">
                             <label class="form-label">Name</label>
                             <input type="text" class="form-control" name="name" id="edit_name" required>
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label">Brand</label>
+                            <input type="text" class="form-control" name="brand" id="edit_brand" placeholder="Optional">
                         </div>
                     </div>
                     <div class="row">
@@ -277,6 +287,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {% for food in foods %}
         {{ food.id }}: {
             name: '{{ food.name | replace("'", "\\'") }}',
+            brand: '{{ food.brand | replace("'", "\\'") }}',
             serving_size: '{{ food.serving_size | replace("'", "\\'") }}',
             serving_unit: '{{ food.serving_unit | replace("'", "\\'") }}',
             calories: {{ food.calories }},
@@ -295,9 +306,10 @@ document.addEventListener('DOMContentLoaded', function() {
     window.editFood = function(foodId) {
         const food = foodsData[foodId];
         if (!food) return;
-        
+
         document.getElementById('edit_food_id').value = foodId;
         document.getElementById('edit_name').value = food.name;
+        document.getElementById('edit_brand').value = food.brand || '';
         document.getElementById('edit_serving_size').value = food.serving_size;
         document.getElementById('edit_serving_unit').value = food.serving_unit;
         document.getElementById('edit_calories').value = food.calories;
@@ -308,7 +320,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('edit_sugar').value = food.sugar;
         document.getElementById('edit_sodium').value = food.sodium;
         document.getElementById('edit_calcium').value = food.calcium;
-        
+
         new bootstrap.Modal(document.getElementById('editFoodModal')).show();
     };
 });

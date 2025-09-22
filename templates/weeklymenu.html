@@ -1,0 +1,400 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-calendar-week"></i> Weekly Menus</h2>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createWeeklyMenuModal">
+                <i class="bi bi-plus-circle"></i> Create Weekly Menu
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Your Weekly Menus</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped" id="weeklyMenusTable">
+                        <thead>
+                            <tr>
+                                <th>Weekly Menu Name</th>
+                                <th>Templates Assigned</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Weekly menus will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Weekly Menu Modal -->
+<div class="modal fade" id="createWeeklyMenuModal" tabindex="-1" aria-labelledby="createWeeklyMenuModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createWeeklyMenuModalLabel">Create New Weekly Menu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="createWeeklyMenuForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="weeklyMenuName" class="form-label">Weekly Menu Name</label>
+                        <input type="text" class="form-control" id="weeklyMenuName" name="name" required>
+                    </div>
+
+                    <h6 class="mb-3">Assign Templates to Days</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="monday" class="form-label">Monday</label>
+                                <select class="form-control template-select" id="monday" name="monday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tuesday" class="form-label">Tuesday</label>
+                                <select class="form-control template-select" id="tuesday" name="tuesday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="wednesday" class="form-label">Wednesday</label>
+                                <select class="form-control template-select" id="wednesday" name="wednesday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="thursday" class="form-label">Thursday</label>
+                                <select class="form-control template-select" id="thursday" name="thursday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="friday" class="form-label">Friday</label>
+                                <select class="form-control template-select" id="friday" name="friday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="saturday" class="form-label">Saturday</label>
+                                <select class="form-control template-select" id="saturday" name="saturday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="sunday" class="form-label">Sunday</label>
+                                <select class="form-control template-select" id="sunday" name="sunday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Weekly Menu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Apply Weekly Menu Modal -->
+<div class="modal fade" id="applyWeeklyMenuModal" tabindex="-1" aria-labelledby="applyWeeklyMenuModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="applyWeeklyMenuModalLabel">Apply Weekly Menu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="applyWeeklyMenuForm">
+                <div class="modal-body">
+                    <p>Apply this weekly menu to your plan starting from the selected week:</p>
+                    <div class="mb-3">
+                        <label for="weekStartDate" class="form-label">Select Week Start Date (Monday)</label>
+                        <input type="date" class="form-control" id="weekStartDate" name="week_start_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="applyPerson" class="form-label">Person</label>
+                        <select class="form-control" id="applyPerson" name="person" required>
+                            <option value="Person A">Person A</option>
+                            <option value="Person B">Person B</option>
+                        </select>
+                    </div>
+                    <div id="applyOverwriteWarning" class="alert alert-warning" style="display: none;">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Warning:</strong> There are already meals planned for this week.
+                        Applying the weekly menu will overwrite them.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Apply Weekly Menu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentWeeklyMenuId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadWeeklyMenus();
+
+    // Handle weekly menu creation
+    document.getElementById('createWeeklyMenuForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        createWeeklyMenu();
+    });
+
+    // Handle weekly menu application
+    document.getElementById('applyWeeklyMenuForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        applyWeeklyMenu();
+    });
+});
+
+function loadWeeklyMenus() {
+    fetch('/weeklymenu')
+        .then(response => response.text())
+        .then(html => {
+            // Extract weekly menus data from the HTML response
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const weeklyMenus = JSON.parse(doc.querySelector('script[data-weekly-menus]')?.textContent || '[]');
+
+            const tbody = document.querySelector('#weeklyMenusTable tbody');
+            tbody.innerHTML = '';
+
+            if (weeklyMenus.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No weekly menus created yet. Click "Create Weekly Menu" to get started.</td></tr>';
+                return;
+            }
+
+            const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+            weeklyMenus.forEach(weeklyMenu => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${weeklyMenu.name}</strong></td>
+                    <td>
+                        ${weeklyMenu.weekly_menu_days && weeklyMenu.weekly_menu_days.length > 0 ?
+                            weeklyMenu.weekly_menu_days.map(wmd =>
+                                `<span class="badge bg-secondary me-1">${dayNames[wmd.day_of_week]}: ${wmd.template.name}</span>`
+                            ).join('') : 'No templates assigned'}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-2" onclick="applyWeeklyMenuModal(${weeklyMenu.id})">
+                            <i class="bi bi-play-circle"></i> Apply
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteWeeklyMenu(${weeklyMenu.id})">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading weekly menus:', error);
+        });
+}
+
+function createWeeklyMenu() {
+    const form = document.getElementById('createWeeklyMenuForm');
+    const formData = new FormData(form);
+
+    // Build template assignments string
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const assignments = [];
+
+    days.forEach((day, index) => {
+        const templateId = formData.get(day);
+        if (templateId) {
+            assignments.push(`${index}:${templateId}`);
+        }
+    });
+
+    const data = {
+        name: formData.get('name'),
+        template_assignments: assignments.join(',')
+    };
+
+    fetch('/weeklymenu/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('createWeeklyMenuModal')).hide();
+            form.reset();
+            loadWeeklyMenus();
+        } else {
+            alert('Error creating weekly menu: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating weekly menu');
+    });
+}
+
+function applyWeeklyMenuModal(weeklyMenuId) {
+    currentWeeklyMenuId = weeklyMenuId;
+    // Set default date to current week's Monday
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - today.getDay() + 1); // Get Monday of current week
+    document.getElementById('weekStartDate').value = monday.toISOString().split('T')[0];
+    document.getElementById('applyOverwriteWarning').style.display = 'none';
+    new bootstrap.Modal(document.getElementById('applyWeeklyMenuModal')).show();
+}
+
+function applyWeeklyMenu() {
+    const form = document.getElementById('applyWeeklyMenuForm');
+    const formData = new FormData(form);
+
+    const data = {
+        person: formData.get('person'),
+        week_start_date: formData.get('week_start_date')
+    };
+
+    fetch(`/weeklymenu/${currentWeeklyMenuId}/apply`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'confirm_overwrite') {
+            // Show overwrite warning
+            document.getElementById('applyOverwriteWarning').style.display = 'block';
+            // Change button text to confirm overwrite
+            const submitBtn = document.querySelector('#applyWeeklyMenuForm button[type="submit"]');
+            submitBtn.textContent = 'Overwrite Existing Meals';
+            submitBtn.onclick = () => confirmApplyOverwrite(data);
+        } else if (data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('applyWeeklyMenuModal')).hide();
+            alert('Weekly menu applied to your plan successfully!');
+        } else {
+            alert('Error applying weekly menu: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error applying weekly menu');
+    });
+}
+
+function confirmApplyOverwrite(overwriteData) {
+    const form = document.getElementById('applyWeeklyMenuForm');
+    const formData = new FormData(form);
+
+    const data = {
+        person: formData.get('person'),
+        week_start_date: formData.get('week_start_date'),
+        confirm_overwrite: 'true'
+    };
+
+    fetch(`/weeklymenu/${currentWeeklyMenuId}/apply`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('applyWeeklyMenuModal')).hide();
+            alert('Weekly menu applied to your plan successfully!');
+        } else {
+            alert('Error applying weekly menu: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error applying weekly menu');
+    });
+}
+
+function deleteWeeklyMenu(weeklyMenuId) {
+    if (!confirm('Are you sure you want to delete this weekly menu?')) {
+        return;
+    }
+
+    fetch(`/weeklymenu/${weeklyMenuId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            loadWeeklyMenus();
+        } else {
+            alert('Error deleting weekly menu: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error deleting weekly menu');
+    });
+}
+</script>
+
+<!-- Hidden script to pass weekly menus data -->
+<script type="application/json" data-weekly-menus>
+{{ weekly_menus|tojson }}
+</script>
+{% endblock %}
