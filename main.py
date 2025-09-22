@@ -74,7 +74,7 @@ class Plan(Base):
     __tablename__ = "plans"
 
     id = Column(Integer, primary_key=True, index=True)
-    person = Column(String, index=True)  # Person A or Person B
+    person = Column(String, index=True)  # Sarah or Stuart
     date = Column(Date, index=True)  # Store actual calendar dates
     meal_id = Column(Integer, ForeignKey("meals.id"))
     meal_time = Column(String)  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
@@ -126,7 +126,7 @@ class TrackedDay(Base):
     __tablename__ = "tracked_days"
 
     id = Column(Integer, primary_key=True, index=True)
-    person = Column(String, index=True)  # Person A or Person B
+    person = Column(String, index=True)  # Sarah or Stuart
     date = Column(Date, index=True)  # Date being tracked
     is_modified = Column(Boolean, default=False)  # Whether this day has been modified from original plan
 
@@ -928,7 +928,7 @@ async def delete_meals(meal_ids: dict = Body(...), db: Session = Depends(get_db)
 
 # Plan tab
 @app.get("/plan", response_class=HTMLResponse)
-async def plan_page(request: Request, person: str = "Person A", week_start_date: str = None, db: Session = Depends(get_db)):
+async def plan_page(request: Request, person: str = "Sarah", week_start_date: str = None, db: Session = Depends(get_db)):
     from datetime import datetime, timedelta
 
     # If no week_start_date provided, use current week starting from Monday
@@ -1095,7 +1095,7 @@ async def remove_from_plan(plan_id: int, db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 @app.get("/detailed", response_class=HTMLResponse)
-async def detailed(request: Request, person: str = "Person A", plan_date: str = None, template_id: int = None, db: Session = Depends(get_db)):
+async def detailed(request: Request, person: str = "Sarah", plan_date: str = None, template_id: int = None, db: Session = Depends(get_db)):
     from datetime import datetime
 
     if template_id:
@@ -1458,7 +1458,7 @@ async def delete_weekly_menu(weekly_menu_id: int, db: Session = Depends(get_db))
 
 # Tracker tab
 @app.get("/tracker", response_class=HTMLResponse)
-async def tracker_page(request: Request, person: str = "Person A", date: str = None, db: Session = Depends(get_db)):
+async def tracker_page(request: Request, person: str = "Sarah", date: str = None, db: Session = Depends(get_db)):
     from datetime import datetime, date as date_type
 
     # If no date provided, use today

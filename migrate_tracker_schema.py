@@ -21,7 +21,7 @@ class TrackedDay(Base):
     __tablename__ = "tracked_days"
 
     id = Column(Integer, primary_key=True, index=True)
-    person = Column(String, index=True)  # Person A or Person B
+    person = Column(String, index=True)  # Sarah or Stuart
     date = Column(Date, index=True)  # Date being tracked
 
 class TrackedMeal(Base):

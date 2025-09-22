@@ -34,8 +34,8 @@
     <div class="container-fluid">
         <div class="person-toggle">
             <select id="personSelect" class="form-select" onchange="switchPerson()">
-                <option value="Person A" {% if person == "Person A" %}selected{% endif %}>Person A</option>
-                <option value="Person B" {% if person == "Person B" %}selected{% endif %}>Person B</option>
+                <option value="Sarah" {% if person == "Sarah" %}selected{% endif %}>Sarah</option>
+                <option value="Stuart" {% if person == "Stuart" %}selected{% endif %}>Stuart</option>
             </select>
         </div>
 
@@ -65,6 +65,7 @@
     <script>
         function switchPerson() {
             const person = document.getElementById('personSelect').value;
+            localStorage.setItem('selectedPerson', person);
             const currentUrl = new URL(window.location);
             currentUrl.searchParams.set('person', person);
             window.location.href = currentUrl.toString();
