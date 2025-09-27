@@ -18,7 +18,7 @@ import requests
 from fastapi import File, UploadFile
 
 # Database setup - Use SQLite for easier setup
-DATABASE_URL = "sqlite:///./meal_planner.db"
+DATABASE_URL = "sqlite:///data/meal_planner.db"
 # For production, use PostgreSQL: DATABASE_URL = "postgresql://username:password@localhost/meal_planner"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})

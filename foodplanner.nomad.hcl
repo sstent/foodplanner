@@ -52,12 +52,6 @@ job "foodplanner" {
       config {
         image = "ghcr.io/sstent/foodplanner:main"
         ports = ["http"]
-
-        # Mount the SQLite database file to persist data
-        # Adjust the source path as needed for your environment
-        volumes = [
-          "/alloc/tmp/meal_planner.db:/app/meal_planner.db"
-        ]
       }
 
       resources {
