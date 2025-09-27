@@ -1339,6 +1339,147 @@ async def delete_template(template_id: int, db: Session = Depends(get_db)):
         db.rollback()
         return {"status": "error", "message": str(e)}
 
+@app.post("/templates/edit")
+async def edit_template(template_id: int = Form(...), name: str = Form(...),
+                       meal_assignments: str = Form(...), db: Session = Depends(get_db)):
+    """Edit an existing template with new name and meal assignments"""
+    try:
+        # Get existing template
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            return {"status": "error", "message": "Template not found"}
+
+        # Update template name
+        template.name = name
+
+        # Delete existing template meals
+        db.query(TemplateMeal).filter(TemplateMeal.template_id == template_id).delete()
+
+        # Parse meal assignments (format: "meal_time:meal_id,meal_time:meal_id,...")
+        if meal_assignments:
+            assignments = meal_assignments.split(',')
+            for assignment in assignments:
+                if ':' in assignment:
+                    meal_time, meal_id = assignment.split(':', 1)
+                    if meal_id.strip():  # Only add if meal_id is not empty
+                        template_meal = TemplateMeal(
+                            template_id=template.id,
+                            meal_id=int(meal_id.strip()),
+                            meal_time=meal_time.strip()
+                        )
+                        db.add(template_meal)
+
+        db.commit()
+        return {"status": "success", "template_id": template.id}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/templates/create_from_template")
+async def create_template_from_existing(source_template_id: int = Form(...),
+                                       new_name: str = Form(...), db: Session = Depends(get_db)):
+    """Create a new template by copying an existing template's meal assignments"""
+    try:
+        # Get source template
+        source_template = db.query(Template).filter(Template.id == source_template_id).first()
+        if not source_template:
+            return {"status": "error", "message": "Source template not found"}
+
+        # Create new template
+        new_template = Template(name=new_name)
+        db.add(new_template)
+        db.flush()  # Get new template ID
+
+        # Copy template meals from source
+        source_meals = db.query(TemplateMeal).filter(TemplateMeal.template_id == source_template_id).all()
+        for source_meal in source_meals:
+            new_template_meal = TemplateMeal(
+                template_id=new_template.id,
+                meal_id=source_meal.meal_id,
+                meal_time=source_meal.meal_time
+            )
+            db.add(new_template_meal)
+
+        db.commit()
+        return {"status": "success", "template_id": new_template.id}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/templates/upload")
+async def bulk_upload_templates(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Handle bulk template upload from CSV"""
+    try:
+        contents = await file.read()
+        decoded = contents.decode('utf-8').splitlines()
+        reader = csv.DictReader(decoded)
+
+        stats = {'created': 0, 'updated': 0, 'errors': []}
+
+        for row_num, row in enumerate(reader, 2):  # Row numbers start at 2 (1-based + header)
+            try:
+                user = row.get('User', '').strip()
+                template_id = row.get('ID', '').strip()
+
+                if not user or not template_id:
+                    stats['errors'].append(f"Row {row_num}: Missing User or ID")
+                    continue
+
+                # Create template name in format <User>-<ID>
+                template_name = f"{user}-{template_id}"
+
+                # Check if template already exists
+                existing_template = db.query(Template).filter(Template.name == template_name).first()
+                if existing_template:
+                    # Update existing template - remove existing meals
+                    db.query(TemplateMeal).filter(TemplateMeal.template_id == existing_template.id).delete()
+                    template = existing_template
+                    stats['updated'] += 1
+                else:
+                    # Create new template
+                    template = Template(name=template_name)
+                    db.add(template)
+                    stats['created'] += 1
+
+                db.flush()  # Get template ID
+
+                # Meal time mappings from CSV columns
+                meal_columns = {
+                    'Beverage 1': 'Beverage 1',
+                    'Breakfast': 'Breakfast',
+                    'Lunch': 'Lunch',
+                    'Dinner': 'Dinner',
+                    'Snack 1': 'Snack 1',
+                    'Snack 2': 'Snack 2'
+                }
+
+                # Process each meal column
+                for csv_column, meal_time in meal_columns.items():
+                    meal_name = row.get(csv_column, '').strip()
+                    if meal_name:
+                        # Find meal by name
+                        meal = db.query(Meal).filter(Meal.name.ilike(meal_name)).first()
+                        if meal:
+                            # Create template meal
+                            template_meal = TemplateMeal(
+                                template_id=template.id,
+                                meal_id=meal.id,
+                                meal_time=meal_time
+                            )
+                            db.add(template_meal)
+                        else:
+                            stats['errors'].append(f"Row {row_num}: Meal '{meal_name}' not found for {meal_time}")
+
+            except (KeyError, ValueError) as e:
+                stats['errors'].append(f"Row {row_num}: {str(e)}")
+
+        db.commit()
+        return stats
+
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
 # Weekly Menu tab
 @app.get("/weeklymenu", response_class=HTMLResponse)
 async def weeklymenu_page(request: Request, db: Session = Depends(get_db)):
@@ -1371,9 +1512,33 @@ async def weeklymenu_page(request: Request, db: Session = Depends(get_db)):
         "templates": templates_list
     })
 
+@app.get("/weeklymenu/{weekly_menu_id}")
+async def get_weekly_menu(weekly_menu_id: int, db: Session = Depends(get_db)):
+    """Get details for a specific weekly menu for editing"""
+    try:
+        weekly_menu = db.query(WeeklyMenu).filter(WeeklyMenu.id == weekly_menu_id).first()
+        if not weekly_menu:
+            return {"status": "error", "message": "Weekly menu not found"}
+
+        weekly_menu_days = db.query(WeeklyMenuDay).filter(WeeklyMenuDay.weekly_menu_id == weekly_menu_id).all()
+
+        # Create a dictionary mapping day_of_week to template_id
+        template_assignments = {}
+        for wmd in weekly_menu_days:
+            template_assignments[wmd.day_of_week] = wmd.template_id
+
+        return {
+            "status": "success",
+            "id": weekly_menu.id,
+            "name": weekly_menu.name,
+            "template_assignments": template_assignments
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.post("/weeklymenu/create")
 async def create_weekly_menu(request: Request, name: str = Form(...),
-                           template_assignments: str = Form(...), db: Session = Depends(get_db)):
+                            template_assignments: str = Form(...), db: Session = Depends(get_db)):
     """Create a new weekly menu with template assignments"""
     try:
         # Create weekly menu
@@ -1394,6 +1559,52 @@ async def create_weekly_menu(request: Request, name: str = Form(...),
                             template_id=int(template_id.strip())
                         )
                         db.add(weekly_menu_day)
+
+        db.commit()
+        return {"status": "success", "weekly_menu_id": weekly_menu.id}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/weeklymenu/edit")
+async def edit_weekly_menu(request: Request, weekly_menu_id: int = Form(...),
+                          name: str = Form(...), monday: str = Form(""),
+                          tuesday: str = Form(""), wednesday: str = Form(""),
+                          thursday: str = Form(""), friday: str = Form(""),
+                          saturday: str = Form(""), sunday: str = Form(""),
+                          db: Session = Depends(get_db)):
+    """Edit an existing weekly menu with new name and template assignments"""
+    try:
+        # Get existing weekly menu
+        weekly_menu = db.query(WeeklyMenu).filter(WeeklyMenu.id == weekly_menu_id).first()
+        if not weekly_menu:
+            return {"status": "error", "message": "Weekly menu not found"}
+
+        # Update name
+        weekly_menu.name = name
+
+        # Delete existing weekly menu days
+        db.query(WeeklyMenuDay).filter(WeeklyMenuDay.weekly_menu_id == weekly_menu_id).delete()
+
+        # Create new template assignments
+        day_assignments = {
+            0: monday,    # Monday
+            1: tuesday,   # Tuesday
+            2: wednesday, # Wednesday
+            3: thursday,  # Thursday
+            4: friday,    # Friday
+            5: saturday,  # Saturday
+            6: sunday     # Sunday
+        }
+
+        for day_of_week, template_id in day_assignments.items():
+            if template_id and template_id.strip():
+                weekly_menu_day = WeeklyMenuDay(
+                    weekly_menu_id=weekly_menu.id,
+                    day_of_week=day_of_week,
+                    template_id=int(template_id.strip())
+                )
+                db.add(weekly_menu_day)
 
         db.commit()
         return {"status": "success", "weekly_menu_id": weekly_menu.id}

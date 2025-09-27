@@ -181,6 +181,118 @@
     </div>
 </div>
 
+<!-- Edit Weekly Menu Modal -->
+<div class="modal fade" id="editWeeklyMenuModal" tabindex="-1" aria-labelledby="editWeeklyMenuModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editWeeklyMenuModalLabel">Edit Weekly Menu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editWeeklyMenuForm">
+                <input type="hidden" id="editWeeklyMenuId" name="weekly_menu_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editWeeklyMenuName" class="form-label">Weekly Menu Name</label>
+                        <input type="text" class="form-control" id="editWeeklyMenuName" name="name" required>
+                    </div>
+
+                    <h6 class="mb-3">Assign Templates to Days</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editMonday" class="form-label">Monday</label>
+                                <select class="form-control template-select" id="editMonday" name="monday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editTuesday" class="form-label">Tuesday</label>
+                                <select class="form-control template-select" id="editTuesday" name="tuesday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editWednesday" class="form-label">Wednesday</label>
+                                <select class="form-control template-select" id="editWednesday" name="wednesday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editThursday" class="form-label">Thursday</label>
+                                <select class="form-control template-select" id="editThursday" name="thursday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editFriday" class="form-label">Friday</label>
+                                <select class="form-control template-select" id="editFriday" name="friday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editSaturday" class="form-label">Saturday</label>
+                                <select class="form-control template-select" id="editSaturday" name="saturday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editSunday" class="form-label">Sunday</label>
+                                <select class="form-control template-select" id="editSunday" name="sunday">
+                                    <option value="">Select template...</option>
+                                    {% for template in templates %}
+                                    <option value="{{ template.id }}">{{ template.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 let currentWeeklyMenuId = null;
 
@@ -191,6 +303,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('createWeeklyMenuForm').addEventListener('submit', function(e) {
         e.preventDefault();
         createWeeklyMenu();
+    });
+
+    // Handle weekly menu editing
+    document.getElementById('editWeeklyMenuForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        editWeeklyMenu();
     });
 
     // Handle weekly menu application
@@ -232,6 +350,9 @@ function loadWeeklyMenus() {
                     <td>
                         <button class="btn btn-sm btn-outline-primary me-2" onclick="applyWeeklyMenuModal(${weeklyMenu.id})">
                             <i class="bi bi-play-circle"></i> Apply
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="editWeeklyMenuModal(${weeklyMenu.id})">
+                            <i class="bi bi-pencil"></i> Edit
                         </button>
                         <button class="btn btn-sm btn-outline-danger" onclick="deleteWeeklyMenu(${weeklyMenu.id})">
                             <i class="bi bi-trash"></i> Delete
@@ -389,6 +510,71 @@ function deleteWeeklyMenu(weeklyMenuId) {
     .catch(error => {
         console.error('Error:', error);
         alert('Error deleting weekly menu');
+    });
+}
+
+function editWeeklyMenuModal(weeklyMenuId) {
+    // Fetch weekly menu data
+    fetch(`/weeklymenu/${weeklyMenuId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Populate the form
+                document.getElementById('editWeeklyMenuId').value = data.id;
+                document.getElementById('editWeeklyMenuName').value = data.name;
+
+                // Reset all selects
+                const selects = ['editMonday', 'editTuesday', 'editWednesday', 'editThursday', 'editFriday', 'editSaturday', 'editSunday'];
+                selects.forEach(selectId => {
+                    document.getElementById(selectId).value = '';
+                });
+
+                // Set template assignments
+                const assignments = data.template_assignments;
+                if (assignments[0]) document.getElementById('editMonday').value = assignments[0];
+                if (assignments[1]) document.getElementById('editTuesday').value = assignments[1];
+                if (assignments[2]) document.getElementById('editWednesday').value = assignments[2];
+                if (assignments[3]) document.getElementById('editThursday').value = assignments[3];
+                if (assignments[4]) document.getElementById('editFriday').value = assignments[4];
+                if (assignments[5]) document.getElementById('editSaturday').value = assignments[5];
+                if (assignments[6]) document.getElementById('editSunday').value = assignments[6];
+
+                // Show modal
+                new bootstrap.Modal(document.getElementById('editWeeklyMenuModal')).show();
+            } else {
+                alert('Error loading weekly menu: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading weekly menu');
+        });
+}
+
+function editWeeklyMenu() {
+    const form = document.getElementById('editWeeklyMenuForm');
+    const formData = new FormData(form);
+
+    fetch('/weeklymenu/edit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('editWeeklyMenuModal')).hide();
+            form.reset();
+            loadWeeklyMenus();
+        } else {
+            alert('Error updating weekly menu: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating weekly menu');
     });
 }
 </script>

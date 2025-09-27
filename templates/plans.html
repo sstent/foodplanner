@@ -181,6 +181,144 @@
     </div>
 </div>
 
+<!-- Edit Template Modal -->
+<div class="modal fade" id="editTemplateModal" tabindex="-1" aria-labelledby="editTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editTemplateModalLabel">Edit Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editTemplateForm">
+                <input type="hidden" id="editTemplateId" name="template_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editTemplateName" class="form-label">Template Name</label>
+                        <input type="text" class="form-control" id="editTemplateName" name="name" required>
+                    </div>
+
+                    <h6 class="mb-3">Assign Meals to Meal Times</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editBreakfast" class="form-label">Breakfast</label>
+                                <select class="form-control meal-select" id="editBreakfast" name="breakfast">
+                                    <option value="">Select meal...</option>
+                                    {% for meal in meals %}
+                                    <option value="{{ meal.id }}">{{ meal.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editLunch" class="form-label">Lunch</label>
+                                <select class="form-control meal-select" id="editLunch" name="lunch">
+                                    <option value="">Select meal...</option>
+                                    {% for meal in meals %}
+                                    <option value="{{ meal.id }}">{{ meal.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editDinner" class="form-label">Dinner</label>
+                                <select class="form-control meal-select" id="editDinner" name="dinner">
+                                    <option value="">Select meal...</option>
+                                    {% for meal in meals %}
+                                    <option value="{{ meal.id }}">{{ meal.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editSnack1" class="form-label">Snack 1</label>
+                                <select class="form-control meal-select" id="editSnack1" name="snack1">
+                                    <option value="">Select meal...</option>
+                                    {% for meal in meals %}
+                                    <option value="{{ meal.id }}">{{ meal.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editSnack2" class="form-label">Snack 2</label>
+                                <select class="form-control meal-select" id="editSnack2" name="snack2">
+                                    <option value="">Select meal...</option>
+                                    {% for meal in meals %}
+                                    <option value="{{ meal.id }}">{{ meal.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editBeverage1" class="form-label">Beverage 1</label>
+                                <select class="form-control meal-select" id="editBeverage1" name="beverage1">
+                                    <option value="">Select meal...</option>
+                                    {% for meal in meals %}
+                                    <option value="{{ meal.id }}">{{ meal.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editBeverage2" class="form-label">Beverage 2</label>
+                                <select class="form-control meal-select" id="editBeverage2" name="beverage2">
+                                    <option value="">Select meal...</option>
+                                    {% for meal in meals %}
+                                    <option value="{{ meal.id }}">{{ meal.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Template</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Create from Template Modal -->
+<div class="modal fade" id="createFromTemplateModal" tabindex="-1" aria-labelledby="createFromTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createFromTemplateModalLabel">Create New Template from Existing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="createFromTemplateForm">
+                <input type="hidden" id="sourceTemplateId" name="source_template_id">
+                <div class="modal-body">
+                    <p>This will create a new template with the same meal assignments as the selected template.</p>
+                    <div class="mb-3">
+                        <label for="newTemplateName" class="form-label">New Template Name</label>
+                        <input type="text" class="form-control" id="newTemplateName" name="new_name" required placeholder="Enter name for the new template">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Template</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 let currentTemplateId = null;
 
@@ -197,6 +335,18 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('useTemplateForm').addEventListener('submit', function(e) {
         e.preventDefault();
         useTemplate();
+    });
+
+    // Handle template editing
+    document.getElementById('editTemplateForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        editTemplate();
+    });
+
+    // Handle create from template
+    document.getElementById('createFromTemplateForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        createFromTemplate();
     });
 });
 
@@ -229,6 +379,12 @@ function loadTemplates() {
                     <td>
                         <button class="btn btn-sm btn-outline-primary me-2" onclick="useTemplateModal(${template.id})">
                             <i class="bi bi-play-circle"></i> Use
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="editTemplateModal(${template.id})">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <button class="btn btn-sm btn-outline-info me-2" onclick="createFromTemplateModal(${template.id})">
+                            <i class="bi bi-copy"></i> Create from This
                         </button>
                         <button class="btn btn-sm btn-outline-danger" onclick="deleteTemplate(${template.id})">
                             <i class="bi bi-trash"></i> Delete
@@ -363,6 +519,141 @@ function confirmOverwrite(overwriteData) {
     .catch(error => {
         console.error('Error:', error);
         alert('Error using template');
+    });
+}
+
+function editTemplateModal(templateId) {
+    console.log('editTemplateModal called with templateId:', templateId);
+    // Fetch template data
+    fetch(`/templates/${templateId}`)
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            // Check if this is an error response (has status field)
+            if (data.status === 'error') {
+                alert('Error loading template: ' + (data.message || 'Unknown error'));
+                return;
+            }
+
+            // This is a successful response with template data
+            if (data.id && data.name) {
+                // Populate form
+                document.getElementById('editTemplateId').value = templateId;
+                document.getElementById('editTemplateName').value = data.name;
+
+                // Clear all selects first
+                const mealTimes = ['Breakfast', 'Lunch', 'Dinner', 'Snack 1', 'Snack 2', 'Beverage 1', 'Beverage 2'];
+                const selectIds = ['editBreakfast', 'editLunch', 'editDinner', 'editSnack1', 'editSnack2', 'editBeverage1', 'editBeverage2'];
+
+                selectIds.forEach(id => {
+                    document.getElementById(id).value = '';
+                });
+
+                // Populate meal assignments
+                if (data.meals && Array.isArray(data.meals)) {
+                    data.meals.forEach(meal => {
+                        const selectId = 'edit' + meal.meal_time.replace(' ', '');
+                        const select = document.getElementById(selectId);
+                        if (select) {
+                            select.value = meal.meal_id;
+                        }
+                    });
+                }
+
+                // Show modal
+                new bootstrap.Modal(document.getElementById('editTemplateModal')).show();
+            } else {
+                alert('Error: Invalid response format from server');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading template');
+        });
+}
+
+function createFromTemplateModal(templateId) {
+    document.getElementById('sourceTemplateId').value = templateId;
+    document.getElementById('newTemplateName').value = '';
+    new bootstrap.Modal(document.getElementById('createFromTemplateModal')).show();
+}
+
+function editTemplate() {
+    const form = document.getElementById('editTemplateForm');
+    const formData = new FormData(form);
+
+    // Build meal assignments string
+    const mealTimes = ['breakfast', 'lunch', 'dinner', 'snack1', 'snack2', 'beverage1', 'beverage2'];
+    const assignments = [];
+
+    mealTimes.forEach(mealTime => {
+        const mealId = formData.get(mealTime);
+        if (mealId) {
+            const displayName = mealTime.charAt(0).toUpperCase() + mealTime.slice(1).replace('1', ' 1').replace('2', ' 2');
+            assignments.push(`${displayName}:${mealId}`);
+        }
+    });
+
+    const data = {
+        template_id: formData.get('template_id'),
+        name: formData.get('name'),
+        meal_assignments: assignments.join(',')
+    };
+
+    fetch('/templates/edit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('editTemplateModal')).hide();
+            loadTemplates();
+        } else {
+            alert('Error updating template: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating template');
+    });
+}
+
+function createFromTemplate() {
+    const form = document.getElementById('createFromTemplateForm');
+    const formData = new FormData(form);
+
+    const data = {
+        source_template_id: formData.get('source_template_id'),
+        new_name: formData.get('new_name')
+    };
+
+    fetch('/templates/create_from_template', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('createFromTemplateModal')).hide();
+            form.reset();
+            loadTemplates();
+        } else {
+            alert('Error creating template: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating template');
     });
 }
 
