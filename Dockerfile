@@ -28,8 +28,6 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-#RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 # Set working directory
 WORKDIR /app
@@ -40,18 +38,11 @@ COPY --from=builder /app/venv /app/venv
 # Activate the virtual environment
 ENV PATH="/app/venv/bin:$PATH"
 
-# Create data directory and set permissions
-#RUN mkdir -p /app/data && \
-#    chown -R appuser:appuser /app/data
+# Create data directory
+RUN mkdir -p /app/data
 
 # Copy application code
 COPY . .
-
-# Ensure appuser owns all files
-#RUN chown -R appuser:appuser /app
-
-# Switch to non-root user
-#USER appuser
 
 # Set working directory to /app for the application
 WORKDIR /app
@@ -60,10 +51,6 @@ WORKDIR /app
 ENV DATABASE_PATH=/app/data
 ENV DATABASE_URL=sqlite:////app/data/meal_planner.db
 
-# Verify directory ownership (for debugging)
-RUN ls -ld /app/data && \
-    touch /app/data/test_write.txt && \
-    echo "Write test successful" > /app/data/test_write.txt
 
 # Expose port (as defined in main.py)
 EXPOSE 8999

@@ -31,7 +31,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Database setup - Use SQLite for easier setup
 # Use environment variables if set, otherwise use defaults
-DATABASE_PATH = os.getenv('DATABASE_PATH', '/app/data')
+# Use current directory for database
+DATABASE_PATH = os.getenv('DATABASE_PATH', '.')
 DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{DATABASE_PATH}/meal_planner.db')
 
 logging.info(f"Database URL: {DATABASE_URL}")
