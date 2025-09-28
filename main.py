@@ -325,7 +325,14 @@ def scheduled_backup():
 @app.on_event("startup")
 def startup_event():
     logging.info("FastAPI application startup event triggered.")
-    run_migrations()
+    try:
+        run_migrations()
+        logging.info("Database migrations completed successfully in startup_event.")
+    except Exception as e:
+        logging.error(f"Error during database migrations in startup_event: {e}")
+        # Depending on severity, you might want to re-raise or handle differently
+        # raise
+
     # Schedule the backup job
     scheduler = BackgroundScheduler()
     scheduler.add_job(scheduled_backup, 'cron', hour=0)
