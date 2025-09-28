@@ -1,8 +1,6 @@
 
 print("DEBUG: main.py started")
 
-print("DEBUG: main.py started")
-
 # Meal Planner FastAPI Application
 # Run with: uvicorn main:app --reload
 
@@ -326,6 +324,7 @@ def scheduled_backup():
 
 @app.on_event("startup")
 def startup_event():
+    logging.info("FastAPI application startup event triggered.")
     run_migrations()
     # Schedule the backup job
     scheduler = BackgroundScheduler()
@@ -416,7 +415,6 @@ async def root(request: Request):
 # Admin Section
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
-    print("DEBUG: /admin route accessed")
     return templates.TemplateResponse("admin/index.html", {"request": request})
 
 @app.get("/admin/imports", response_class=HTMLResponse)
