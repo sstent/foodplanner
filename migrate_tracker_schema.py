@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 # Database setup
-DATABASE_URL = "sqlite:///./meal_planner.db"
+DATABASE_URL = f"sqlite:///{os.getenv('DATABASE_PATH', './data')}/meal_planner.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
