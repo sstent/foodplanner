@@ -343,17 +343,20 @@ def scheduled_backup():
 
 @app.on_event("startup")
 def startup_event():
+    logging.info("DEBUG: Startup event triggered")
     run_migrations()
+    logging.info("DEBUG: Startup event completed")
 
     # Schedule the backup job - temporarily disabled for debugging
-    # scheduler = BackgroundScheduler()
-    # scheduler.add_job(scheduled_backup, 'cron', hour=0)
-    # scheduler.start()
-    # logging.info("Scheduled backup job started.")
-    logging.info("Startup completed - scheduler temporarily disabled")
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(scheduled_backup, 'cron', hour=0)
+    scheduler.start()
+    logging.info("Scheduled backup job started.")
+    # logging.info("Startup completed - scheduler temporarily disabled")
 
 def test_sqlite_connection(db_path):
     """Test if we can create and write to SQLite database file"""
+    logging.info(f"DEBUG: Starting SQLite connection test for path: {db_path}")
     try:
         import sqlite3
         import stat
@@ -361,33 +364,54 @@ def test_sqlite_connection(db_path):
         
         # Log directory permissions
         db_dir = os.path.dirname(db_path)
+        logging.info(f"DEBUG: Checking database directory: {db_dir}")
         if os.path.exists(db_dir):
             dir_stat = os.stat(db_dir)
             dir_perm = stat.filemode(dir_stat.st_mode)
             dir_uid = dir_stat.st_uid
             dir_gid = dir_stat.st_gid
-            logging.info(f"Database directory permissions: {dir_perm}, UID:{dir_uid}, GID:{dir_gid}")
+            logging.info(f"DEBUG: Database directory permissions: {dir_perm}, UID:{dir_uid}, GID:{dir_gid}")
             
             # Test write access
             test_file = os.path.join(db_dir, "write_test.txt")
+            logging.info(f"DEBUG: Testing write access with file: {test_file}")
             try:
                 with open(test_file, "w") as f:
                     f.write("test")
                 os.remove(test_file)
-                logging.info("Write test to directory succeeded")
+                logging.info("DEBUG: Write test to directory succeeded")
             except Exception as e:
-                logging.error(f"Write test to directory failed: {e}")
+                logging.error(f"DEBUG: Write test to directory failed: {e}")
+                return False
         else:
-            logging.warning(f"Database directory does not exist: {db_dir}")
+            logging.warning(f"DEBUG: Database directory does not exist: {db_dir}")
+            return False
         
         # Test SQLite operations
+        logging.info("DEBUG: Attempting SQLite connection...")
         conn = sqlite3.connect(db_path)
+        logging.info("DEBUG: SQLite connection established")
+        
         cursor = conn.cursor()
+        logging.info("DEBUG: Creating test table...")
         cursor.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+        logging.info("DEBUG: Test table created")
+        
+        logging.info("DEBUG: Inserting test data...")
         cursor.execute("INSERT INTO test VALUES (1)")
+        logging.info("DEBUG: Test data inserted")
+        
+        logging.info("DEBUG: Committing transaction...")
         conn.commit()
+        logging.info("DEBUG: Transaction committed")
+        
+        logging.info("DEBUG: Dropping test table...")
         cursor.execute("DROP TABLE test")
+        logging.info("DEBUG: Test table dropped")
+        
+        logging.info("DEBUG: Closing connection...")
         conn.close()
+        logging.info("DEBUG: Connection closed")
         
         # Log file permissions
         if os.path.exists(db_path):
@@ -395,34 +419,46 @@ def test_sqlite_connection(db_path):
             file_perm = stat.filemode(file_stat.st_mode)
             file_uid = file_stat.st_uid
             file_gid = file_stat.st_gid
-            logging.info(f"Database file permissions: {file_perm}, UID:{file_uid}, GID:{file_gid}")
+            logging.info(f"DEBUG: Database file permissions: {file_perm}, UID:{file_uid}, GID:{file_gid}")
+        
+        logging.info("DEBUG: SQLite connection test completed successfully")
         return True
     except Exception as e:
-        logging.error(f"SQLite connection test failed: {e}", exc_info=True)
+        logging.error(f"DEBUG: SQLite connection test failed: {e}", exc_info=True)
         return False
 
 def run_migrations():
-    logging.info("Running database migrations...")
+    logging.info("DEBUG: Starting database setup...")
     try:
         # Extract database path from URL
         db_path = DATABASE_URL.split("///")[1]
-        logging.info(f"Database path: {db_path}")
+        logging.info(f"DEBUG: Database path extracted: {db_path}")
         
         # Create directory if needed
         db_dir = os.path.dirname(db_path)
+        logging.info(f"DEBUG: Database directory: {db_dir}")
         if not os.path.exists(db_dir):
-            logging.info(f"Creating database directory: {db_dir}")
+            logging.info(f"DEBUG: Creating database directory: {db_dir}")
             os.makedirs(db_dir, exist_ok=True)
+            logging.info(f"DEBUG: Database directory created successfully")
+        else:
+            logging.info(f"DEBUG: Database directory already exists")
         
         # Test SQLite connection
+        logging.info("DEBUG: Testing SQLite connection...")
         if not test_sqlite_connection(db_path):
+            logging.error("DEBUG: SQLite connection test failed")
             raise Exception("SQLite connection test failed")
+        logging.info("DEBUG: SQLite connection test passed")
         
-        alembic_cfg = Config("alembic.ini")
-        command.upgrade(alembic_cfg, "head")
-        logging.info("Database migrations completed successfully.")
+        # Create all tables using SQLAlchemy directly instead of alembic
+        logging.info("DEBUG: Creating database tables using SQLAlchemy...")
+        Base.metadata.create_all(bind=engine)
+        logging.info("DEBUG: Database tables created successfully.")
+        
+        logging.info("DEBUG: Database setup completed, returning to caller")
     except Exception as e:
-        logging.error(f"Failed to run database migrations: {e}", exc_info=True)
+        logging.error(f"DEBUG: Failed to setup database: {e}", exc_info=True)
         raise
 
 # Utility functions

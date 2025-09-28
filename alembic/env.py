@@ -1,5 +1,6 @@
 from logging.config import fileConfig
-
+import logging
+import os
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
@@ -16,8 +17,9 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-from main import Base
-target_metadata = Base.metadata
+# We create an empty metadata object since we're not using autogenerate
+# and we have explicit migration files
+target_metadata = None
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -37,10 +39,11 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # Use environment variable if available, otherwise fall back to config
+    url = os.getenv('DATABASE_URL', config.get_main_option("sqlalchemy.url"))
     context.configure(
         url=url,
-        target_metadata=target_metadata,
+        target_metadata=None,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -56,22 +59,33 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    logging.info("DEBUG: Creating database engine for alembic")
+    # Use environment variable for database URL if available
+    db_url = os.getenv('DATABASE_URL', config.get_main_option("sqlalchemy.url"))
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        {'sqlalchemy.url': db_url},
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    logging.info("DEBUG: Database engine created successfully")
 
     with connectable.connect() as connection:
+        logging.info("DEBUG: Database connection established for alembic")
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, target_metadata=None
         )
+        logging.info("DEBUG: Alembic context configured")
 
         with context.begin_transaction():
+            logging.info("DEBUG: Starting alembic transaction")
             context.run_migrations()
+            logging.info("DEBUG: Alembic migrations completed within transaction")
 
 
 if context.is_offline_mode():
+    logging.info("DEBUG: Running migrations in offline mode")
     run_migrations_offline()
 else:
+    logging.info("DEBUG: Running migrations in online mode")
     run_migrations_online()
+    logging.info("DEBUG: Online migrations completed")
