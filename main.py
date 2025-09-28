@@ -36,7 +36,14 @@ DATABASE_URL = f"sqlite:///{DATABASE_PATH}/meal_planner.db"
 logging.info(f"Database URL: {DATABASE_URL}")
 
 # Ensure the database directory exists
-os.makedirs(DATABASE_PATH, exist_ok=True)
+logging.info(f"Creating database directory at: {DATABASE_PATH}")
+try:
+    os.makedirs(DATABASE_PATH, exist_ok=True)
+    logging.info(f"Database directory created successfully")
+except Exception as e:
+    logging.error(f"Failed to create database directory: {e}")
+    raise
+
 # For production, use PostgreSQL: DATABASE_URL = "postgresql://username:password@localhost/meal_planner"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
@@ -47,6 +54,14 @@ Base = declarative_base()
 app = FastAPI(title="Meal Planner")
 templates = Jinja2Templates(directory="templates")
 
+# Get the port from environment variable or default to 8999
+PORT = int(os.getenv("PORT", 8999))
+
+# This will be called if running directly with Python
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    
 # Database Models
 class Food(Base):
     __tablename__ = "foods"

@@ -28,6 +28,9 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
+# Create a non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
 # Set working directory
 WORKDIR /app
 
@@ -40,8 +43,14 @@ ENV PATH="/app/venv/bin:$PATH"
 # Copy application code
 COPY . .
 
+# Change ownership of the app directory
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
 # Expose port (as defined in main.py)
 EXPOSE 8999
 
-# Run the application with uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0", "--port", "8999"]
+# Run the application with uvicorn - fix host to 0.0.0.0
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8999"]
