@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+#RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 # Set working directory
 WORKDIR /app
@@ -41,14 +41,14 @@ COPY --from=builder /app/venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 
 # Create data directory and set permissions
-RUN mkdir -p /app/data && \
-    chown -R appuser:appuser /app/data
+#RUN mkdir -p /app/data && \
+#    chown -R appuser:appuser /app/data
 
 # Copy application code
 COPY . .
 
 # Ensure appuser owns all files
-RUN chown -R appuser:appuser /app
+#RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
 #USER appuser
