@@ -51,6 +51,22 @@
     </div>
 </div>
 
+<div class="row mt-4">
+    <div class="col-md-6">
+        <h3>Global Data Management</h3>
+        <div class="mb-3">
+            <button type="button" class="btn btn-info" onclick="exportAllData()">Export All Data</button>
+        </div>
+        <form action="/import/all" method="post" enctype="multipart/form-data" id="importAllForm">
+            <div class="mb-3">
+                <label class="form-label">Import All Data (JSON)</label>
+                <input type="file" class="form-control" name="file" accept=".json" required>
+            </div>
+            <button type="submit" class="btn btn-warning">Import All Data</button>
+        </form>
+    </div>
+</div>
+
 <div class="mt-4" id="upload-results" style="display: none;">
     <div class="alert alert-success">
         <strong>Upload Results:</strong>
@@ -206,6 +222,48 @@ async function addOpenFoodFactsFood(index) {
 document.getElementById('offSearch').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         searchOpenFoodFacts();
+    }
+});
+
+function exportAllData() {
+    window.location.href = '/export/all';
+}
+
+document.getElementById('importAllForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    const fileInput = form.querySelector('input[type="file"]');
+    const file = fileInput.files[0];
+
+    if (file) {
+        if (confirm('Are you sure you want to import all data? This will overwrite existing data.')) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Importing...';
+
+            try {
+                const response = await fetch('/import/all', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                alert('Import successful! The page will now reload.');
+                window.location.reload();
+            } catch (error) {
+                alert('Import failed: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Import All Data';
+            }
+        }
+    } else {
+        alert('Please select a JSON file to import.');
     }
 });
 </script>

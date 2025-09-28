@@ -17,6 +17,8 @@ import csv
 import requests
 from fastapi import File, UploadFile
 import logging
+from alembic.config import Config
+from alembic import command
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -206,6 +208,80 @@ class TrackedMealCreate(BaseModel):
     meal_time: str
     quantity: float = 1.0
 
+class FoodExport(FoodResponse):
+    pass
+
+class MealFoodExport(BaseModel):
+    food_id: int
+    quantity: float
+
+class MealExport(BaseModel):
+    id: int
+    name: str
+    meal_type: str
+    meal_time: str
+    meal_foods: List[MealFoodExport]
+
+    class Config:
+        from_attributes = True
+
+class PlanExport(BaseModel):
+    id: int
+    person: str
+    date: date
+    meal_id: int
+    meal_time: str
+
+    class Config:
+        from_attributes = True
+
+class TemplateMealExport(BaseModel):
+    meal_id: int
+    meal_time: str
+
+class TemplateExport(BaseModel):
+    id: int
+    name: str
+    template_meals: List[TemplateMealExport]
+
+    class Config:
+        from_attributes = True
+
+class WeeklyMenuDayExport(BaseModel):
+    day_of_week: int
+    template_id: int
+
+class WeeklyMenuExport(BaseModel):
+    id: int
+    name: str
+    weekly_menu_days: List[WeeklyMenuDayExport]
+
+    class Config:
+        from_attributes = True
+
+class TrackedMealExport(BaseModel):
+    meal_id: int
+    meal_time: str
+    quantity: float
+
+class TrackedDayExport(BaseModel):
+    id: int
+    person: str
+    date: date
+    is_modified: bool
+    tracked_meals: List[TrackedMealExport]
+
+    class Config:
+        from_attributes = True
+
+class AllData(BaseModel):
+    foods: List[FoodExport]
+    meals: List[MealExport]
+    plans: List[PlanExport]
+    templates: List[TemplateExport]
+    weekly_menus: List[WeeklyMenuExport]
+    tracked_days: List[TrackedDayExport]
+
 # Database dependency
 def get_db():
     db = SessionLocal()
@@ -214,15 +290,16 @@ def get_db():
     finally:
         db.close()
 
-try:
-    # Create tables
-    Base.metadata.create_all(bind=engine)
-    logging.info("Database tables checked/created successfully.")
-except Exception as e:
-    logging.error(f"Failed to connect to or create database at {DATABASE_URL}: {e}")
-    # Depending on desired behavior, you might want to exit the application or handle it gracefully
-    # For now, we'll re-raise to ensure the application doesn't start with a broken DB connection
-    raise
+@app.on_event("startup")
+def run_migrations():
+    logging.info("Running database migrations...")
+    try:
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        logging.info("Database migrations completed successfully.")
+    except Exception as e:
+        logging.error(f"Failed to run database migrations: {e}")
+        raise
 
 # Utility functions
 def calculate_meal_nutrition(meal, db: Session):
@@ -298,6 +375,261 @@ async def root(request: Request):
 @app.get("/imports", response_class=HTMLResponse)
 async def imports_page(request: Request):
     return templates.TemplateResponse("imports.html", {"request": request})
+
+@app.get("/export/all", response_model=AllData)
+async def export_all_data(db: Session = Depends(get_db)):
+    """Export all data from the database as a single JSON file."""
+    foods = db.query(Food).all()
+    meals = db.query(Meal).all()
+    plans = db.query(Plan).all()
+    templates = db.query(Template).all()
+    weekly_menus = db.query(WeeklyMenu).all()
+    tracked_days = db.query(TrackedDay).all()
+
+    # Manual serialization to handle nested relationships
+    
+    # Meals with MealFoods
+    meals_export = []
+    for meal in meals:
+        meal_foods_export = [
+            MealFoodExport(food_id=mf.food_id, quantity=mf.quantity)
+            for mf in meal.meal_foods
+        ]
+        meals_export.append(
+            MealExport(
+                id=meal.id,
+                name=meal.name,
+                meal_type=meal.meal_type,
+                meal_time=meal.meal_time,
+                meal_foods=meal_foods_export,
+            )
+        )
+
+    # Templates with TemplateMeals
+    templates_export = []
+    for template in templates:
+        template_meals_export = [
+            TemplateMealExport(meal_id=tm.meal_id, meal_time=tm.meal_time)
+            for tm in template.template_meals
+        ]
+        templates_export.append(
+            TemplateExport(
+                id=template.id,
+                name=template.name,
+                template_meals=template_meals_export,
+            )
+        )
+
+    # Weekly Menus with WeeklyMenuDays
+    weekly_menus_export = []
+    for weekly_menu in weekly_menus:
+        weekly_menu_days_export = [
+            WeeklyMenuDayExport(
+                day_of_week=wmd.day_of_week, template_id=wmd.template_id
+            )
+            for wmd in weekly_menu.weekly_menu_days
+        ]
+        weekly_menus_export.append(
+            WeeklyMenuExport(
+                id=weekly_menu.id,
+                name=weekly_menu.name,
+                weekly_menu_days=weekly_menu_days_export,
+            )
+        )
+
+    # Tracked Days with TrackedMeals
+    tracked_days_export = []
+    for tracked_day in tracked_days:
+        tracked_meals_export = [
+            TrackedMealExport(
+                meal_id=tm.meal_id,
+                meal_time=tm.meal_time,
+                quantity=tm.quantity,
+            )
+            for tm in tracked_day.tracked_meals
+        ]
+        tracked_days_export.append(
+            TrackedDayExport(
+                id=tracked_day.id,
+                person=tracked_day.person,
+                date=tracked_day.date,
+                is_modified=tracked_day.is_modified,
+                tracked_meals=tracked_meals_export,
+            )
+        )
+
+    return AllData(
+        foods=[FoodExport.from_orm(f) for f in foods],
+        meals=meals_export,
+        plans=[PlanExport.from_orm(p) for p in plans],
+        templates=templates_export,
+        weekly_menus=weekly_menus_export,
+        tracked_days=tracked_days_export,
+    )
+
+@app.post("/import/all")
+async def import_all_data(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Import all data from a JSON file, overwriting existing data."""
+    try:
+        contents = await file.read()
+        data = AllData.parse_raw(contents)
+
+        # Validate data before import
+        validate_import_data(data)
+
+        # 1. Delete existing data in the correct order
+        db.query(TrackedMeal).delete()
+        db.query(TrackedDay).delete()
+        db.query(WeeklyMenuDay).delete()
+        db.query(WeeklyMenu).delete()
+        db.query(Plan).delete()
+        db.query(TemplateMeal).delete()
+        db.query(Template).delete()
+        db.query(MealFood).delete()
+        db.query(Meal).delete()
+        db.query(Food).delete()
+        db.commit()
+
+        # 2. Insert new data in the correct order
+        # Foods
+        for food_data in data.foods:
+            db.add(Food(**food_data.dict()))
+        db.commit()
+
+        # Meals
+        for meal_data in data.meals:
+            meal = Meal(
+                id=meal_data.id,
+                name=meal_data.name,
+                meal_type=meal_data.meal_type,
+                meal_time=meal_data.meal_time,
+            )
+            db.add(meal)
+            db.flush()
+            for mf_data in meal_data.meal_foods:
+                db.add(
+                    MealFood(
+                        meal_id=meal.id,
+                        food_id=mf_data.food_id,
+                        quantity=mf_data.quantity,
+                    )
+                )
+        db.commit()
+
+        # Templates
+        for template_data in data.templates:
+            template = Template(id=template_data.id, name=template_data.name)
+            db.add(template)
+            db.flush()
+            for tm_data in template_data.template_meals:
+                db.add(
+                    TemplateMeal(
+                        template_id=template.id,
+                        meal_id=tm_data.meal_id,
+                        meal_time=tm_data.meal_time,
+                    )
+                )
+        db.commit()
+        
+        # Plans
+        for plan_data in data.plans:
+            db.add(Plan(**plan_data.dict()))
+        db.commit()
+
+        # Weekly Menus
+        for weekly_menu_data in data.weekly_menus:
+            weekly_menu = WeeklyMenu(
+                id=weekly_menu_data.id, name=weekly_menu_data.name
+            )
+            db.add(weekly_menu)
+            db.flush()
+            for wmd_data in weekly_menu_data.weekly_menu_days:
+                db.add(
+                    WeeklyMenuDay(
+                        weekly_menu_id=weekly_menu.id,
+                        day_of_week=wmd_data.day_of_week,
+                        template_id=wmd_data.template_id,
+                    )
+                )
+        db.commit()
+
+        # Tracked Days
+        for tracked_day_data in data.tracked_days:
+            tracked_day = TrackedDay(
+                id=tracked_day_data.id,
+                person=tracked_day_data.person,
+                date=tracked_day_data.date,
+                is_modified=tracked_day_data.is_modified,
+            )
+            db.add(tracked_day)
+            db.flush()
+            for tm_data in tracked_day_data.tracked_meals:
+                db.add(
+                    TrackedMeal(
+                        tracked_day_id=tracked_day.id,
+                        meal_id=tm_data.meal_id,
+                        meal_time=tm_data.meal_time,
+                        quantity=tm_data.quantity,
+                    )
+                )
+        db.commit()
+
+        return {"status": "success", "message": "All data imported successfully."}
+
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Failed to import data: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to import data: {e}")
+
+def validate_import_data(data: AllData):
+    """Validate the integrity of the imported data."""
+    food_ids = {f.id for f in data.foods}
+    meal_ids = {m.id for m in data.meals}
+    template_ids = {t.id for t in data.templates}
+
+    # Validate Meals
+    for meal in data.meals:
+        for meal_food in meal.meal_foods:
+            if meal_food.food_id not in food_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid meal food: food_id {meal_food.food_id} not found.",
+                )
+
+    # Validate Plans
+    for plan in data.plans:
+        if plan.meal_id not in meal_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid plan: meal_id {plan.meal_id} not found.",
+            )
+
+    # Validate Templates
+    for template in data.templates:
+        for template_meal in template.template_meals:
+            if template_meal.meal_id not in meal_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid template meal: meal_id {template_meal.meal_id} not found.",
+                )
+
+    # Validate Weekly Menus
+    for weekly_menu in data.weekly_menus:
+        for day in weekly_menu.weekly_menu_days:
+            if day.template_id not in template_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid weekly menu day: template_id {day.template_id} not found.",
+                )
+
+    # Validate Tracked Days
+    for tracked_day in data.tracked_days:
+        for tracked_meal in tracked_day.tracked_meals:
+            if tracked_meal.meal_id not in meal_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid tracked meal: meal_id {tracked_meal.meal_id} not found.",
+                )
 
 # Foods tab
 @app.get("/foods", response_class=HTMLResponse)

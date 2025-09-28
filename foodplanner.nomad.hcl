@@ -57,6 +57,7 @@ job "foodplanner" {
         # Adjust the source path as needed for your environment
         volumes = [
           "/alloc/tmp/:/data/"
+          "/mnt/Public/configs/FoodPlanner_backups:/backups",
         ]
       }
 
