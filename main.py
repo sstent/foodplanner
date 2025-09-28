@@ -1,4 +1,8 @@
 
+print("DEBUG: main.py started")
+
+print("DEBUG: main.py started")
+
 # Meal Planner FastAPI Application
 # Run with: uvicorn main:app --reload
 
