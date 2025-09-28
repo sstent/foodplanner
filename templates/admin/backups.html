@@ -1,0 +1,39 @@
+{% extends "admin/index.html" %}
+
+{% block admin_content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Database Backups</h5>
+    </div>
+    <div class="card-body">
+        <p>
+            Create a snapshot of the database or restore from a previous backup. Backups are stored in the <code>/backups</code> directory.
+        </p>
+
+        <div class="mb-3">
+            <form action="/admin/backups/create" method="post" class="d-inline">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-cloud-download"></i> Backup Now
+                </button>
+            </form>
+        </div>
+
+        <hr>
+
+        <h5>Restore from Backup</h5>
+        <form action="/admin/backups/restore" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="backup-file" class="form-label">Select backup file to restore</label>
+                <select class="form-select" id="backup-file" name="backup_file">
+                    {% for backup in backups %}
+                        <option value="{{ backup }}">{{ backup }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-cloud-upload"></i> Restore
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

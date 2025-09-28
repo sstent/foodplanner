@@ -1,0 +1,35 @@
+{% extends "admin/index.html" %}
+
+{% block admin_content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Import/Export All Data</h5>
+    </div>
+    <div class="card-body">
+        <p>
+            This section allows you to export all your data (foods, meals, plans, etc.) into a single JSON file. 
+            You can also import this data back, which will overwrite any existing data. 
+            This is useful for backups or migrating to a new instance.
+        </p>
+        
+        <div class="mb-3">
+            <a href="/export/all" class="btn btn-primary" download="meal_planner_backup.json">
+                <i class="bi bi-download"></i> Export All Data
+            </a>
+        </div>
+
+        <hr>
+
+        <h5>Import Data</h5>
+        <form id="import-form" action="/import/all" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="import-file" class="form-label">Select JSON file to import</label>
+                <input class="form-control" type="file" id="import-file" name="file" accept=".json">
+            </div>
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-upload"></i> Import and Overwrite
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

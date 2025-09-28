@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">Admin</h2>
+
+<ul class="nav nav-tabs" id="adminTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <a class="nav-link" id="imports-tab" href="/admin/imports">Imports</a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link" id="backups-tab" href="/admin/backups">Backups</a>
+    </li>
+</ul>
+
+<div class="tab-content mt-3">
+    {% block admin_content %}{% endblock %}
+</div>
+{% endblock %}
