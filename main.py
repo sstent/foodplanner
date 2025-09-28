@@ -31,44 +31,43 @@ logging.info(f"Database URL: {DATABASE_URL}")
 os.makedirs(DATABASE_PATH, exist_ok=True)
 # For production, use PostgreSQL: DATABASE_URL = "postgresql://username:password@localhost/meal_planner"
 
-try:
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base = declarative_base()
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-    # Initialize FastAPI app
-    app = FastAPI(title="Meal Planner")
-    templates = Jinja2Templates(directory="templates")
+# Initialize FastAPI app
+app = FastAPI(title="Meal Planner")
+templates = Jinja2Templates(directory="templates")
 
-    # Database Models
-    class Food(Base):
-        __tablename__ = "foods"
+# Database Models
+class Food(Base):
+    __tablename__ = "foods"
 
-        id = Column(Integer, primary_key=True, index=True)
-        name = Column(String, unique=True, index=True)
-        serving_size = Column(String)
-        serving_unit = Column(String)
-        calories = Column(Float)
-        protein = Column(Float)
-        carbs = Column(Float)
-        fat = Column(Float)
-        fiber = Column(Float, default=0)
-        sugar = Column(Float, default=0)
-        sodium = Column(Float, default=0)
-        calcium = Column(Float, default=0)
-        source = Column(String, default="manual")  # manual, csv, openfoodfacts
-        brand = Column(String, default="") # Brand name for the food
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    serving_size = Column(String)
+    serving_unit = Column(String)
+    calories = Column(Float)
+    protein = Column(Float)
+    carbs = Column(Float)
+    fat = Column(Float)
+    fiber = Column(Float, default=0)
+    sugar = Column(Float, default=0)
+    sodium = Column(Float, default=0)
+    calcium = Column(Float, default=0)
+    source = Column(String, default="manual")  # manual, csv, openfoodfacts
+    brand = Column(String, default="") # Brand name for the food
 
-    class Meal(Base):
-        __tablename__ = "meals"
-        
-        id = Column(Integer, primary_key=True, index=True)
-        name = Column(String, index=True)
-        meal_type = Column(String)  # breakfast, lunch, dinner, snack, custom
-        meal_time = Column(String, default="Breakfast") # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
-        
-        # Relationship to meal foods
-        meal_foods = relationship("MealFood", back_populates="meal")
+class Meal(Base):
+    __tablename__ = "meals"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    meal_type = Column(String)  # breakfast, lunch, dinner, snack, custom
+    meal_time = Column(String, default="Breakfast") # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
+    
+    # Relationship to meal foods
+    meal_foods = relationship("MealFood", back_populates="meal")
 
 class MealFood(Base):
     __tablename__ = "meal_foods"
@@ -215,6 +214,7 @@ def get_db():
     finally:
         db.close()
 
+try:
     # Create tables
     Base.metadata.create_all(bind=engine)
     logging.info("Database tables checked/created successfully.")
