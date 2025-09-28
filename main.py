@@ -412,6 +412,7 @@ async def root(request: Request):
 # Admin Section
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
+    print("DEBUG: /admin route accessed")
     return templates.TemplateResponse("admin/index.html", {"request": request})
 
 @app.get("/admin/imports", response_class=HTMLResponse)
