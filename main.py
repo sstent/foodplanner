@@ -30,10 +30,13 @@ import sqlite3
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Database setup - Use SQLite for easier setup
-DATABASE_PATH = os.getenv('DATABASE_PATH', './data')
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}/meal_planner.db"
+# Use environment variables if set, otherwise use defaults
+DATABASE_PATH = os.getenv('DATABASE_PATH', '/app/data')
+DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{DATABASE_PATH}/meal_planner.db')
 
 logging.info(f"Database URL: {DATABASE_URL}")
+logging.info(f"Absolute database path: {os.path.abspath(DATABASE_PATH)}")
+logging.info(f"Absolute database path: {os.path.abspath(DATABASE_PATH)}")
 
 # Ensure the database directory exists
 logging.info(f"Creating database directory at: {DATABASE_PATH}")
@@ -350,11 +353,25 @@ def startup_event():
 def run_migrations():
     logging.info("Running database migrations...")
     try:
-        alembic_cfg = Config("alembic.ini")
+        # Get absolute path to alembic.ini
+        alembic_ini_path = os.path.abspath("alembic.ini")
+        logging.info(f"Alembic config path: {alembic_ini_path}")
+        
+        alembic_cfg = Config(alembic_ini_path)
+        
+        # Get database URL for logging
+        db_url = alembic_cfg.get_main_option("sqlalchemy.url")
+        logging.info(f"Database URL from alembic.ini: {db_url}")
+        
+        # Verify alembic versions directory
+        versions_dir = os.path.abspath("alembic/versions")
+        logging.info(f"Alembic versions directory: {versions_dir}")
+        logging.info(f"Version files: {os.listdir(versions_dir)}")
+        
         command.upgrade(alembic_cfg, "head")
         logging.info("Database migrations completed successfully.")
     except Exception as e:
-        logging.error(f"Failed to run database migrations: {e}")
+        logging.error(f"Failed to run database migrations: {e}", exc_info=True)
         raise
 
 # Utility functions

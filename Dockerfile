@@ -40,6 +40,11 @@ COPY --from=builder /app/venv /app/venv
 # Activate the virtual environment
 ENV PATH="/app/venv/bin:$PATH"
 
+# Create data directory and set permissions
+RUN mkdir -p /app/data && \
+    touch /app/data/meal_planner.db && \
+    chown -R appuser:appuser /app/data
+
 # Copy application code
 COPY . .
 
@@ -48,6 +53,13 @@ RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
+
+# Set working directory to /app for the application
+WORKDIR /app
+
+# Set environment variables
+ENV DATABASE_PATH=/app/data
+ENV DATABASE_URL=sqlite:////app/data/meal_planner.db
 
 # Expose port (as defined in main.py)
 EXPOSE 8999
