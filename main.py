@@ -345,11 +345,12 @@ def scheduled_backup():
 def startup_event():
     run_migrations()
 
-    # Schedule the backup job
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_backup, 'cron', hour=0)
-    scheduler.start()
-    logging.info("Scheduled backup job started.")
+    # Schedule the backup job - temporarily disabled for debugging
+    # scheduler = BackgroundScheduler()
+    # scheduler.add_job(scheduled_backup, 'cron', hour=0)
+    # scheduler.start()
+    # logging.info("Scheduled backup job started.")
+    logging.info("Startup completed - scheduler temporarily disabled")
 
 def test_sqlite_connection(db_path):
     """Test if we can create and write to SQLite database file"""
