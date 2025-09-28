@@ -47,11 +47,11 @@ RUN mkdir -p /app/data && \
 # Copy application code
 COPY . .
 
-# Change ownership of the app directory
+# Ensure appuser owns all files
 RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
-USER appuser
+#USER appuser
 
 # Set working directory to /app for the application
 WORKDIR /app
@@ -59,6 +59,11 @@ WORKDIR /app
 # Set environment variables
 ENV DATABASE_PATH=/app/data
 ENV DATABASE_URL=sqlite:////app/data/meal_planner.db
+
+# Verify directory ownership (for debugging)
+RUN ls -ld /app/data && \
+    touch /app/data/test_write.txt && \
+    echo "Write test successful" > /app/data/test_write.txt
 
 # Expose port (as defined in main.py)
 EXPOSE 8999

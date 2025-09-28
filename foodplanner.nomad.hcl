@@ -56,7 +56,7 @@ job "foodplanner" {
         # Mount the SQLite database file to persist data
         # Adjust the source path as needed for your environment
         volumes = [
-          "/alloc/tmp/:/app/data/",
+          "/alloc/data/:/app/data/",
           "/mnt/Public/configs/FoodPlanner_backups:/backups",
         ]
       }
