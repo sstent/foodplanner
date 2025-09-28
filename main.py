@@ -350,24 +350,73 @@ def startup_event():
     scheduler.start()
     logging.info("Scheduled backup job started.")
 
+def test_sqlite_connection(db_path):
+    """Test if we can create and write to SQLite database file"""
+    try:
+        import sqlite3
+        import stat
+        import os
+        
+        # Log directory permissions
+        db_dir = os.path.dirname(db_path)
+        if os.path.exists(db_dir):
+            dir_stat = os.stat(db_dir)
+            dir_perm = stat.filemode(dir_stat.st_mode)
+            dir_uid = dir_stat.st_uid
+            dir_gid = dir_stat.st_gid
+            logging.info(f"Database directory permissions: {dir_perm}, UID:{dir_uid}, GID:{dir_gid}")
+            
+            # Test write access
+            test_file = os.path.join(db_dir, "write_test.txt")
+            try:
+                with open(test_file, "w") as f:
+                    f.write("test")
+                os.remove(test_file)
+                logging.info("Write test to directory succeeded")
+            except Exception as e:
+                logging.error(f"Write test to directory failed: {e}")
+        else:
+            logging.warning(f"Database directory does not exist: {db_dir}")
+        
+        # Test SQLite operations
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+        cursor.execute("INSERT INTO test VALUES (1)")
+        conn.commit()
+        cursor.execute("DROP TABLE test")
+        conn.close()
+        
+        # Log file permissions
+        if os.path.exists(db_path):
+            file_stat = os.stat(db_path)
+            file_perm = stat.filemode(file_stat.st_mode)
+            file_uid = file_stat.st_uid
+            file_gid = file_stat.st_gid
+            logging.info(f"Database file permissions: {file_perm}, UID:{file_uid}, GID:{file_gid}")
+        return True
+    except Exception as e:
+        logging.error(f"SQLite connection test failed: {e}", exc_info=True)
+        return False
+
 def run_migrations():
     logging.info("Running database migrations...")
     try:
-        # Get absolute path to alembic.ini
-        alembic_ini_path = os.path.abspath("alembic.ini")
-        logging.info(f"Alembic config path: {alembic_ini_path}")
+        # Extract database path from URL
+        db_path = DATABASE_URL.split("///")[1]
+        logging.info(f"Database path: {db_path}")
         
-        alembic_cfg = Config(alembic_ini_path)
+        # Create directory if needed
+        db_dir = os.path.dirname(db_path)
+        if not os.path.exists(db_dir):
+            logging.info(f"Creating database directory: {db_dir}")
+            os.makedirs(db_dir, exist_ok=True)
         
-        # Get database URL for logging
-        db_url = alembic_cfg.get_main_option("sqlalchemy.url")
-        logging.info(f"Database URL from alembic.ini: {db_url}")
+        # Test SQLite connection
+        if not test_sqlite_connection(db_path):
+            raise Exception("SQLite connection test failed")
         
-        # Verify alembic versions directory
-        versions_dir = os.path.abspath("alembic/versions")
-        logging.info(f"Alembic versions directory: {versions_dir}")
-        logging.info(f"Version files: {os.listdir(versions_dir)}")
-        
+        alembic_cfg = Config("alembic.ini")
         command.upgrade(alembic_cfg, "head")
         logging.info("Database migrations completed successfully.")
     except Exception as e:

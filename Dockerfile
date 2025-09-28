@@ -42,7 +42,6 @@ ENV PATH="/app/venv/bin:$PATH"
 
 # Create data directory and set permissions
 RUN mkdir -p /app/data && \
-    touch /app/data/meal_planner.db && \
     chown -R appuser:appuser /app/data
 
 # Copy application code
