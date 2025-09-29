@@ -389,7 +389,8 @@ function createWeeklyMenu() {
         if (data.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('createWeeklyMenuModal')).hide();
             form.reset();
-            loadWeeklyMenus();
+            // Reload the page to get updated data
+            location.reload();
         } else {
             alert('Error creating weekly menu: ' + data.message);
         }
@@ -492,7 +493,8 @@ function deleteWeeklyMenu(weeklyMenuId) {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            loadWeeklyMenus();
+            // Reload the page to get updated data
+            location.reload();
         } else {
             alert('Error deleting weekly menu: ' + data.message);
         }

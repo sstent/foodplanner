@@ -1590,6 +1590,8 @@ async def weekly_menu_page(request: Request, db: Session = Depends(get_db)):
             })
         weekly_menus_data.append(wm_dict)
     
+    logging.info(f"DEBUG: Loading weekly menu page with {len(weekly_menus_data)} weekly menus")
+    
     return templates.TemplateResponse("weeklymenu.html", {
         "request": request,
         "weekly_menus": weekly_menus_data,
