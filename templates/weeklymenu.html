@@ -297,7 +297,9 @@
 let currentWeeklyMenuId = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    loadWeeklyMenus();
+    // Use the data that's already available in the template via the data attribute
+    const weeklyMenusData = JSON.parse(document.querySelector('script[data-weekly-menus]').textContent);
+    loadWeeklyMenus(weeklyMenusData);
 
     // Handle weekly menu creation
     document.getElementById('createWeeklyMenuForm').addEventListener('submit', function(e) {
@@ -318,53 +320,41 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-function loadWeeklyMenus() {
-    fetch('/weeklymenu')
-        .then(response => response.text())
-        .then(html => {
-            // Extract weekly menus data from the HTML response
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const weeklyMenus = JSON.parse(doc.querySelector('script[data-weekly-menus]')?.textContent || '[]');
-
-            const tbody = document.querySelector('#weeklyMenusTable tbody');
-            tbody.innerHTML = '';
-
-            if (weeklyMenus.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No weekly menus created yet. Click "Create Weekly Menu" to get started.</td></tr>';
-                return;
-            }
-
-            const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-            weeklyMenus.forEach(weeklyMenu => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><strong>${weeklyMenu.name}</strong></td>
-                    <td>
-                        ${weeklyMenu.weekly_menu_days && weeklyMenu.weekly_menu_days.length > 0 ?
-                            weeklyMenu.weekly_menu_days.map(wmd =>
-                                `<span class="badge bg-secondary me-1">${dayNames[wmd.day_of_week]}: ${wmd.template.name}</span>`
-                            ).join('') : 'No templates assigned'}
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary me-2" onclick="applyWeeklyMenuModal(${weeklyMenu.id})">
-                            <i class="bi bi-play-circle"></i> Apply
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="editWeeklyMenuModal(${weeklyMenu.id})">
-                            <i class="bi bi-pencil"></i> Edit
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteWeeklyMenu(${weeklyMenu.id})">
-                            <i class="bi bi-trash"></i> Delete
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        })
-        .catch(error => {
-            console.error('Error loading weekly menus:', error);
-        });
+function loadWeeklyMenus(weeklyMenus) {
+    const tbody = document.querySelector('#weeklyMenusTable tbody');
+    tbody.innerHTML = '';
+    
+    if (!weeklyMenus || weeklyMenus.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No weekly menus created yet. Click "Create Weekly Menu" to get started.</td></tr>';
+        return;
+    }
+    
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    
+    weeklyMenus.forEach(weeklyMenu => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>\${weeklyMenu.name}</strong></td>
+            <td>
+                \${weeklyMenu.weekly_menu_days && weeklyMenu.weekly_menu_days.length > 0 ?
+                    weeklyMenu.weekly_menu_days.map(wmd =>
+                        \`<span class="badge bg-secondary me-1">\${dayNames[wmd.day_of_week]}: \${wmd.template_name}</span>\`
+                    ).join('') : 'No templates assigned'}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary me-2" onclick="applyWeeklyMenuModal(\${weeklyMenu.id})">
+                    <i class="bi bi-play-circle"></i> Apply
+                </button>
+                <button class="btn btn-sm btn-outline-secondary me-2" onclick="editWeeklyMenuModal(\${weeklyMenu.id})">
+                    <i class="bi bi-pencil"></i> Edit
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteWeeklyMenu(\${weeklyMenu.id})">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
 }
 
 function createWeeklyMenu() {
@@ -518,32 +508,26 @@ function editWeeklyMenuModal(weeklyMenuId) {
     fetch(`/weeklymenu/${weeklyMenuId}`)
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success') {
-                // Populate the form
-                document.getElementById('editWeeklyMenuId').value = data.id;
-                document.getElementById('editWeeklyMenuName').value = data.name;
-
-                // Reset all selects
-                const selects = ['editMonday', 'editTuesday', 'editWednesday', 'editThursday', 'editFriday', 'editSaturday', 'editSunday'];
-                selects.forEach(selectId => {
-                    document.getElementById(selectId).value = '';
-                });
-
-                // Set template assignments
-                const assignments = data.template_assignments;
-                if (assignments[0]) document.getElementById('editMonday').value = assignments[0];
-                if (assignments[1]) document.getElementById('editTuesday').value = assignments[1];
-                if (assignments[2]) document.getElementById('editWednesday').value = assignments[2];
-                if (assignments[3]) document.getElementById('editThursday').value = assignments[3];
-                if (assignments[4]) document.getElementById('editFriday').value = assignments[4];
-                if (assignments[5]) document.getElementById('editSaturday').value = assignments[5];
-                if (assignments[6]) document.getElementById('editSunday').value = assignments[6];
-
-                // Show modal
-                new bootstrap.Modal(document.getElementById('editWeeklyMenuModal')).show();
-            } else {
-                alert('Error loading weekly menu: ' + data.message);
-            }
+            // Populate the form
+            document.getElementById('editWeeklyMenuId').value = data.id;
+            document.getElementById('editWeeklyMenuName').value = data.name;
+            
+            // Reset all selects
+            const selects = ['editMonday', 'editTuesday', 'editWednesday', 'editThursday', 'editFriday', 'editSaturday', 'editSunday'];
+            selects.forEach(selectId => {
+                document.getElementById(selectId).value = '';
+            });
+            
+            // Set template assignments based on weekly menu days
+            data.weekly_menu_days.forEach(wmd => {
+                const dayIndex = wmd.day_of_week;
+                const templateId = wmd.template_id;
+                const selectId = `edit${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dayIndex]}`;
+                document.getElementById(selectId).value = templateId;
+            });
+            
+            // Show modal
+            new bootstrap.Modal(document.getElementById('editWeeklyMenuModal')).show();
         })
         .catch(error => {
             console.error('Error:', error);
@@ -554,20 +538,40 @@ function editWeeklyMenuModal(weeklyMenuId) {
 function editWeeklyMenu() {
     const form = document.getElementById('editWeeklyMenuForm');
     const formData = new FormData(form);
+    
+    // Build template assignments string
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const assignments = [];
+    
+    days.forEach((day, index) => {
+        const selectId = `edit${day.charAt(0).toUpperCase() + day.slice(1)}`;
+        const templateId = document.getElementById(selectId).value;
+        if (templateId) {
+            assignments.push(`${index}:${templateId}`);
+        }
+    });
 
-    fetch('/weeklymenu/edit', {
-        method: 'POST',
+    const weeklyMenuId = document.getElementById('editWeeklyMenuId').value;
+    const data = {
+        name: formData.get('name'),
+        template_assignments: assignments.join(',')
+    };
+
+    fetch(`/weeklymenu/${weeklyMenuId}`, {
+        method: 'PUT',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams(formData)
+        body: new URLSearchParams(data)
     })
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('editWeeklyMenuModal')).hide();
             form.reset();
-            loadWeeklyMenus();
+            // Reload the weekly menus using the same data that's already available in the template
+            const weeklyMenusData = JSON.parse(document.querySelector('script[data-weekly-menus]').textContent);
+            loadWeeklyMenus(weeklyMenusData);
         } else {
             alert('Error updating weekly menu: ' + data.message);
         }

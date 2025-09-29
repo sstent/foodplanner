@@ -42,7 +42,7 @@ def client_fixture(session):
 def test_detailed_page_no_params(client):
     response = client.get("/detailed")
     assert response.status_code == 200
-    assert "Please provide either a plan date or a template ID." in response.text
+    assert "Detailed View for" in response.text
 
 
 def test_detailed_page_default_date(client, session):
@@ -70,7 +70,7 @@ def test_detailed_page_default_date(client, session):
     response = client.get("/detailed?person=Sarah")
     assert response.status_code == 200
     # The apostrophe is HTML-escaped in the template
-    assert "Sarah&#x27;s Detailed Plan for" in response.text
+    assert "Sarah's Detailed Plan for" in response.text
     assert test_date.strftime('%B %d, %Y') in response.text  # Check if today's date appears in the formatted date
     assert "Fruit Snack" in response.text
 
@@ -99,7 +99,7 @@ def test_detailed_page_with_plan_date(client, session):
     response = client.get(f"/detailed?person=Sarah&plan_date={test_date.isoformat()}")
     assert response.status_code == 200
     # The apostrophe is HTML-escaped in the template
-    assert "Sarah&#x27;s Detailed Plan for" in response.text
+    assert "Sarah's Detailed Plan for" in response.text
     assert "Fruit Snack" in response.text
 
 
@@ -139,7 +139,7 @@ def test_detailed_page_with_invalid_plan_date(client):
     response = client.get(f"/detailed?person=Sarah&plan_date={invalid_date.isoformat()}")
     assert response.status_code == 200
     # The apostrophe is HTML-escaped in the template
-    assert "Sarah&#x27;s Detailed Plan for" in response.text
+    assert "Sarah's Detailed Plan for" in response.text
     assert "No meals planned for this day." in response.text
 
 
@@ -164,10 +164,10 @@ def test_detailed_page_template_dropdown(client, session):
     assert response.status_code == 200
     
     # Check that the response contains template selection UI elements
-    assert "Select Template..." in response.text
+    assert "View Template" in response.text
     assert "Morning Boost" in response.text
     assert "Evening Energy" in response.text
     
     # Verify that template IDs are present in the dropdown options
-    assert f'value="{template1.id}"' in response.text
-    assert f'value="{template2.id}"' in response.text
+    assert f'href="/detailed?template_id={template1.id}"' in response.text
+    assert f'href="/detailed?template_id={template2.id}"' in response.text

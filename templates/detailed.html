@@ -29,7 +29,7 @@
                 View Template
             </button>
             <ul class="dropdown-menu" aria-labelledby="templateDropdown">
-                {% for t in templates %}
+                {% for t in templates_list %}
                 <li><a class="dropdown-item" href="{{ url_for('detailed', template_id=t.id) }}">{{ t.name }}</a></li>
                 {% endfor %}
             </ul>

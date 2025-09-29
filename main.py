@@ -1617,6 +1617,28 @@ async def get_weekly_menus_api(db: Session = Depends(get_db)):
         ))
     return results
 
+
+@app.get("/weeklymenu/{weekly_menu_id}", response_model=WeeklyMenuDetail)
+async def get_weekly_menu_detail(weekly_menu_id: int, db: Session = Depends(get_db)):
+    """API endpoint to get a specific weekly menu with template details."""
+    weekly_menu = db.query(WeeklyMenu).options(joinedload(WeeklyMenu.weekly_menu_days).joinedload(WeeklyMenuDay.template)).filter(WeeklyMenu.id == weekly_menu_id).first()
+    
+    if not weekly_menu:
+        raise HTTPException(status_code=404, detail="Weekly menu not found")
+    
+    day_details = [
+        WeeklyMenuDayDetail(
+            day_of_week=wmd.day_of_week,
+            template_id=wmd.template_id,
+            template_name=wmd.template.name if wmd.template else "Unknown"
+        ) for wmd in weekly_menu.weekly_menu_days
+    ]
+    return WeeklyMenuDetail(
+        id=weekly_menu.id,
+        name=weekly_menu.name,
+        weekly_menu_days=day_details
+    )
+
 @app.post("/weeklymenu/create")
 async def create_weekly_menu(request: Request, db: Session = Depends(get_db)):
     """Create a new weekly menu with template assignments."""
@@ -1723,6 +1745,83 @@ async def apply_weekly_menu(weekly_menu_id: int, request: Request, db: Session =
     except Exception as e:
         db.rollback()
         logging.error(f"Error applying weekly menu: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.put("/weeklymenu/{weekly_menu_id}")
+async def update_weekly_menu(weekly_menu_id: int, request: Request, db: Session = Depends(get_db)):
+    """Update an existing weekly menu with new template assignments."""
+    try:
+        form_data = await request.form()
+        name = form_data.get("name")
+        template_assignments_str = form_data.get("template_assignments")
+
+        weekly_menu = db.query(WeeklyMenu).filter(WeeklyMenu.id == weekly_menu_id).first()
+        if not weekly_menu:
+            return {"status": "error", "message": "Weekly menu not found"}
+
+        if not name:
+            return {"status": "error", "message": "Weekly menu name is required"}
+
+        # Check for duplicate name if changed
+        if name != weekly_menu.name:
+            existing_weekly_menu = db.query(WeeklyMenu).filter(WeeklyMenu.name == name).first()
+            if existing_weekly_menu:
+                return {"status": "error", "message": f"Weekly menu with name '{name}' already exists"}
+
+        weekly_menu.name = name
+
+        # Clear existing weekly menu days
+        db.query(WeeklyMenuDay).filter(WeeklyMenuDay.weekly_menu_id == weekly_menu_id).delete()
+        db.flush()
+
+        # Process new template assignments
+        if template_assignments_str:
+            assignments = template_assignments_str.split(',')
+            for assignment in assignments:
+                day_of_week_str, template_id_str = assignment.split(':', 1)
+                day_of_week = int(day_of_week_str)
+                template_id = int(template_id_str)
+
+                # Check if template exists
+                template = db.query(Template).filter(Template.id == template_id).first()
+                if not template:
+                    raise HTTPException(status_code=400, detail=f"Template with ID {template_id} not found.")
+
+                weekly_menu_day = WeeklyMenuDay(
+                    weekly_menu_id=weekly_menu.id,
+                    day_of_week=day_of_week,
+                    template_id=template_id
+                )
+                db.add(weekly_menu_day)
+
+        db.commit()
+        return {"status": "success", "message": "Weekly menu updated successfully"}
+
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error updating weekly menu: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.delete("/weeklymenu/{weekly_menu_id}")
+async def delete_weekly_menu(weekly_menu_id: int, db: Session = Depends(get_db)):
+    """Delete a weekly menu and its day assignments."""
+    try:
+        weekly_menu = db.query(WeeklyMenu).filter(WeeklyMenu.id == weekly_menu_id).first()
+        if not weekly_menu:
+            return {"status": "error", "message": "Weekly menu not found"}
+
+        # Delete associated weekly menu days
+        db.query(WeeklyMenuDay).filter(WeeklyMenuDay.weekly_menu_id == weekly_menu_id).delete()
+
+        db.delete(weekly_menu)
+        db.commit()
+
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error deleting weekly menu: {e}")
         return {"status": "error", "message": str(e)}
 
 # Plan tab
@@ -1899,7 +1998,7 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
     logging.info(f"DEBUG: Detailed page requested with person={person}, plan_date={plan_date}, template_id={template_id}")
 
     # Get all templates for the dropdown
-    templates = db.query(Template).order_by(Template.name).all()
+    templates_list = db.query(Template).order_by(Template.name).all()
 
     if template_id:
         # Show template details
@@ -1907,11 +2006,11 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
         template = db.query(Template).filter(Template.id == template_id).first()
         if not template:
             logging.error(f"DEBUG: Template with id {template_id} not found")
-            return templates.TemplateResponse("detailed.html", {
+            return templates.TemplateResponse(request, "detailed.html", {
                 "request": request, "title": "Template Not Found",
                 "error": "Template not found",
                 "day_totals": {},
-                "templates": templates,
+                "templates": templates_list,
                 "person": person
             })
 
@@ -1948,11 +2047,11 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
             "meal_details": meal_details,
             "day_totals": template_nutrition,
             "person": person,
-            "templates": templates,
+            "templates": templates_list,
             "selected_template_id": template_id
         }
         logging.info(f"DEBUG: Rendering template details with context: {context}")
-        return templates.TemplateResponse("detailed.html", context)
+        return templates.TemplateResponse(request, "detailed.html", context)
 
     # If no plan_date is provided, default to today's date
     if not plan_date:
@@ -1966,7 +2065,7 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
                 "request": request, "title": "Invalid Date",
                 "error": "Invalid date format. Please use YYYY-MM-DD.",
                 "day_totals": {},
-                "templates": templates,
+                "templates": templates_list,
                 "person": person
             })
 
@@ -2008,7 +2107,7 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
         "day_totals": day_totals,
         "person": person,
         "plan_date": plan_date_obj,
-        "templates": templates
+        "templates": templates_list
     }
     
     # If no meals are planned, add a message
