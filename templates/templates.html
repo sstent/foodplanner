@@ -318,14 +318,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadTemplates() {
-    fetch('/templates')
-        .then(response => response.text())
-        .then(html => {
-            // Extract templates data from the HTML response
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const templates = JSON.parse(doc.querySelector('script[data-templates]')?.textContent || '[]');
-
+    fetch('/api/templates')
+        .then(response => response.json())
+        .then(templates => {
             const tbody = document.querySelector('#templatesTable tbody');
             tbody.innerHTML = '';
 
@@ -340,7 +335,7 @@ function loadTemplates() {
                     <td><strong>${template.name}</strong></td>
                     <td>
                         ${template.template_meals && template.template_meals.length > 0 ? template.template_meals.map(tm =>
-                            `<span class="badge bg-secondary me-1">${tm.meal_time}: ${tm.meal.name}</span>`
+                            `<span class="badge bg-secondary me-1">${tm.meal_time}: ${tm.meal_name}</span>`
                         ).join('') : 'No meals assigned'}
                     </td>
                     <td>
@@ -502,8 +497,4 @@ function deleteTemplate(templateId) {
 }
 </script>
 
-<!-- Hidden script to pass templates data -->
-<script type="application/json" data-templates>
-{{ templates|tojson }}
-</script>
 {% endblock %}

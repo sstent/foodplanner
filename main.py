@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, Date, Boolean
 from sqlalchemy import or_
-from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base
+from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base, orm
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
@@ -293,9 +293,21 @@ class TemplateExport(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class TemplateMealDetail(BaseModel):
+   meal_id: int
+   meal_time: str
+   meal_name: str
+
+class TemplateDetail(BaseModel):
+   id: int
+   name: str
+   template_meals: List[TemplateMealDetail]
+
+   model_config = ConfigDict(from_attributes=True)
+
 class WeeklyMenuDayExport(BaseModel):
-    day_of_week: int
-    template_id: int
+   day_of_week: int
+   template_id: int
 
 class WeeklyMenuExport(BaseModel):
     id: int
@@ -2180,12 +2192,29 @@ async def test_route():
 
 @app.get("/templates", response_class=HTMLResponse)
 async def templates_page(request: Request, db: Session = Depends(get_db)):
-    templates_list = db.query(Template).all()
-    logging.info(f"DEBUG: templates_list contains {len(templates_list)} templates.")
-    for t in templates_list:
-        logging.info(f"DEBUG: Template object: {t.__dict__}")
     meals = db.query(Meal).all()
-    return templates.TemplateResponse(request, "templates.html", {"templates": templates_list, "meals": meals})
+    return templates.TemplateResponse(request, "templates.html", {"meals": meals})
+
+@app.get("/api/templates", response_model=List[TemplateDetail])
+async def get_templates_api(db: Session = Depends(get_db)):
+    """API endpoint to get all templates with meal details."""
+    templates = db.query(Template).options(orm.joinedload(Template.template_meals).joinedload(TemplateMeal.meal)).all()
+    
+    results = []
+    for t in templates:
+        meal_details = [
+            TemplateMealDetail(
+                meal_id=tm.meal_id,
+                meal_time=tm.meal_time,
+                meal_name=tm.meal.name
+            ) for tm in t.template_meals
+        ]
+        results.append(TemplateDetail(
+            id=t.id,
+            name=t.name,
+            template_meals=meal_details
+        ))
+    return results
 
 @app.post("/templates/upload")
 async def bulk_upload_templates(file: UploadFile = File(...), db: Session = Depends(get_db)):
