@@ -7,11 +7,17 @@ import pytest
 class TestWeeklyMenuRoutes:
     """Test weekly menu-related routes"""
     
-    def test_get_weekly_menu_page(self, client):
-        """Test GET /weeklymenu page"""
+    def test_get_weekly_menu_page(self, client, sample_weekly_menu, sample_template):
+        """Test GET /weeklymenu page displays weekly menus correctly"""
         response = client.get("/weeklymenu")
         assert response.status_code == 200
-        assert b"Weekly" in response.content or b"weekly" in response.content or b"Menu" in response.content
+        
+        # Check for the presence of the weekly menu name
+        assert sample_weekly_menu.name.encode('utf-8') in response.content
+        
+        # Check for the assigned templates' names
+        for weekly_menu_day in sample_weekly_menu.weekly_menu_days:
+            assert weekly_menu_day.template.name.encode('utf-8') in response.content
 
 
     def test_create_weekly_menu_route(self, client, sample_template):
