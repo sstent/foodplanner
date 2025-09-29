@@ -24,15 +24,6 @@ class TestWeeklyMenuRoutes:
         assert response.status_code == 200
         assert response.json() == {"status": "success", "message": "Weekly menu created successfully"}
 
-    def test_create_weekly_menu_route(self, client, sample_template):
-        """Test POST /weeklymenu/create route"""
-        form_data = {
-            "name": "My New Weekly Menu",
-            "template_assignments": f"0:{sample_template.id},1:{sample_template.id}"
-        }
-        response = client.post("/weeklymenu/create", data=form_data)
-        assert response.status_code == 200
-        assert response.json() == {"status": "success", "message": "Weekly menu created successfully"}
 
     def test_apply_weekly_menu_route(self, client, db_session, sample_weekly_menu):
         """Test POST /weeklymenu/{weekly_menu_id}/apply route"""
@@ -89,7 +80,7 @@ class TestWeeklyMenuCRUD:
         
         menu_day = WeeklyMenuDay(
             weekly_menu_id=weekly_menu.id,
-            day_of_week=0,  # Monday
+            day_of_week=0, # Monday
             template_id=sample_template.id
         )
         db_session.add(menu_day)
@@ -98,3 +89,67 @@ class TestWeeklyMenuCRUD:
         # Verify relationships
         assert menu_day.weekly_menu.id == weekly_menu.id
         assert menu_day.template.id == sample_template.id
+
+
+class TestWeeklyMenuAPI:
+    """Test weekly menu API endpoints"""
+    
+    def test_get_weekly_menu_detail(self, client, sample_weekly_menu):
+        """Test GET /weeklymenu/{id} endpoint"""
+        response = client.get(f"/weeklymenu/{sample_weekly_menu.id}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "id" in data
+        assert "name" in data
+        assert "weekly_menu_days" in data
+        assert data["id"] == sample_weekly_menu.id
+        assert data["name"] == sample_weekly_menu.name
+        
+    def test_get_weekly_menus_api(self, client, sample_weekly_menu):
+        """Test GET /api/weeklymenus endpoint"""
+        response = client.get("/api/weeklymenus")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) >= 1  # Should include our sample weekly menu
+        
+        # Find our sample menu in the response
+        sample_menu_found = False
+        for menu in data:
+            if menu["id"] == sample_weekly_menu.id:
+                sample_menu_found = True
+                assert menu["name"] == sample_weekly_menu.name
+                break
+        assert sample_menu_found, "Sample weekly menu should be in API response"
+    
+    def test_update_weekly_menu(self, client, sample_weekly_menu, sample_template):
+        """Test PUT /weeklymenu/{id} endpoint"""
+        form_data = {
+            "name": "Updated Weekly Menu Name",
+            "template_assignments": f"0:{sample_template.id},1:{sample_template.id},2:{sample_template.id}"
+        }
+        response = client.put(f"/weeklymenu/{sample_weekly_menu.id}", data=form_data)
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["status"] == "success"
+        
+        # Verify the update worked by getting the menu again
+        get_response = client.get(f"/weeklymenu/{sample_weekly_menu.id}")
+        assert get_response.status_code == 200
+        updated_data = get_response.json()
+        assert updated_data["name"] == "Updated Weekly Menu Name"
+    
+    def test_delete_weekly_menu(self, client, sample_weekly_menu):
+        """Test DELETE /weeklymenu/{id} endpoint"""
+        response = client.delete(f"/weeklymenu/{sample_weekly_menu.id}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["status"] == "success"
+        
+        # Verify the deletion worked by trying to get the menu again
+        get_response = client.get(f"/weeklymenu/{sample_weekly_menu.id}")
+        assert get_response.status_code == 404

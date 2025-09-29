@@ -333,26 +333,28 @@ function loadWeeklyMenus(weeklyMenus) {
     
     weeklyMenus.forEach(weeklyMenu => {
         const row = document.createElement('tr');
-        row.innerHTML = `
-            <td><strong>\${weeklyMenu.name}</strong></td>
-            <td>
-                \${weeklyMenu.weekly_menu_days && weeklyMenu.weekly_menu_days.length > 0 ?
-                    weeklyMenu.weekly_menu_days.map(wmd =>
-                        \`<span class="badge bg-secondary me-1">\${dayNames[wmd.day_of_week]}: \${wmd.template_name}</span>\`
-                    ).join('') : 'No templates assigned'}
-            </td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary me-2" onclick="applyWeeklyMenuModal(\${weeklyMenu.id})">
-                    <i class="bi bi-play-circle"></i> Apply
-                </button>
-                <button class="btn btn-sm btn-outline-secondary me-2" onclick="editWeeklyMenuModal(\${weeklyMenu.id})">
-                    <i class="bi bi-pencil"></i> Edit
-                </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteWeeklyMenu(\${weeklyMenu.id})">
-                    <i class="bi bi-trash"></i> Delete
-                </button>
-            </td>
-        `;
+        let templateBadges = '';
+        if (weeklyMenu.weekly_menu_days && weeklyMenu.weekly_menu_days.length > 0) {
+            templateBadges = weeklyMenu.weekly_menu_days.map(wmd =>
+                '<span class="badge bg-secondary me-1">' + dayNames[wmd.day_of_week] + ': ' + wmd.template_name + '</span>'
+            ).join('');
+        } else {
+            templateBadges = 'No templates assigned';
+        }
+        row.innerHTML =
+            '<td><strong>' + weeklyMenu.name + '</strong></td>' +
+            '<td>' + templateBadges + '</td>' +
+            '<td>' +
+                '<button class="btn btn-sm btn-outline-primary me-2" onclick="applyWeeklyMenuModal(' + weeklyMenu.id + ')">' +
+                    '<i class="bi bi-play-circle"></i> Apply' +
+                '</button>' +
+                '<button class="btn btn-sm btn-outline-secondary me-2" onclick="editWeeklyMenuModal(' + weeklyMenu.id + ')">' +
+                    '<i class="bi bi-pencil"></i> Edit' +
+                '</button>' +
+                '<button class="btn btn-sm btn-outline-danger" onclick="deleteWeeklyMenu(' + weeklyMenu.id + ')">' +
+                    '<i class="bi bi-trash"></i> Delete' +
+                '</button>' +
+            '</td>';
         tbody.appendChild(row);
     });
 }
