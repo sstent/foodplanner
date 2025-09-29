@@ -1938,7 +1938,6 @@ async def tracker_save_template(request: Request, db: Session = Depends(get_db))
                 meal_time=tracked_meal.meal_time
             )
             db.add(template_meal)
-        
         db.commit()
         
         logging.info(f"DEBUG: Successfully saved template with {len(tracked_meals)} meals")
@@ -2061,3 +2060,77 @@ async def tracker_reset_to_plan(request: Request, db: Session = Depends(get_db))
 async def test_route():
     logging.info("DEBUG: Test route called")
     return {"status": "success", "message": "Test route is working"}
+
+@app.post("/templates/upload")
+async def bulk_upload_templates(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Handle bulk template upload from CSV"""
+    try:
+        contents = await file.read()
+        decoded = contents.decode('utf-8').splitlines()
+        reader = csv.DictReader(decoded)
+
+        stats = {'created': 0, 'updated': 0, 'errors': []}
+
+        for row_num, row in enumerate(reader, 2):  # Row numbers start at 2 (1-based + header)
+            try:
+                user = row.get('User', '').strip()
+                template_id = row.get('ID', '').strip()
+
+                if not user or not template_id:
+                    stats['errors'].append(f"Row {row_num}: Missing User or ID")
+                    continue
+
+                # Create template name in format <User>-<ID>
+                template_name = f"{user}-{template_id}"
+
+                # Check if template already exists
+                existing_template = db.query(Template).filter(Template.name == template_name).first()
+                if existing_template:
+                    # Update existing template - remove existing meals
+                    db.query(TemplateMeal).filter(TemplateMeal.template_id == existing_template.id).delete()
+                    template = existing_template
+                    stats['updated'] += 1
+                else:
+                    # Create new template
+                    template = Template(name=template_name)
+                    db.add(template)
+                    stats['created'] += 1
+
+                db.flush()  # Get template ID
+
+                # Meal time mappings from CSV columns
+                meal_columns = {
+                    'Beverage 1': 'Beverage 1',
+                    'Breakfast': 'Breakfast',
+                    'Lunch': 'Lunch',
+                    'Dinner': 'Dinner',
+                    'Snack 1': 'Snack 1',
+                    'Snack 2': 'Snack 2'
+                }
+
+                # Process each meal column
+                for csv_column, meal_time in meal_columns.items():
+                    meal_name = row.get(csv_column, '').strip()
+                    if meal_name:
+                        # Find meal by name
+                        meal = db.query(Meal).filter(Meal.name.ilike(meal_name)).first()
+                        if meal:
+                            # Create template meal
+                            template_meal = TemplateMeal(
+                                template_id=template.id,
+                                meal_id=meal.id,
+                                meal_time=meal_time
+                            )
+                            db.add(template_meal)
+                        else:
+                            stats['errors'].append(f"Row {row_num}: Meal '{meal_name}' not found for {meal_time}")
+
+            except (KeyError, ValueError) as e:
+                stats['errors'].append(f"Row {row_num}: {str(e)}")
+
+        db.commit()
+        return stats
+
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
