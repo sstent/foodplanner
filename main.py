@@ -1513,6 +1513,19 @@ async def delete_meals(meal_ids: dict = Body(...), db: Session = Depends(get_db)
         db.rollback()
         return {"status": "error", "message": str(e)}
 
+#Weekly Menu tab
+
+@app.get("/weekly-menu", response_class=HTMLResponse)
+async def weekly_menu_page(request: Request, db: Session = Depends(get_db)):
+    weekly_menus = db.query(WeeklyMenu).all()
+    templates = db.query(Template).all()
+    return templates.TemplateResponse("weekly_menu.html", {
+        "request": request,
+        "weekly_menus": weekly_menus,
+        "templates": templates
+    })
+
+
 # Plan tab
 @app.get("/plan", response_class=HTMLResponse)
 async def plan_page(request: Request, person: str = "Sarah", week_start_date: str = None, db: Session = Depends(get_db)):
