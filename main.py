@@ -60,11 +60,11 @@ app = FastAPI(title="Meal Planner")
 templates = Jinja2Templates(directory="templates")
 
 # Add a logging middleware to see incoming requests
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    logging.info(f"Incoming request: {request.method} {request.url.path}")
-    response = await call_next(request)
-    return response
+# @app.middleware("http")
+# async def log_requests(request: Request, call_next):
+#     logging.info(f"Incoming request: {request.method} {request.url.path}")
+#     response = await call_next(request)
+#     return response
 
 # Get the port from environment variable or default to 8999
 PORT = int(os.getenv("PORT", 8999))
@@ -392,18 +392,18 @@ def scheduled_backup():
     backup_path = os.path.join(backup_dir, f"meal_planner_{timestamp}.db")
     backup_database(db_path, backup_path)
 
-@app.on_event("startup")
-def startup_event():
-    logging.info("DEBUG: Startup event triggered")
-    run_migrations()
-    logging.info("DEBUG: Startup event completed")
-
-    # Schedule the backup job - temporarily disabled for debugging
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_backup, 'cron', hour=0)
-    scheduler.start()
-    logging.info("Scheduled backup job started.")
-    # logging.info("Startup completed - scheduler temporarily disabled")
+# @app.on_event("startup")
+# def startup_event():
+#     logging.info("DEBUG: Startup event triggered")
+#     run_migrations()
+#     logging.info("DEBUG: Startup event completed")
+#
+#     # Schedule the backup job - temporarily disabled for debugging
+#     scheduler = BackgroundScheduler()
+#     scheduler.add_job(scheduled_backup, 'cron', hour=0)
+#     scheduler.start()
+#     logging.info("Scheduled backup job started.")
+#     # logging.info("Startup completed - scheduler temporarily disabled")
 
 def test_sqlite_connection(db_path):
     """Test if we can create and write to SQLite database file"""
