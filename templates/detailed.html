@@ -2,44 +2,38 @@
 {% block content %}
 <div class="row mb-3">
     <div class="col-md-6">
-        <h3>Detailed View for {{ person }}</h3>
-        <div class="mb-3">
-            <div class="btn-group" role="group">
-                <input type="radio" class="btn-check" name="viewMode" id="dayView" autocomplete="off" {% if view_mode == 'day' or not view_mode %}checked{% endif %}>
-                <label class="btn btn-outline-primary" for="dayView">View Planned Day</label>
-                <input type="radio" class="btn-check" name="viewMode" id="templateView" autocomplete="off" {% if view_mode == 'template' %}checked{% endif %}>
-                <label class="btn btn-outline-primary" for="templateView">View Template</label>
+        <h3>
+            Detailed View for
+            <div class="btn-group">
+                <a href="{{ url_for('detailed', person='Sarah', plan_date=plan_date.isoformat() if plan_date else '') }}"
+                   class="btn btn-sm {% if person == 'Sarah' %}btn-primary{% else %}btn-outline-primary{% endif %}">Sarah</a>
+                <a href="{{ url_for('detailed', person='Stuart', plan_date=plan_date.isoformat() if plan_date else '') }}"
+                   class="btn btn-sm {% if person == 'Stuart' %}btn-primary{% else %}btn-outline-primary{% endif %}">Stuart</a>
             </div>
-        </div>
-
-        <div id="daySelector" {% if view_mode == 'template' %}style="display: none;"{% endif %}>
-            <form method="get" class="d-flex">
+        </h3>
+        
+        <div id="daySelector">
+            <form action="{{ url_for('detailed') }}" method="get" class="d-flex">
                 <input type="hidden" name="person" value="{{ person }}">
-                <input type="date" class="form-control me-2" name="plan_date" value="{% if view_mode == 'day' %}{{ plan_date }}{% else %}{{ today|default('') }}{% endif %}" required>
+                <input type="date" class="form-control me-2" name="plan_date" value="{{ plan_date.isoformat() if plan_date else '' }}" required>
                 <button class="btn btn-primary" type="submit">
                     <i class="bi bi-search"></i> View Day
-                </button>
-            </form>
-        </div>
-
-        <div id="templateSelector" {% if view_mode != 'template' %}style="display: none;"{% endif %}>
-            <form method="get" class="d-flex">
-                <input type="hidden" name="person" value="{{ person }}">
-                <select class="form-control me-2" name="template_id" required>
-                    <option value="">Select Template...</option>
-                    {% for template in templates %}
-                    <option value="{{ template.id }}" {% if template_id == template.id %}selected{% endif %}>{{ template.name }}</option>
-                    {% endfor %}
-                </select>
-                <button class="btn btn-primary" type="submit">
-                    <i class="bi bi-search"></i> View Template
                 </button>
             </form>
         </div>
     </div>
     <div class="col-md-6 text-end">
         <h4 class="mb-0">{{ title }}</h4>
-        <small class="text-muted">Detailed nutritional breakdown</small>
+        <div class="dropdown mt-2">
+            <button class="btn btn-secondary dropdown-toggle" type="button" id="templateDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                View Template
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="templateDropdown">
+                {% for t in templates %}
+                <li><a class="dropdown-item" href="{{ url_for('detailed', template_id=t.id) }}">{{ t.name }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
 </div>
 

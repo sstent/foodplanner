@@ -1895,8 +1895,11 @@ async def remove_from_plan(plan_id: int, db: Session = Depends(get_db)):
 
 @app.get("/detailed", response_class=HTMLResponse)
 async def detailed(request: Request, person: str = "Sarah", plan_date: str = None, template_id: int = None, db: Session = Depends(get_db)):
-    from datetime import datetime
+    from datetime import datetime, date
     logging.info(f"DEBUG: Detailed page requested with person={person}, plan_date={plan_date}, template_id={template_id}")
+
+    # Get all templates for the dropdown
+    templates = db.query(Template).order_by(Template.name).all()
 
     if template_id:
         # Show template details
@@ -1904,10 +1907,12 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
         template = db.query(Template).filter(Template.id == template_id).first()
         if not template:
             logging.error(f"DEBUG: Template with id {template_id} not found")
-            return templates.TemplateResponse(request, "detailed.html", {
+            return templates.TemplateResponse("detailed.html", {
                 "request": request, "title": "Template Not Found",
                 "error": "Template not found",
-                "day_totals": {}
+                "day_totals": {},
+                "templates": templates,
+                "person": person
             })
 
         template_meals = db.query(TemplateMeal).filter(TemplateMeal.template_id == template_id).all()
@@ -1920,7 +1925,7 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
         for tm in template_meals:
             meal_nutrition = calculate_meal_nutrition(tm.meal, db)
             meal_details.append({
-                'plan': {'meal': tm.meal},
+                'plan': {'meal': tm.meal, 'meal_time': tm.meal_time},
                 'nutrition': meal_nutrition,
                 'foods': []  # Template view doesn't show individual foods
             })
@@ -1935,79 +1940,83 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
             template_nutrition['protein_pct'] = round((template_nutrition['protein'] * 4 / total_cals) * 100, 1)
             template_nutrition['carbs_pct'] = round((template_nutrition['carbs'] * 4 / total_cals) * 100, 1)
             template_nutrition['fat_pct'] = round((template_nutrition['fat'] * 9 / total_cals) * 100, 1)
-            template_nutrition['net_carbs'] = template_nutrition['carbs'] - template_nutrition['fiber']
+            template_nutrition['net_carbs'] = template_nutrition['carbs'] - template_nutrition.get('fiber', 0)
         
         context = {
             "request": request,
             "title": f"{template.name} Template",
             "meal_details": meal_details,
             "day_totals": template_nutrition,
-            "person": person
+            "person": person,
+            "templates": templates,
+            "selected_template_id": template_id
         }
         logging.info(f"DEBUG: Rendering template details with context: {context}")
-        return templates.TemplateResponse(request, "detailed.html", context)
+        return templates.TemplateResponse("detailed.html", context)
 
-    if plan_date:
-        # Show plan details for a specific date
-        logging.info(f"DEBUG: Loading plan for date: {plan_date}")
+    # If no plan_date is provided, default to today's date
+    if not plan_date:
+        plan_date_obj = date.today()
+    else:
         try:
             plan_date_obj = datetime.fromisoformat(plan_date).date()
         except ValueError:
             logging.error(f"DEBUG: Invalid date format for plan_date: {plan_date}")
-            return templates.TemplateResponse(request, "detailed.html", {
+            return templates.TemplateResponse("detailed.html", {
                 "request": request, "title": "Invalid Date",
                 "error": "Invalid date format. Please use YYYY-MM-DD.",
-                "day_totals": {}
+                "day_totals": {},
+                "templates": templates,
+                "person": person
             })
 
-        plans = db.query(Plan).filter(Plan.person == person, Plan.date == plan_date_obj).all()
-        logging.info(f"DEBUG: Found {len(plans)} plans for {person} on {plan_date_obj}")
+    logging.info(f"DEBUG: Loading plan for {person} on {plan_date_obj}")
+    plans = db.query(Plan).filter(Plan.person == person, Plan.date == plan_date_obj).all()
+    logging.info(f"DEBUG: Found {len(plans)} plans for {person} on {plan_date_obj}")
 
-        day_totals = calculate_day_nutrition(plans, db)
+    day_totals = calculate_day_nutrition(plans, db)
+    
+    meal_details = []
+    for plan in plans:
+        meal_nutrition = calculate_meal_nutrition(plan.meal, db)
         
-        meal_details = []
-        for plan in plans:
-            meal_nutrition = calculate_meal_nutrition(plan.meal, db)
-            
-            foods = []
-            for mf in plan.meal.meal_foods:
-                foods.append({
-                    'name': mf.food.name,
-                    'quantity': mf.quantity,
-                    'serving_size': mf.food.serving_size,
-                    'serving_unit': mf.food.serving_unit,
-                    'calories': mf.food.calories * mf.quantity,
-                    'protein': mf.food.protein * mf.quantity,
-                    'carbs': mf.food.carbs * mf.quantity,
-                    'fat': mf.food.fat * mf.quantity,
-                    'fiber': mf.food.fiber * mf.quantity,
-                    'sodium': mf.food.sodium * mf.quantity,
-                })
-            
-            meal_details.append({
-                'plan': plan,
-                'nutrition': meal_nutrition,
-                'foods': foods
+        foods = []
+        for mf in plan.meal.meal_foods:
+            foods.append({
+                'name': mf.food.name,
+                'quantity': mf.quantity,
+                'serving_size': mf.food.serving_size,
+                'serving_unit': mf.food.serving_unit,
+                'calories': mf.food.calories * mf.quantity,
+                'protein': mf.food.protein * mf.quantity,
+                'carbs': mf.food.carbs * mf.quantity,
+                'fat': mf.food.fat * mf.quantity,
+                'fiber': (mf.food.fiber or 0) * mf.quantity,
+                'sodium': (mf.food.sodium or 0) * mf.quantity,
             })
         
-        context = {
-            "request": request,
-            "title": f"{person}'s Detailed Plan for {plan_date_obj.strftime('%B %d, %Y')}",
-            "meal_details": meal_details,
-            "day_totals": day_totals,
-            "person": person,
-            "plan_date": plan_date_obj
-        }
-        logging.info(f"DEBUG: Rendering plan details with context: {context}")
-        return templates.TemplateResponse(request, "detailed.html", context)
+        meal_details.append({
+            'plan': plan,
+            'nutrition': meal_nutrition,
+            'foods': foods
+        })
+    
+    context = {
+        "request": request,
+        "title": f"{person}'s Detailed Plan for {plan_date_obj.strftime('%B %d, %Y')}",
+        "meal_details": meal_details,
+        "day_totals": day_totals,
+        "person": person,
+        "plan_date": plan_date_obj,
+        "templates": templates
+    }
+    
+    # If no meals are planned, add a message
+    if not meal_details:
+        context["message"] = "No meals planned for this day."
 
-    # If neither plan_date nor template_id is provided, return an error
-    logging.error("DEBUG: Neither plan_date nor template_id were provided")
-    return templates.TemplateResponse(request, "detailed.html", {
-        "request": request, "title": "Error",
-        "error": "Please provide either a plan date or a template ID.",
-        "day_totals": {}
-    })
+    logging.info(f"DEBUG: Rendering plan details with context: {context}")
+    return templates.TemplateResponse("detailed.html", context)
 
 # Tracker tab - Main page
 @app.get("/tracker", response_class=HTMLResponse)
