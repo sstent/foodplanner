@@ -56,11 +56,13 @@ job "foodplanner" {
         # Mount the SQLite database file to persist data
         # Adjust the source path as needed for your environment
         volumes = [
-          "/alloc/data/:/app/data/",
           "/mnt/Public/configs/FoodPlanner_backups:/app/backups/",
         ]
       }
-
+      env {
+        DATABASE_PATH = "/alloc/tmp"
+        DATABASE_URL = "sqlite:////alloc/tmp/meal_planner.db"
+      }
       resources {
         cpu    = 500
         memory = 1024
@@ -88,9 +90,6 @@ job "foodplanner" {
           "replicate",
           "/alloc/tmp/meal_planner.db",
           "sftp://root:odroid@192.168.4.63/mnt/Shares/litestream/foodplanner.db"
-        ]
-        volumes = [
-         "/opt/nomad/data:/data"
         ]
       }
     }

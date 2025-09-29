@@ -2106,7 +2106,8 @@ async def test_route():
 @app.get("/templates", response_class=HTMLResponse)
 async def templates_page(request: Request, db: Session = Depends(get_db)):
     templates_list = db.query(Template).all()
-    return templates.TemplateResponse("templates.html", {"request": request, "templates": templates_list})
+    meals = db.query(Meal).all()
+    return templates.TemplateResponse("templates.html", {"request": request, "templates": templates_list, "meals": meals})
 
 @app.post("/templates/upload")
 async def bulk_upload_templates(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -2180,4 +2181,204 @@ async def bulk_upload_templates(file: UploadFile = File(...), db: Session = Depe
 
     except Exception as e:
         db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/templates/create")
+async def create_template(request: Request, db: Session = Depends(get_db)):
+    """Create a new template with meal assignments."""
+    try:
+        form_data = await request.form()
+        template_name = form_data.get("name")
+        meal_assignments_str = form_data.get("meal_assignments")
+
+        if not template_name:
+            return {"status": "error", "message": "Template name is required"}
+
+        # Check if template already exists
+        existing_template = db.query(Template).filter(Template.name == template_name).first()
+        if existing_template:
+            return {"status": "error", "message": f"Template with name '{template_name}' already exists"}
+
+        # Create new template
+        template = Template(name=template_name)
+        db.add(template)
+        db.flush()
+
+        # Process meal assignments
+        if meal_assignments_str:
+            assignments = meal_assignments_str.split(',')
+            for assignment in assignments:
+                meal_time, meal_id_str = assignment.split(':')
+                meal_id = int(meal_id_str)
+                
+                meal = db.query(Meal).filter(Meal.id == meal_id).first()
+                if meal:
+                    template_meal = TemplateMeal(
+                        template_id=template.id,
+                        meal_id=meal.id,
+                        meal_time=meal_time
+                    )
+                    db.add(template_meal)
+                else:
+                    logging.warning(f"Meal with ID {meal_id} not found for template '{template_name}'")
+
+        db.commit()
+        return {"status": "success", "message": "Template created successfully"}
+
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error creating template: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/templates/{template_id}")
+async def get_template_details(template_id: int, db: Session = Depends(get_db)):
+    """Get details for a single template"""
+    try:
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            return {"status": "error", "message": "Template not found"}
+        
+        template_meals_details = []
+        for tm in template.template_meals:
+            template_meals_details.append({
+                "meal_id": tm.meal_id,
+                "meal_time": tm.meal_time,
+                "meal_name": tm.meal.name  # Include meal name for display
+            })
+
+        return {
+            "status": "success",
+            "template": {
+                "id": template.id,
+                "name": template.name,
+                "template_meals": template_meals_details
+            }
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.put("/templates/{template_id}")
+async def update_template(template_id: int, request: Request, db: Session = Depends(get_db)):
+    """Update an existing template with new meal assignments."""
+    try:
+        form_data = await request.form()
+        template_name = form_data.get("name")
+        meal_assignments_str = form_data.get("meal_assignments")
+
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            return {"status": "error", "message": "Template not found"}
+
+        if not template_name:
+            return {"status": "error", "message": "Template name is required"}
+
+        # Check for duplicate name if changed
+        if template_name != template.name:
+            existing_template = db.query(Template).filter(Template.name == template_name).first()
+            if existing_template:
+                return {"status": "error", "message": f"Template with name '{template_name}' already exists"}
+        
+        template.name = template_name
+        
+        # Clear existing template meals
+        db.query(TemplateMeal).filter(TemplateMeal.template_id == template_id).delete()
+        db.flush()
+
+        # Process new meal assignments
+        if meal_assignments_str:
+            assignments = meal_assignments_str.split(',')
+            for assignment in assignments:
+                meal_time, meal_id_str = assignment.split(':')
+                meal_id = int(meal_id_str)
+                
+                meal = db.query(Meal).filter(Meal.id == meal_id).first()
+                if meal:
+                    template_meal = TemplateMeal(
+                        template_id=template.id,
+                        meal_id=meal.id,
+                        meal_time=meal_time
+                    )
+                    db.add(template_meal)
+                else:
+                    logging.warning(f"Meal with ID {meal_id} not found for template '{template_name}'")
+
+        db.commit()
+        return {"status": "success", "message": "Template updated successfully"}
+
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error updating template: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/templates/{template_id}/use")
+async def use_template(template_id: int, request: Request, db: Session = Depends(get_db)):
+    """Apply a template to a specific date for a person."""
+    try:
+        form_data = await request.form()
+        person = form_data.get("person")
+        date_str = form_data.get("start_date") # Renamed from start_day to start_date
+        
+        if not person or not date_str:
+            return {"status": "error", "message": "Person and date are required"}
+        
+        from datetime import datetime
+        target_date = datetime.fromisoformat(date_str).date()
+
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            return {"status": "error", "message": "Template not found"}
+        
+        template_meals = db.query(TemplateMeal).filter(TemplateMeal.template_id == template_id).all()
+        if not template_meals:
+            return {"status": "error", "message": "Template has no meals"}
+
+        # Check for existing tracked day
+        tracked_day = db.query(TrackedDay).filter(
+            TrackedDay.person == person,
+            TrackedDay.date == target_date
+        ).first()
+
+        if not tracked_day:
+            tracked_day = TrackedDay(person=person, date=target_date, is_modified=True)
+            db.add(tracked_day)
+            db.flush()
+        else:
+            # Clear existing meals for the tracked day
+            db.query(TrackedMeal).filter(TrackedMeal.tracked_day_id == tracked_day.id).delete()
+            tracked_day.is_modified = True
+        
+        for template_meal in template_meals:
+            tracked_meal = TrackedMeal(
+                tracked_day_id=tracked_day.id,
+                meal_id=template_meal.meal_id,
+                meal_time=template_meal.meal_time,
+                quantity=1.0 # Default quantity when applying template
+            )
+            db.add(tracked_meal)
+        
+        db.commit()
+        return {"status": "success", "message": "Template applied successfully"}
+
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error applying template: {e}")
+        return {"status": "error", "message": str(e)}
+@app.delete("/templates/{template_id}")
+async def delete_template(template_id: int, db: Session = Depends(get_db)):
+    """Delete a template and its meal assignments."""
+    try:
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            return {"status": "error", "message": "Template not found"}
+
+        # Delete associated template meals
+        db.query(TemplateMeal).filter(TemplateMeal.template_id == template_id).delete()
+        
+        db.delete(template)
+        db.commit()
+        
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error deleting template: {e}")
         return {"status": "error", "message": str(e)}
