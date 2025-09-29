@@ -5,9 +5,9 @@
         <h3>
             Detailed View for
             <div class="btn-group">
-                <a href="{{ url_for('detailed', person='Sarah', plan_date=plan_date.isoformat() if plan_date else '') }}"
+                <a href="{{ url_for('detailed') }}?person=Sarah{% if plan_date %}&plan_date={{ plan_date.isoformat() }}{% endif %}"
                    class="btn btn-sm {% if person == 'Sarah' %}btn-primary{% else %}btn-outline-primary{% endif %}">Sarah</a>
-                <a href="{{ url_for('detailed', person='Stuart', plan_date=plan_date.isoformat() if plan_date else '') }}"
+                <a href="{{ url_for('detailed') }}?person=Stuart{% if plan_date %}&plan_date={{ plan_date.isoformat() }}{% endif %}"
                    class="btn btn-sm {% if person == 'Stuart' %}btn-primary{% else %}btn-outline-primary{% endif %}">Stuart</a>
             </div>
         </h3>
