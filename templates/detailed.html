@@ -38,7 +38,7 @@
         </div>
     </div>
     <div class="col-md-6 text-end">
-        <h4 class="mb-0">{{ selected_day }}</h4>
+        <h4 class="mb-0">{{ title }}</h4>
         <small class="text-muted">Detailed nutritional breakdown</small>
     </div>
 </div>
@@ -169,19 +169,19 @@
             {% for meal_food in meal_detail.foods %}
             <tr>
                 <td>
-                    <div class="food-name">{{ meal_food.food.name }}</div>
+                    <div class="food-name">{{ meal_food.name }}</div>
                 </td>
                 <td>
                     <div class="serving-info">
-                        {{ meal_food.quantity }} × {{ meal_food.food.serving_size }}{{ meal_food.food.serving_unit }}
+                        {{ meal_food.quantity }} × {{ meal_food.serving_size }}{{ meal_food.serving_unit }}
                     </div>
                 </td>
-                <td class="nutrient-value">{{ "%.0f"|format(meal_food.food.calories * meal_food.quantity) }}</td>
-                <td class="nutrient-value">{{ "%.1f"|format(meal_food.food.protein * meal_food.quantity) }}g</td>
-                <td class="nutrient-value">{{ "%.1f"|format(meal_food.food.carbs * meal_food.quantity) }}g</td>
-                <td class="nutrient-value">{{ "%.1f"|format(meal_food.food.fat * meal_food.quantity) }}g</td>
-                <td class="nutrient-value">{{ "%.1f"|format((meal_food.food.fiber or 0) * meal_food.quantity) }}g</td>
-                <td class="nutrient-value">{{ "%.0f"|format((meal_food.food.sodium or 0) * meal_food.quantity) }}mg</td>
+                <td class="nutrient-value">{{ "%.0f"|format(meal_food.calories) }}</td>
+                <td class="nutrient-value">{{ "%.1f"|format(meal_food.protein) }}g</td>
+                <td class="nutrient-value">{{ "%.1f"|format(meal_food.carbs) }}g</td>
+                <td class="nutrient-value">{{ "%.1f"|format(meal_food.fat) }}g</td>
+                <td class="nutrient-value">{{ "%.1f"|format(meal_food.fiber or 0) }}g</td>
+                <td class="nutrient-value">{{ "%.0f"|format(meal_food.sodium or 0) }}mg</td>
             </tr>
             {% endfor %}
             <!-- Meal Totals Row -->
@@ -231,6 +231,7 @@
 {% endfor %}
 
 <!-- Day Totals -->
+{% if day_totals and day_totals.calories is defined and day_totals.calories > 0 %}
 <div class="day-totals">
     <h5 class="mb-3 text-center">
         <i class="bi bi-calendar-check"></i> Daily Totals - {{ "%.0f"|format(day_totals.calories) }} Total Calories
@@ -276,19 +277,24 @@
     
     <div class="text-center mt-2">
         <small>
-            <strong>Daily Macro Ratio:</strong> 
+            <strong>Daily Macro Ratio:</strong>
             {{ day_totals.protein_pct or 0 }}% Protein : {{ day_totals.carbs_pct or 0 }}% Carbs : {{ day_totals.fat_pct or 0 }}% Fat
         </small>
     </div>
 </div>
+{% endif %}
 
-{% if not meal_details %}
-<div class="alert alert-info">
+{% if error %}
+<div class="alert alert-danger mt-3">
+    <i class="bi bi-exclamation-triangle-fill"></i> <strong>Error:</strong> {{ error }}
+</div>
+{% elif not meal_details %}
+<div class="alert alert-info mt-3">
     <i class="bi bi-info-circle"></i>
     {% if view_mode == 'template' %}
-        No template selected. Please select a template to view.
+        This template has no meals.
     {% else %}
-        No meals planned for this date. Go to the Plan tab to add meals.
+        No meals planned for this day.
     {% endif %}
 </div>
 {% endif %}

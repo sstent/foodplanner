@@ -32,7 +32,7 @@ def client_fixture(session):
 def test_detailed_page_no_params(client):
     response = client.get("/detailed")
     assert response.status_code == 200
-    assert "error" in response.text or "Template Not Found" in response.text # Based on the existing code, it returns an error template if neither plan_date nor template_id is provided, and template_id is None.
+    assert "Please provide either a plan date or a template ID." in response.text
 
 def test_detailed_page_with_plan_date(client, session):
     # Create mock data
@@ -57,8 +57,8 @@ def test_detailed_page_with_plan_date(client, session):
 
     response = client.get(f"/detailed?person=Sarah&plan_date={test_date.isoformat()}")
     assert response.status_code == 200
-    assert b"Sarah's Detailed Plan" in response.content
-    assert b"Fruit Snack" in response.content
+    assert "Sarah's Detailed Plan for" in response.text
+    assert "Fruit Snack" in response.text
 
 def test_detailed_page_with_template_id(client, session):
     # Create mock data
@@ -87,17 +87,17 @@ def test_detailed_page_with_template_id(client, session):
 
     response = client.get(f"/detailed?template_id={template.id}")
     assert response.status_code == 200
-    assert b"Morning Boost Template" in response.content
-    assert b"Banana Smoothie" in response.content
+    assert "Morning Boost Template" in response.text
+    assert "Banana Smoothie" in response.text
 
 def test_detailed_page_with_invalid_plan_date(client):
     invalid_date = date.today() + timedelta(days=100) # A date far in the future
     response = client.get(f"/detailed?person=Sarah&plan_date={invalid_date.isoformat()}")
     assert response.status_code == 200
-    assert b"Sarah's Detailed Plan" in response.content
-    assert b"No meals planned for this day." in response.content # Assuming this message is displayed
+    assert "Sarah's Detailed Plan for" in response.text
+    assert "No meals planned for this day." in response.text
 
 def test_detailed_page_with_invalid_template_id(client):
     response = client.get(f"/detailed?template_id=99999")
     assert response.status_code == 200
-    assert b"Template Not Found" in response.content
+    assert "Template Not Found" in response.text
