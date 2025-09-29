@@ -5,15 +5,15 @@ print("DEBUG: main.py started")
 # Run with: uvicorn main:app --reload
 
 from fastapi import FastAPI, Depends, HTTPException, Request, Form, Body
+from contextlib import asynccontextmanager
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, Date, Boolean
 from sqlalchemy import or_
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
 import os
@@ -53,18 +53,36 @@ except Exception as e:
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
 # Initialize FastAPI app
-app = FastAPI(title="Meal Planner")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logging.info("DEBUG: Startup event triggered")
+    run_migrations()
+    logging.info("DEBUG: Startup event completed")
+
+    # Schedule the backup job - temporarily disabled for debugging
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(scheduled_backup, 'cron', hour=0)
+    scheduler.start()
+    logging.info("Scheduled backup job started.")
+    yield
+    # Shutdown
+    scheduler.shutdown()
+
+app = FastAPI(title="Meal Planner", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
 # Add a logging middleware to see incoming requests
-# @app.middleware("http")
-# async def log_requests(request: Request, call_next):
-#     logging.info(f"Incoming request: {request.method} {request.url.path}")
-#     response = await call_next(request)
-#     return response
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logging.info(f"Incoming request: {request.method} {request.url.path}")
+    response = await call_next(request)
+    return response
 
 # Get the port from environment variable or default to 8999
 PORT = int(os.getenv("PORT", 8999))
@@ -223,8 +241,7 @@ class FoodResponse(BaseModel):
     source: str
     brand: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MealCreate(BaseModel):
     name: str
@@ -255,8 +272,7 @@ class MealExport(BaseModel):
     meal_time: str
     meal_foods: List[MealFoodExport]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PlanExport(BaseModel):
     id: int
@@ -265,8 +281,7 @@ class PlanExport(BaseModel):
     meal_id: int
     meal_time: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TemplateMealExport(BaseModel):
     meal_id: int
@@ -277,8 +292,7 @@ class TemplateExport(BaseModel):
     name: str
     template_meals: List[TemplateMealExport]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class WeeklyMenuDayExport(BaseModel):
     day_of_week: int
@@ -289,8 +303,7 @@ class WeeklyMenuExport(BaseModel):
     name: str
     weekly_menu_days: List[WeeklyMenuDayExport]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TrackedMealExport(BaseModel):
     meal_id: int
@@ -304,8 +317,7 @@ class TrackedDayExport(BaseModel):
     is_modified: bool
     tracked_meals: List[TrackedMealExport]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AllData(BaseModel):
     foods: List[FoodExport]
@@ -392,18 +404,6 @@ def scheduled_backup():
     backup_path = os.path.join(backup_dir, f"meal_planner_{timestamp}.db")
     backup_database(db_path, backup_path)
 
-# @app.on_event("startup")
-# def startup_event():
-#     logging.info("DEBUG: Startup event triggered")
-#     run_migrations()
-#     logging.info("DEBUG: Startup event completed")
-#
-#     # Schedule the backup job - temporarily disabled for debugging
-#     scheduler = BackgroundScheduler()
-#     scheduler.add_job(scheduled_backup, 'cron', hour=0)
-#     scheduler.start()
-#     logging.info("Scheduled backup job started.")
-#     # logging.info("Startup completed - scheduler temporarily disabled")
 
 def test_sqlite_connection(db_path):
     """Test if we can create and write to SQLite database file"""
@@ -600,7 +600,7 @@ async def admin_backups_page(request: Request):
             [f for f in os.listdir(BACKUP_DIR) if f.endswith(".db")],
             reverse=True
         )
-    return templates.TemplateResponse("admin/backups.html", {"request": request, "backups": backups})
+    return templates.TemplateResponse(request, "admin/backups.html", {"backups": backups})
 
 @app.post("/admin/backups/create", response_class=HTMLResponse)
 async def create_backup(request: Request, db: Session = Depends(get_db)):
@@ -902,7 +902,7 @@ def validate_import_data(data: AllData):
 @app.get("/foods", response_class=HTMLResponse)
 async def foods_page(request: Request, db: Session = Depends(get_db)):
     foods = db.query(Food).all()
-    return templates.TemplateResponse("foods.html", {"request": request, "foods": foods})
+    return templates.TemplateResponse(request, "foods.html", {"foods": foods})
 
 @app.post("/foods/upload")
 async def bulk_upload_foods(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -2107,7 +2107,7 @@ async def test_route():
 async def templates_page(request: Request, db: Session = Depends(get_db)):
     templates_list = db.query(Template).all()
     meals = db.query(Meal).all()
-    return templates.TemplateResponse("templates.html", {"request": request, "templates": templates_list, "meals": meals})
+    return templates.TemplateResponse(request, "templates.html", {"templates": templates_list, "meals": meals})
 
 @app.post("/templates/upload")
 async def bulk_upload_templates(file: UploadFile = File(...), db: Session = Depends(get_db)):
