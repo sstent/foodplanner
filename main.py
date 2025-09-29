@@ -317,7 +317,19 @@ def get_db():
 
 def backup_database(source_db_path, backup_db_path):
     """Backs up an SQLite database using the online backup API."""
+    logging.info(f"DEBUG: Starting backup - source: {source_db_path}, backup: {backup_db_path}")
     try:
+        # Check if source database exists
+        if not os.path.exists(source_db_path):
+            logging.error(f"DEBUG: Source database file does not exist: {source_db_path}")
+            return False
+            
+        # Ensure backup directory exists
+        backup_dir = os.path.dirname(backup_db_path)
+        if backup_dir and not os.path.exists(backup_dir):
+            logging.info(f"DEBUG: Creating backup directory: {backup_dir}")
+            os.makedirs(backup_dir, exist_ok=True)
+            
         source_conn = sqlite3.connect(source_db_path)
         dest_conn = sqlite3.connect(backup_db_path)
 
@@ -325,9 +337,14 @@ def backup_database(source_db_path, backup_db_path):
             source_conn.backup(dest_conn)
 
         logging.info(f"Backup of '{source_db_path}' created successfully at '{backup_db_path}'")
+        return True
 
     except sqlite3.Error as e:
-        logging.error(f"SQLite error during backup: {e}")
+        logging.error(f"SQLite error during backup: {e}", exc_info=True)
+        return False
+    except Exception as e:
+        logging.error(f"Unexpected error during backup: {e}", exc_info=True)
+        return False
     finally:
         if 'source_conn' in locals() and source_conn:
             source_conn.close()
@@ -338,7 +355,12 @@ def scheduled_backup():
     """Create a backup of the database."""
     db_path = DATABASE_URL.split("///")[1]
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    backup_path = os.path.join("./backups", f"meal_planner_{timestamp}.db")
+    backup_dir = "./backups"
+    
+    # Ensure backup directory exists
+    os.makedirs(backup_dir, exist_ok=True)
+    
+    backup_path = os.path.join(backup_dir, f"meal_planner_{timestamp}.db")
     backup_database(db_path, backup_path)
 
 @app.on_event("startup")
@@ -555,7 +577,12 @@ async def admin_backups_page(request: Request):
 async def create_backup(request: Request, db: Session = Depends(get_db)):
     db_path = DATABASE_URL.split("///")[1]
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    backup_path = os.path.join("./backups", f"meal_planner_{timestamp}.db")
+    backup_dir = "./backups"
+    
+    # Ensure backup directory exists
+    os.makedirs(backup_dir, exist_ok=True)
+    
+    backup_path = os.path.join(backup_dir, f"meal_planner_{timestamp}.db")
     backup_database(db_path, backup_path)
 
     # Redirect back to the backups page
