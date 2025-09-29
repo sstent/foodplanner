@@ -7,6 +7,7 @@ print("DEBUG: main.py started")
 from fastapi import FastAPI, Depends, HTTPException, Request, Form, Body
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, Date, Boolean
 from sqlalchemy import or_
@@ -57,6 +58,13 @@ Base = declarative_base()
 # Initialize FastAPI app
 app = FastAPI(title="Meal Planner")
 templates = Jinja2Templates(directory="templates")
+
+# Add a logging middleware to see incoming requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logging.info(f"Incoming request: {request.method} {request.url.path}")
+    response = await call_next(request)
+    return response
 
 # Get the port from environment variable or default to 8999
 PORT = int(os.getenv("PORT", 8999))
@@ -1536,11 +1544,11 @@ async def delete_meals(meal_ids: dict = Body(...), db: Session = Depends(get_db)
 
 #Weekly Menu tab
 
-@app.get("/weekly-menu", response_class=HTMLResponse)
+@app.get("/weeklymenu", response_class=HTMLResponse)
 async def weekly_menu_page(request: Request, db: Session = Depends(get_db)):
     weekly_menus = db.query(WeeklyMenu).all()
     templates = db.query(Template).all()
-    return templates.TemplateResponse("weekly_menu.html", {
+    return templates.TemplateResponse("weeklymenu.html", {
         "request": request,
         "weekly_menus": weekly_menus,
         "templates": templates
@@ -2094,6 +2102,11 @@ async def tracker_reset_to_plan(request: Request, db: Session = Depends(get_db))
 async def test_route():
     logging.info("DEBUG: Test route called")
     return {"status": "success", "message": "Test route is working"}
+
+@app.get("/templates", response_class=HTMLResponse)
+async def templates_page(request: Request, db: Session = Depends(get_db)):
+    templates = db.query(Template).all()
+    return templates.TemplateResponse("templates.html", {"request": request, "templates": templates})
 
 @app.post("/templates/upload")
 async def bulk_upload_templates(file: UploadFile = File(...), db: Session = Depends(get_db)):
