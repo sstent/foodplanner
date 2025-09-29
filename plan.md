@@ -1,50 +1,92 @@
-# Plan for Pytest of Details Tab
+# Plan for Adding New Tests to test_detailed.py
 
-This plan outlines the steps to create a comprehensive pytest for the "details" tab in the Food Planner application.
+## Overview
+This plan outlines the additional tests that need to be added to `tests/test_detailed.py` to cover the following functionality:
+- Load today's date by default
+- View date should return the meals planned for a date (already covered)
+- The template dropdown should show a list of templates available to view
 
-## Objective
-The goal is to create a suite of tests that verify the functionality of the `/detailed` route, ensuring it correctly handles both plan-based and template-based views, as well as invalid inputs.
+## Current Test Coverage
+The existing tests in `tests/test_detailed.py` already cover:
+- `test_detailed_page_no_params` - when no params are provided
+- `test_detailed_page_with_plan_date` - when plan_date is provided
+- `test_detailed_page_with_template_id` - when template_id is provided
+- `test_detailed_page_with_invalid_plan_date` - when invalid plan_date is provided
+- `test_detailed_page_with_invalid_template_id` - when invalid template_id is provided
 
-## File to be Created
-- `tests/test_detailed.py`
+## New Tests to Add
 
-## Test Cases
+### 1. Test Default Date Loading
+**Test Name:** `test_detailed_page_default_date`
+**Purpose:** Verify that when no plan_date is provided, the detailed page loads with today's date by default
+**Implementation:**
+```python
+def test_detailed_page_default_date(client, session):
+    # Create mock data for today
+    food = Food(name="Apple", serving_size="100", serving_unit="g", calories=52, protein=0.3, carbs=14, fat=0.2)
+    session.add(food)
+    session.commit()
+    session.refresh(food)
 
-### 1. Test with `plan_date`
-- **Description**: This test will check the `/detailed` route when a valid `plan_date` is provided.
-- **Steps**:
-    1. Create mock data: a `Food`, a `Meal`, a `MealFood`, and a `Plan` for a specific date.
-    2. Send a GET request to `/detailed` with the `person` and `plan_date` as query parameters.
-    3. Assert that the response status code is 200.
-    4. Assert that the response contains the correct data for the plan.
+    meal = Meal(name="Fruit Snack", meal_type="snack", meal_time="Snack")
+    session.add(meal)
+    session.commit()
+    session.refresh(meal)
 
-### 2. Test with `template_id`
-- **Description**: This test will check the `/detailed` route when a valid `template_id` is provided.
-- **Steps**:
-    1. Create mock data: a `Food`, a `Meal`, a `Template`, and a `TemplateMeal`.
-    2. Send a GET request to `/detailed` with the `template_id` as a query parameter.
-    3. Assert that the response status code is 200.
-    4. Assert that the response contains the correct data for the template.
+    meal_food = MealFood(meal_id=meal.id, food_id=food.id, quantity=1.0)
+    session.add(meal_food)
+    session.commit()
 
-### 3. Test with Invalid `plan_date`
-- **Description**: This test will ensure the route handles an invalid `plan_date` gracefully.
-- **Steps**:
-    1. Send a GET request to `/detailed` with a non-existent `plan_date`.
-    2. Assert that the response status code is 200 (as the page should still render).
-    3. Assert that the response contains a message indicating that no plan was found.
+    test_date = date.today()
+    plan = Plan(person="Sarah", date=test_date, meal_id=meal.id, meal_time="Snack")
+    session.add(plan)
+    session.commit()
 
-### 4. Test with Invalid `template_id`
-- **Description**: This test will ensure the route handles an invalid `template_id` gracefully.
-- **Steps**:
-    1. Send a GET request to `/detailed` with a non-existent `template_id`.
-    2. Assert that the response status code is 200.
-    3. Assert that the response contains a message indicating that the template was not found.
+    # Test that when no plan_date is provided, today's date is used by default
+    response = client.get("/detailed?person=Sarah")
+    assert response.status_code == 200
+    assert "Sarah's Detailed Plan for" in response.text
+    assert test_date.strftime('%B %d, %Y') in response.text  # Check if today's date appears in the formatted date
+    assert "Fruit Snack" in response.text
+```
 
-## Implementation Details
+### 2. Test Template Dropdown
+**Test Name:** `test_detailed_page_template_dropdown`
+**Purpose:** Verify that the template dropdown shows available templates
+**Implementation:**
+```python
+def test_detailed_page_template_dropdown(client, session):
+    # Create multiple templates
+    template1 = Template(name="Morning Boost")
+    template2 = Template(name="Evening Energy")
+    session.add(template1)
+    session.add(template2)
+    session.commit()
+    session.refresh(template1)
+    session.refresh(template2)
 
-The `tests/test_detailed.py` file should include:
-- Imports for `pytest`, `TestClient`, and the necessary models from `main.py`.
-- A `TestClient` instance for making requests to the application.
-- Fixtures to set up and tear down the test database for each test function to ensure test isolation.
+    # Test that the template dropdown shows available templates
+    response = client.get("/detailed")
+    assert response.status_code == 200
+    
+    # Check that the response contains template selection UI elements
+    assert "Select Template..." in response.text
+    assert "Morning Boost" in response.text
+    assert "Evening Energy" in response.text
+    
+    # Verify that template IDs are present in the dropdown options
+    assert f'value="{template1.id}"' in response.text
+    assert f'value="{template2.id}"' in response.text
+```
 
-This plan provides a clear path for a developer to implement the required tests.
+## Implementation Notes
+- Both tests should use the existing session and client fixtures
+- The tests should create necessary mock data to ensure proper functionality testing
+- The date default test should verify that today's date appears in the response when no date is specified
+- The template dropdown test should verify that templates are properly listed in the UI
+
+## Expected Outcome
+After implementing these tests, the test coverage for the detailed page will include:
+- Default date loading functionality
+- Template dropdown functionality
+- All existing functionality remains covered

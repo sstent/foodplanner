@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, Date, Boolean
 from sqlalchemy import or_
 from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base
+from sqlalchemy.orm import joinedload
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
@@ -309,10 +310,22 @@ class WeeklyMenuDayExport(BaseModel):
    day_of_week: int
    template_id: int
 
+class WeeklyMenuDayDetail(BaseModel):
+    day_of_week: int
+    template_id: int
+    template_name: str
+
 class WeeklyMenuExport(BaseModel):
     id: int
     name: str
     weekly_menu_days: List[WeeklyMenuDayExport]
+
+    model_config = ConfigDict(from_attributes=True)
+
+class WeeklyMenuDetail(BaseModel):
+    id: int
+    name: str
+    weekly_menu_days: List[WeeklyMenuDayDetail]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -596,11 +609,11 @@ async def root(request: Request):
 # Admin Section
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
-    return templates.TemplateResponse("admin/index.html", {"request": request})
+    return templates.TemplateResponse(request, "admin/index.html", {"request": request})
 
 @app.get("/admin/imports", response_class=HTMLResponse)
 async def admin_imports_page(request: Request):
-    return templates.TemplateResponse("admin/imports.html", {"request": request})
+    return templates.TemplateResponse(request, "admin/imports.html", {"request": request})
 
 @app.get("/admin/backups", response_class=HTMLResponse)
 async def admin_backups_page(request: Request):
@@ -1560,11 +1573,49 @@ async def delete_meals(meal_ids: dict = Body(...), db: Session = Depends(get_db)
 async def weekly_menu_page(request: Request, db: Session = Depends(get_db)):
     weekly_menus = db.query(WeeklyMenu).all()
     templates_list = db.query(Template).all()
+    
+    # Convert WeeklyMenu objects to dictionaries for JSON serialization
+    weekly_menus_data = []
+    for wm in weekly_menus:
+        wm_dict = {
+            "id": wm.id,
+            "name": wm.name,
+            "weekly_menu_days": []
+        }
+        for wmd in wm.weekly_menu_days:
+            wm_dict["weekly_menu_days"].append({
+                "day_of_week": wmd.day_of_week,
+                "template_id": wmd.template_id,
+                "template_name": wmd.template.name if wmd.template else "Unknown"
+            })
+        weekly_menus_data.append(wm_dict)
+    
     return templates.TemplateResponse("weeklymenu.html", {
         "request": request,
-        "weekly_menus": weekly_menus,
+        "weekly_menus": weekly_menus_data,
         "templates": templates_list
     })
+
+@app.get("/api/weeklymenus", response_model=List[WeeklyMenuDetail])
+async def get_weekly_menus_api(db: Session = Depends(get_db)):
+    """API endpoint to get all weekly menus with template details."""
+    weekly_menus = db.query(WeeklyMenu).options(joinedload(WeeklyMenu.weekly_menu_days).joinedload(WeeklyMenuDay.template)).all()
+    
+    results = []
+    for wm in weekly_menus:
+        day_details = [
+            WeeklyMenuDayDetail(
+                day_of_week=wmd.day_of_week,
+                template_id=wmd.template_id,
+                template_name=wmd.template.name if wmd.template else "Unknown"
+            ) for wmd in wm.weekly_menu_days
+        ]
+        results.append(WeeklyMenuDetail(
+            id=wm.id,
+            name=wm.name,
+            weekly_menu_days=day_details
+        ))
+    return results
 
 @app.post("/weeklymenu/create")
 async def create_weekly_menu(request: Request, db: Session = Depends(get_db)):
@@ -1853,7 +1904,7 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
         template = db.query(Template).filter(Template.id == template_id).first()
         if not template:
             logging.error(f"DEBUG: Template with id {template_id} not found")
-            return templates.TemplateResponse("detailed.html", {
+            return templates.TemplateResponse(request, "detailed.html", {
                 "request": request, "title": "Template Not Found",
                 "error": "Template not found",
                 "day_totals": {}
@@ -1894,7 +1945,7 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
             "person": person
         }
         logging.info(f"DEBUG: Rendering template details with context: {context}")
-        return templates.TemplateResponse("detailed.html", context)
+        return templates.TemplateResponse(request, "detailed.html", context)
 
     if plan_date:
         # Show plan details for a specific date
@@ -1903,7 +1954,7 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
             plan_date_obj = datetime.fromisoformat(plan_date).date()
         except ValueError:
             logging.error(f"DEBUG: Invalid date format for plan_date: {plan_date}")
-            return templates.TemplateResponse("detailed.html", {
+            return templates.TemplateResponse(request, "detailed.html", {
                 "request": request, "title": "Invalid Date",
                 "error": "Invalid date format. Please use YYYY-MM-DD.",
                 "day_totals": {}
@@ -1948,11 +1999,11 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
             "plan_date": plan_date_obj
         }
         logging.info(f"DEBUG: Rendering plan details with context: {context}")
-        return templates.TemplateResponse("detailed.html", context)
+        return templates.TemplateResponse(request, "detailed.html", context)
 
     # If neither plan_date nor template_id is provided, return an error
     logging.error("DEBUG: Neither plan_date nor template_id were provided")
-    return templates.TemplateResponse("detailed.html", {
+    return templates.TemplateResponse(request, "detailed.html", {
         "request": request, "title": "Error",
         "error": "Please provide either a plan date or a template ID.",
         "day_totals": {}
@@ -2305,7 +2356,7 @@ async def templates_page(request: Request, db: Session = Depends(get_db)):
 @app.get("/api/templates", response_model=List[TemplateDetail])
 async def get_templates_api(db: Session = Depends(get_db)):
     """API endpoint to get all templates with meal details."""
-    templates = db.query(Template).options(orm.joinedload(Template.template_meals).joinedload(TemplateMeal.meal)).all()
+    templates = db.query(Template).options(joinedload(Template.template_meals).joinedload(TemplateMeal.meal)).all()
     
     results = []
     for t in templates:
