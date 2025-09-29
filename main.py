@@ -1694,3 +1694,104 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
             template_nutrition['net_carbs'] = template_nutrition['carbs'] - template_nutrition['fiber']
 
         return templates
+
+# Tracker tab - Main page
+@app.get("/tracker", response_class=HTMLResponse)
+async def tracker_page(request: Request, person: str = "Sarah", date: str = None, db: Session = Depends(get_db)):
+    logging.info(f"DEBUG: Tracker page requested with person={person}, date={date}")
+    
+    from datetime import datetime, timedelta
+    
+    # If no date provided, use today
+    if not date:
+        current_date = datetime.now().date()
+    else:
+        current_date = datetime.fromisoformat(date).date()
+    
+    # Calculate previous and next dates
+    prev_date = (current_date - timedelta(days=1)).isoformat()
+    next_date = (current_date + timedelta(days=1)).isoformat()
+    
+    # Get or create tracked day
+    tracked_day = db.query(TrackedDay).filter(
+        TrackedDay.person == person,
+        TrackedDay.date == current_date
+    ).first()
+    
+    if not tracked_day:
+        # Create new tracked day
+        tracked_day = TrackedDay(person=person, date=current_date, is_modified=False)
+        db.add(tracked_day)
+        db.commit()
+        db.refresh(tracked_day)
+        logging.info(f"DEBUG: Created new tracked day for {person} on {current_date}")
+    
+    # Get tracked meals for this day
+    tracked_meals = db.query(TrackedMeal).filter(
+        TrackedMeal.tracked_day_id == tracked_day.id
+    ).all()
+    
+    # Get all meals for dropdown
+    meals = db.query(Meal).all()
+    
+    # Get all templates for template dropdown
+    templates_list = db.query(Template).all()
+    
+    # Calculate day totals
+    day_totals = calculate_day_nutrition_tracked(tracked_meals, db)
+    
+    logging.info(f"DEBUG: Rendering tracker page with {len(tracked_meals)} tracked meals")
+    
+    return templates.TemplateResponse("tracker.html", {
+        "request": request,
+        "person": person,
+        "current_date": current_date,
+        "prev_date": prev_date,
+        "next_date": next_date,
+        "tracked_meals": tracked_meals,
+        "is_modified": tracked_day.is_modified,
+        "day_totals": day_totals,
+        "meals": meals,
+        "templates": templates_list
+    })
+
+def calculate_day_nutrition_tracked(tracked_meals, db: Session):
+    """Calculate total nutrition for tracked meals"""
+    day_totals = {
+        'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
+        'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
+    }
+    
+    for tracked_meal in tracked_meals:
+        meal_nutrition = calculate_meal_nutrition(tracked_meal.meal, db)
+        quantity = tracked_meal.quantity
+        
+        day_totals['calories'] += meal_nutrition['calories'] * quantity
+        day_totals['protein'] += meal_nutrition['protein'] * quantity
+        day_totals['carbs'] += meal_nutrition['carbs'] * quantity
+        day_totals['fat'] += meal_nutrition['fat'] * quantity
+        day_totals['fiber'] += (meal_nutrition.get('fiber', 0) or 0) * quantity
+        day_totals['sugar'] += (meal_nutrition.get('sugar', 0) or 0) * quantity
+        day_totals['sodium'] += (meal_nutrition.get('sodium', 0) or 0) * quantity
+        day_totals['calcium'] += (meal_nutrition.get('calcium', 0) or 0) * quantity
+    
+    # Calculate percentages
+    total_cals = day_totals['calories']
+    if total_cals > 0:
+        day_totals['protein_pct'] = round((day_totals['protein'] * 4 / total_cals) * 100, 1)
+        day_totals['carbs_pct'] = round((day_totals['carbs'] * 4 / total_cals) * 100, 1)
+        day_totals['fat_pct'] = round((day_totals['fat'] * 9 / total_cals) * 100, 1)
+        day_totals['net_carbs'] = day_totals['carbs'] - day_totals['fiber']
+    else:
+        day_totals['protein_pct'] = 0
+        day_totals['carbs_pct'] = 0
+        day_totals['fat_pct'] = 0
+        day_totals['net_carbs'] = 0
+    
+    return day_totals
+
+# Add a simple test route to confirm routing is working
+@app.get("/test")
+async def test_route():
+    logging.info("DEBUG: Test route called")
+    return {"status": "success", "message": "Test route is working"}
