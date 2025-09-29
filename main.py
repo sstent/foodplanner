@@ -12,7 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, Date, Boolean
 from sqlalchemy import or_
-from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base, orm
+from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base
+from sqlalchemy.orm import joinedload
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
@@ -2198,7 +2199,7 @@ async def templates_page(request: Request, db: Session = Depends(get_db)):
 @app.get("/api/templates", response_model=List[TemplateDetail])
 async def get_templates_api(db: Session = Depends(get_db)):
     """API endpoint to get all templates with meal details."""
-    templates = db.query(Template).options(orm.joinedload(Template.template_meals).joinedload(TemplateMeal.meal)).all()
+    templates = db.query(Template).options(joinedload(Template.template_meals).joinedload(TemplateMeal.meal)).all()
     
     results = []
     for t in templates:
