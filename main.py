@@ -1547,11 +1547,11 @@ async def delete_meals(meal_ids: dict = Body(...), db: Session = Depends(get_db)
 @app.get("/weeklymenu", response_class=HTMLResponse)
 async def weekly_menu_page(request: Request, db: Session = Depends(get_db)):
     weekly_menus = db.query(WeeklyMenu).all()
-    templates = db.query(Template).all()
+    templates_list = db.query(Template).all()
     return templates.TemplateResponse("weeklymenu.html", {
         "request": request,
         "weekly_menus": weekly_menus,
-        "templates": templates
+        "templates": templates_list
     })
 
 
@@ -2105,8 +2105,8 @@ async def test_route():
 
 @app.get("/templates", response_class=HTMLResponse)
 async def templates_page(request: Request, db: Session = Depends(get_db)):
-    templates = db.query(Template).all()
-    return templates.TemplateResponse("templates.html", {"request": request, "templates": templates})
+    templates_list = db.query(Template).all()
+    return templates.TemplateResponse("templates.html", {"request": request, "templates": templates_list})
 
 @app.post("/templates/upload")
 async def bulk_upload_templates(file: UploadFile = File(...), db: Session = Depends(get_db)):
