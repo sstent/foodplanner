@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, Date, Boolean
 from sqlalchemy import or_
-from sqlalchemy.orm import sessionmaker, Session, relationship
+from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
@@ -53,7 +53,6 @@ except Exception as e:
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
@@ -1350,11 +1349,10 @@ async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(
         
         stats = {'created': 0, 'updated': 0, 'errors': []}
         
-        # Skip header rows
-        next(reader)  # First header
-        next(reader)  # Second header
+        # Skip header
+        header = next(reader)
         
-        for row_num, row in enumerate(reader, 3):  # Start at row 3
+        for row_num, row in enumerate(reader, 2):  # Start at row 2
             if not row:
                 continue
                 
@@ -1387,10 +1385,12 @@ async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(
                         food = db.query(Food).filter(Food.name.ilike(f"%{search_pattern}%")).first()
 
                     if not food:
+                        logging.error(f"Food '{food_name}' not found in database.")
                         # Get all food names for debugging
                         all_foods = db.query(Food.name).limit(10).all()
                         food_names = [f[0] for f in all_foods]
                         raise ValueError(f"Food '{food_name}' not found. Available foods include: {', '.join(food_names[:5])}...")
+                    logging.info(f"Found food '{food_name}' with id {food.id}")
                     ingredients.append((food.id, quantity))
                 
                 # Create/update meal
@@ -2206,11 +2206,17 @@ async def create_template(request: Request, db: Session = Depends(get_db)):
 
         # Process meal assignments
         if meal_assignments_str:
+            logging.info(f"Processing meal assignments: {meal_assignments_str}")
             assignments = meal_assignments_str.split(',')
             for assignment in assignments:
-                meal_time, meal_id_str = assignment.split(':')
-                meal_id = int(meal_id_str)
+                meal_time, meal_id_str = assignment.split(':', 1)
+                logging.info(f"Processing assignment: meal_time='{meal_time}', meal_id_str='{meal_id_str}'")
                 
+                if not meal_id_str:
+                    logging.warning(f"Skipping empty meal ID for meal_time '{meal_time}'")
+                    continue
+                
+                meal_id = int(meal_id_str)
                 meal = db.query(Meal).filter(Meal.id == meal_id).first()
                 if meal:
                     template_meal = TemplateMeal(
