@@ -318,24 +318,44 @@ def get_db():
 def backup_database(source_db_path, backup_db_path):
     """Backs up an SQLite database using the online backup API."""
     logging.info(f"DEBUG: Starting backup - source: {source_db_path}, backup: {backup_db_path}")
+    import tempfile
+    
     try:
         # Check if source database exists
         if not os.path.exists(source_db_path):
             logging.error(f"DEBUG: Source database file does not exist: {source_db_path}")
             return False
-            
+        
+        # Create backup in temporary directory first (local fast storage)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as temp_file:
+            temp_backup_path = temp_file.name
+        
+        logging.info(f"DEBUG: Creating temporary backup at: {temp_backup_path}")
+        
+        # Backup to local temp file (fast)
+        source_conn = sqlite3.connect(source_db_path)
+        temp_conn = sqlite3.connect(temp_backup_path)
+        
+        with temp_conn:
+            source_conn.backup(temp_conn)
+        
+        source_conn.close()
+        temp_conn.close()
+        
+        logging.info(f"DEBUG: Temporary backup created, copying to final destination")
+        
         # Ensure backup directory exists
         backup_dir = os.path.dirname(backup_db_path)
         if backup_dir and not os.path.exists(backup_dir):
             logging.info(f"DEBUG: Creating backup directory: {backup_dir}")
             os.makedirs(backup_dir, exist_ok=True)
-            
-        source_conn = sqlite3.connect(source_db_path)
-        dest_conn = sqlite3.connect(backup_db_path)
-
-        with dest_conn:
-            source_conn.backup(dest_conn)
-
+        
+        # Copy to NAS (this may be slow but won't block SQLite)
+        shutil.copy2(temp_backup_path, backup_db_path)
+        
+        # Clean up temp file
+        os.unlink(temp_backup_path)
+        
         logging.info(f"Backup of '{source_db_path}' created successfully at '{backup_db_path}'")
         return True
 
@@ -346,11 +366,12 @@ def backup_database(source_db_path, backup_db_path):
         logging.error(f"Unexpected error during backup: {e}", exc_info=True)
         return False
     finally:
-        if 'source_conn' in locals() and source_conn:
-            source_conn.close()
-        if 'dest_conn' in locals() and dest_conn:
-            dest_conn.close()
-
+        # Cleanup temp file if it still exists
+        if 'temp_backup_path' in locals() and os.path.exists(temp_backup_path):
+            try:
+                os.unlink(temp_backup_path)
+            except:
+                pass
 def scheduled_backup():
     """Create a backup of the database."""
     db_path = DATABASE_URL.split("///")[1]
