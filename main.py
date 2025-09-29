@@ -1810,6 +1810,8 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
                     'protein': mf.food.protein * mf.quantity,
                     'carbs': mf.food.carbs * mf.quantity,
                     'fat': mf.food.fat * mf.quantity,
+                    'fiber': mf.food.fiber * mf.quantity,
+                    'sodium': mf.food.sodium * mf.quantity,
                 })
             
             meal_details.append({
@@ -2179,6 +2181,9 @@ async def test_route():
 @app.get("/templates", response_class=HTMLResponse)
 async def templates_page(request: Request, db: Session = Depends(get_db)):
     templates_list = db.query(Template).all()
+    logging.info(f"DEBUG: templates_list contains {len(templates_list)} templates.")
+    for t in templates_list:
+        logging.info(f"DEBUG: Template object: {t.__dict__}")
     meals = db.query(Meal).all()
     return templates.TemplateResponse(request, "templates.html", {"templates": templates_list, "meals": meals})
 

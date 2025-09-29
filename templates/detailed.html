@@ -180,8 +180,8 @@
                 <td class="nutrient-value">{{ "%.1f"|format(meal_food.protein) }}g</td>
                 <td class="nutrient-value">{{ "%.1f"|format(meal_food.carbs) }}g</td>
                 <td class="nutrient-value">{{ "%.1f"|format(meal_food.fat) }}g</td>
-                <td class="nutrient-value">{{ "%.1f"|format(meal_food.fiber or 0) }}g</td>
-                <td class="nutrient-value">{{ "%.0f"|format(meal_food.sodium or 0) }}mg</td>
+                <td class="nutrient-value">{{ "%.1f"|format(meal_food['fiber']|float) }}g</td>
+                <td class="nutrient-value">{{ "%.0f"|format(meal_food['sodium']|float) }}mg</td>
             </tr>
             {% endfor %}
             <!-- Meal Totals Row -->
