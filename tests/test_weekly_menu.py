@@ -14,6 +14,44 @@ class TestWeeklyMenuRoutes:
         assert b"Weekly" in response.content or b"weekly" in response.content or b"Menu" in response.content
 
 
+    def test_create_weekly_menu_route(self, client, sample_template):
+        """Test POST /weeklymenu/create route"""
+        form_data = {
+            "name": "My New Weekly Menu",
+            "template_assignments": f"0:{sample_template.id},1:{sample_template.id}"
+        }
+        response = client.post("/weeklymenu/create", data=form_data)
+        assert response.status_code == 200
+        assert response.json() == {"status": "success", "message": "Weekly menu created successfully"}
+
+    def test_create_weekly_menu_route(self, client, sample_template):
+        """Test POST /weeklymenu/create route"""
+        form_data = {
+            "name": "My New Weekly Menu",
+            "template_assignments": f"0:{sample_template.id},1:{sample_template.id}"
+        }
+        response = client.post("/weeklymenu/create", data=form_data)
+        assert response.status_code == 200
+        assert response.json() == {"status": "success", "message": "Weekly menu created successfully"}
+
+    def test_apply_weekly_menu_route(self, client, db_session, sample_weekly_menu):
+        """Test POST /weeklymenu/{weekly_menu_id}/apply route"""
+        from datetime import date, timedelta
+        
+        today = date.today()
+        # Find Monday of current week
+        week_start_date = (today - timedelta(days=today.weekday())).isoformat()
+
+        form_data = {
+            "person": "Sarah",
+            "week_start_date": week_start_date,
+            "confirm_overwrite": "false"
+        }
+        response = client.post(f"/weeklymenu/{sample_weekly_menu.id}/apply", data=form_data)
+        assert response.status_code == 200
+        assert response.json() == {"status": "success", "message": "Weekly menu applied successfully."}
+
+
 class TestWeeklyMenuCRUD:
     """Test weekly menu CRUD operations"""
     

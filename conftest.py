@@ -161,6 +161,32 @@ def sample_template(db_session, sample_meal):
 
 
 @pytest.fixture
+def sample_weekly_menu(db_session, sample_template):
+    """Create a sample weekly menu with templates assigned to days"""
+    weekly_menu = WeeklyMenu(name="Sample Weekly Menu")
+    db_session.add(weekly_menu)
+    db_session.commit()
+    db_session.refresh(weekly_menu)
+
+    # Assign sample_template to Monday (day 0) and Tuesday (day 1)
+    weekly_menu_day_monday = WeeklyMenuDay(
+        weekly_menu_id=weekly_menu.id,
+        day_of_week=0,
+        template_id=sample_template.id
+    )
+    weekly_menu_day_tuesday = WeeklyMenuDay(
+        weekly_menu_id=weekly_menu.id,
+        day_of_week=1,
+        template_id=sample_template.id
+    )
+    db_session.add(weekly_menu_day_monday)
+    db_session.add(weekly_menu_day_tuesday)
+    db_session.commit()
+    db_session.refresh(weekly_menu)
+    return weekly_menu
+
+
+@pytest.fixture
 def sample_plan(db_session, sample_meal):
     """Create a sample plan"""
     plan = Plan(
