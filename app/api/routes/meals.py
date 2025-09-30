@@ -205,6 +205,21 @@ async def remove_food_from_meal(meal_food_id: int, db: Session = Depends(get_db)
         db.rollback()
         return {"status": "error", "message": str(e)}
 
+@router.post("/meals/update_food_quantity")
+async def update_meal_food_quantity(meal_food_id: int = Form(...), quantity: float = Form(...), db: Session = Depends(get_db)):
+    """Update the quantity of a food in a meal"""
+    try:
+        meal_food = db.query(MealFood).filter(MealFood.id == meal_food_id).first()
+        if not meal_food:
+            return {"status": "error", "message": "Meal food not found"}
+        
+        meal_food.quantity = quantity
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
 @router.post("/meals/clone/{meal_id}")
 async def clone_meal(meal_id: int, db: Session = Depends(get_db)):
     """Clone an existing meal"""
