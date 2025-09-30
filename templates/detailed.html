@@ -30,7 +30,7 @@
             </button>
             <ul class="dropdown-menu" aria-labelledby="templateDropdown">
                 {% for t in templates %}
-                <li><a class="dropdown-item" href="{{ url_for('detailed', template_id=t.id) }}">{{ t.name }}</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('detailed', person=person, plan_date=plan_date, template_id=t.id) }}">{{ t.name }}</a></li>
                 {% endfor %}
             </ul>
         </div>
