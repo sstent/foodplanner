@@ -1,0 +1,31 @@
+<!-- Add Meal Modal -->
+<div class="modal fade" id="addMealModal" tabindex="-1" aria-labelledby="addMealModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addMealModalLabel">Add Meal to <span id="mealTimeDisplay"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addMealForm">
+                    <input type="hidden" id="addMealTime" name="meal_time">
+                    <input type="hidden" name="person" value="{{ person }}">
+                    <input type="hidden" name="date" value="{{ current_date.isoformat() }}">
+                    <div class="mb-3">
+                        <label class="form-label">Select Meal</label>
+                        <select class="form-control" name="meal_id" required>
+                            <option value="">Choose meal...</option>
+                            {% for meal in meals %}
+                            <option value="{{ meal.id }}">{{ meal.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddMeal()">Add Meal</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,25 @@
+<!-- Save Template Modal -->
+<div class="modal fade" id="saveTemplateModal" tabindex="-1" aria-labelledby="saveTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="saveTemplateModalLabel">Save Day as Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="saveTemplateForm">
+                    <input type="hidden" name="person" value="{{ person }}">
+                    <input type="hidden" name="date" value="{{ current_date.isoformat() }}">
+                    <div class="mb-3">
+                        <label class="form-label">Template Name</label>
+                        <input type="text" class="form-control" name="template_name" required placeholder="e.g., High Protein Day">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="submitSaveTemplate()">Save Template</button>
+            </div>
+        </div>
+    </div>
+</div>
