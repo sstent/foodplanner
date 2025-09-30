@@ -113,11 +113,10 @@ async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(
 
 @router.post("/meals/add")
 async def add_meal(request: Request, db: Session = Depends(get_db),
-                  name: str = Form(...), meal_type: str = Form(...),
-                  meal_time: str = Form(...)):
+                  name: str = Form(...)):
     
     try:
-        meal = Meal(name=name, meal_type=meal_type, meal_time=meal_time)
+        meal = Meal(name=name, meal_type="custom", meal_time="Custom")
         db.add(meal)
         db.commit()
         db.refresh(meal)
@@ -128,8 +127,7 @@ async def add_meal(request: Request, db: Session = Depends(get_db),
 
 @router.post("/meals/edit")
 async def edit_meal(request: Request, db: Session = Depends(get_db),
-                   meal_id: int = Form(...), name: str = Form(...),
-                   meal_type: str = Form(...), meal_time: str = Form(...)):
+                   meal_id: int = Form(...), name: str = Form(...)):
     
     try:
         meal = db.query(Meal).filter(Meal.id == meal_id).first()
@@ -137,8 +135,6 @@ async def edit_meal(request: Request, db: Session = Depends(get_db),
             return {"status": "error", "message": "Meal not found"}
         
         meal.name = name
-        meal.meal_type = meal_type
-        meal.meal_time = meal_time # Update meal_time
         
         db.commit()
         return {"status": "success", "message": "Meal updated successfully"}
@@ -205,6 +201,38 @@ async def remove_food_from_meal(meal_food_id: int, db: Session = Depends(get_db)
         db.delete(meal_food)
         db.commit()
         return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+@router.post("/meals/clone/{meal_id}")
+async def clone_meal(meal_id: int, db: Session = Depends(get_db)):
+    """Clone an existing meal"""
+    try:
+        original_meal = db.query(Meal).filter(Meal.id == meal_id).first()
+        if not original_meal:
+            return {"status": "error", "message": "Original meal not found"}
+
+        # Create new meal
+        new_meal = Meal(
+            name=f"{original_meal.name} - Copy",
+            meal_type=original_meal.meal_type,
+            meal_time=original_meal.meal_time
+        )
+        db.add(new_meal)
+        db.flush()
+
+        # Copy meal foods
+        for meal_food in original_meal.meal_foods:
+            new_meal_food = MealFood(
+                meal_id=new_meal.id,
+                food_id=meal_food.food_id,
+                quantity=meal_food.quantity
+            )
+            db.add(new_meal_food)
+        
+        db.commit()
+        return {"status": "success", "new_meal_id": new_meal.id}
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}

@@ -1,0 +1,55 @@
+<!-- templates/modals/manage_meal.html -->
+<div class="modal fade" id="manageMealModal" tabindex="-1" aria-labelledby="manageMealModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="manageMealModalLabel">Manage Meal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Edit Meal Name -->
+                    <div class="col-md-12 mb-4">
+                        <h6>Meal Name</h6>
+                        <form id="manageMealForm" class="d-flex gap-2">
+                            <input type="hidden" name="meal_id" id="manage_meal_id">
+                            <input type="text" class="form-control" name="name" id="manage_meal_name" required>
+                            <button type="button" class="btn btn-primary" onclick="submitMealForm('manage')">Update Name</button>
+                        </form>
+                    </div>
+
+                    <!-- Food Management -->
+                    <div class="col-md-6">
+                        <h6>Add Food to Meal</h6>
+                        <form id="addFoodToMealForm">
+                            <input type="hidden" id="meal_id_for_food" name="meal_id">
+                            <div class="mb-3">
+                                <label class="form-label">Select Food</label>
+                                <select class="form-control" id="foodSelect" name="food_id" required>
+                                    <option value="">Choose food...</option>
+                                    {% for food in foods %}
+                                    <option value="{{ food.id }}">{{ food.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Quantity</label>
+                                <input type="number" step="0.01" class="form-control" name="quantity" value="1" required>
+                            </div>
+                            <button type="button" class="btn btn-success" onclick="addFoodToMeal()">Add Food</button>
+                        </form>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Current Foods</h6>
+                        <div id="currentMealFoods">
+                            <!-- This will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

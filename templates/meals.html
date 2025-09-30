@@ -34,13 +34,13 @@
                             {% endif %}
                         </td>
                         <td>
-                            <button type="button" class="btn btn-sm btn-outline-primary" 
-                                    onclick="editMeal({{ meal.id }})">
-                                <i class="bi bi-pencil"></i> Edit
+                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                    onclick="manageMeal({{ meal.id }})">
+                                <i class="bi bi-pencil-square"></i> Manage
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-success" 
-                                    onclick="manageMealFoods({{ meal.id }})">
-                                <i class="bi bi-list"></i> Foods
+                            <button type="button" class="btn btn-sm btn-outline-info"
+                                    onclick="cloneMeal({{ meal.id }})">
+                                <i class="bi bi-front"></i> Clone
                             </button>
                         </td>
                     </tr>
@@ -68,19 +68,6 @@
                         <label class="form-label">Meal Name</label>
                         <input type="text" class="form-control" name="name" required>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Meal Time</label>
-                        <select class="form-control" name="meal_time" required>
-                            <option value="Breakfast">Breakfast</option>
-                            <option value="Lunch">Lunch</option>
-                            <option value="Dinner">Dinner</option>
-                            <option value="Snack 1">Snack 1</option>
-                            <option value="Snack 2">Snack 2</option>
-                            <option value="Beverage 1">Beverage 1</option>
-                            <option value="Beverage 2">Beverage 2</option>
-                            <option value="Custom">Custom</option>
-                        </select>
-                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -91,88 +78,7 @@
     </div>
 </div>
 
-<!-- Edit Meal Modal -->
-<div class="modal fade" id="editMealModal" tabindex="-1" aria-labelledby="editMealModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editMealModalLabel">Edit Meal</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editMealForm" action="/meals/edit" method="post">
-                    <input type="hidden" name="meal_id" id="edit_meal_id">
-                    <div class="mb-3">
-                        <label class="form-label">Meal Name</label>
-                        <input type="text" class="form-control" name="name" id="edit_meal_name" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Meal Time</label>
-                        <select class="form-control" name="meal_time" id="edit_meal_time" required>
-                            <option value="Breakfast">Breakfast</option>
-                            <option value="Lunch">Lunch</option>
-                            <option value="Dinner">Dinner</option>
-                            <option value="Snack 1">Snack 1</option>
-                            <option value="Snack 2">Snack 2</option>
-                            <option value="Beverage 1">Beverage 1</option>
-                            <option value="Beverage 2">Beverage 2</option>
-                            <option value="Custom">Custom</option>
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitMealForm('edit')">Update Meal</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Manage Meal Foods Modal -->
-<div class="modal fade" id="manageMealFoodsModal" tabindex="-1" aria-labelledby="manageMealFoodsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="manageMealFoodsModalLabel">Manage Foods for Meal</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>Add Food to Meal</h6>
-                        <form id="addFoodToMealForm">
-                            <input type="hidden" id="meal_id_for_food" name="meal_id">
-                            <div class="mb-3">
-                                <label class="form-label">Select Food</label>
-                                <select class="form-control" id="foodSelect" name="food_id" required>
-                                    <option value="">Choose food...</option>
-                                    {% for food in foods %}
-                                    <option value="{{ food.id }}">{{ food.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Quantity</label>
-                                <input type="number" step="0.01" class="form-control" name="quantity" value="1" required>
-                            </div>
-                            <button type="button" class="btn btn-success" onclick="addFoodToMeal()">Add Food</button>
-                        </form>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Current Foods</h6>
-                        <div id="currentMealFoods">
-                            <!-- This will be populated dynamically -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
+{% include 'modals/manage_meal.html' %}
 
 <script>
 function toggleAllMeals(source) {
@@ -180,39 +86,21 @@ function toggleAllMeals(source) {
     checkboxes.forEach(checkbox => checkbox.checked = source.checked);
 }
 
-// Edit meal function
-async function editMeal(id) {
-    document.getElementById('edit_meal_id').value = id;
-
-    try {
-        const response = await fetch(`/meals/${id}`); // Assuming an endpoint /meals/{id} exists to get meal details
-        const meal = await response.json();
-
-        if (meal.status === 'success') {
-            document.getElementById('edit_meal_name').value = meal.name;
-            document.getElementById('edit_meal_time').value = meal.meal_time;
-            new bootstrap.Modal(document.getElementById('editMealModal')).show();
-        } else {
-            alert('Error fetching meal details: ' + meal.message);
-        }
-    } catch (error) {
-        alert('Error fetching meal details: ' + error.message);
-    }
-}
-
-// Manage meal foods function
-async function manageMealFoods(mealId) {
+// Manage meal function
+async function manageMeal(mealId) {
+    document.getElementById('manage_meal_id').value = mealId;
     document.getElementById('meal_id_for_food').value = mealId;
 
     try {
-        const response = await fetch(`/meals/${mealId}`); // Assuming an endpoint /meals/{id} exists to get meal details
+        const response = await fetch(`/meals/${mealId}`);
         const meal = await response.json();
 
         if (meal.status === 'success') {
-            document.getElementById('manageMealFoodsModalLabel').textContent = `Manage Foods for: ${meal.name}`;
-            // Load current meal foods
+            document.getElementById('manage_meal_name').value = meal.name;
+            document.getElementById('manageMealModalLabel').textContent = `Manage Meal: ${meal.name}`;
+            
             await loadCurrentMealFoods(mealId);
-            new bootstrap.Modal(document.getElementById('manageMealFoodsModal')).show();
+            new bootstrap.Modal(document.getElementById('manageMealModal')).show();
         } else {
             alert('Error fetching meal details: ' + meal.message);
         }
@@ -294,9 +182,34 @@ async function removeFoodFromMeal(mealFoodId) {
     }
 }
 
-// Submit meal form (add or edit)
+// Submit meal form (add or manage)
 async function submitMealForm(action) {
     const form = document.getElementById(action + 'MealForm');
+    if (action === 'manage') { // Handle name update separately
+        const mealId = document.getElementById('manage_meal_id').value;
+        const newName = document.getElementById('manage_meal_name').value;
+        const formData = new FormData();
+        formData.append('meal_id', mealId);
+        formData.append('name', newName);
+
+        try {
+            const response = await fetch('/meals/edit', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                document.getElementById('manageMealModalLabel').textContent = `Manage Meal: ${newName}`;
+                // No page reload, just confirmation
+                alert('Meal name updated successfully!');
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error updating meal name: ' + error.message);
+        }
+        return;
+    }
     const formData = new FormData(form);
     
     try {
@@ -350,5 +263,23 @@ async function deleteSelectedMeals() {
     }
 }
 
+// Clone meal function
+async function cloneMeal(mealId) {
+    if (confirm('Are you sure you want to clone this meal?')) {
+        try {
+            const response = await fetch(`/meals/clone/${mealId}`, {
+                method: 'POST'
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                location.reload();
+            } else {
+                alert('Error cloning meal: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error cloning meal: ' + error.message);
+        }
+    }
+}
 </script>
 {% endblock %}
