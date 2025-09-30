@@ -9,8 +9,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from datetime import date, timedelta
 
-# Import from main application
-from main import app, Base, get_db, Food, Meal, MealFood, Plan, Template, TemplateMeal, WeeklyMenu, WeeklyMenuDay, TrackedDay, TrackedMeal
+# Import from main application and database module
+from main import app
+from app.database import Base, get_db, Food, Meal, MealFood, Plan, Template, TemplateMeal, WeeklyMenu, WeeklyMenuDay, TrackedDay, TrackedMeal
 
 
 @pytest.fixture(scope="function")

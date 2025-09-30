@@ -1,0 +1,389 @@
+"""
+Database models and session management for the meal planner app
+"""
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, Date, Boolean
+from sqlalchemy import or_
+from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base
+from sqlalchemy.orm import joinedload
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
+from datetime import date, datetime
+import os
+
+# Database setup - Use SQLite for easier setup
+# Use environment variables if set, otherwise use defaults
+# Use current directory for database
+DATABASE_PATH = os.getenv('DATABASE_PATH', '.')
+DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{DATABASE_PATH}/meal_planner.db')
+
+# For production, use PostgreSQL: DATABASE_URL = "postgresql://username:password@localhost/meal_planner"
+
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Database Models
+class Food(Base):
+    __tablename__ = "foods"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    serving_size = Column(String)
+    serving_unit = Column(String)
+    calories = Column(Float)
+    protein = Column(Float)
+    carbs = Column(Float)
+    fat = Column(Float)
+    fiber = Column(Float, default=0)
+    sugar = Column(Float, default=0)
+    sodium = Column(Float, default=0)
+    calcium = Column(Float, default=0)
+    source = Column(String, default="manual")  # manual, csv, openfoodfacts
+    brand = Column(String, default="") # Brand name for the food
+
+class Meal(Base):
+    __tablename__ = "meals"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    meal_type = Column(String)  # breakfast, lunch, dinner, snack, custom
+    meal_time = Column(String, default="Breakfast") # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
+    
+    # Relationship to meal foods
+    meal_foods = relationship("MealFood", back_populates="meal")
+
+class MealFood(Base):
+    __tablename__ = "meal_foods"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    meal_id = Column(Integer, ForeignKey("meals.id"))
+    food_id = Column(Integer, ForeignKey("foods.id"))
+    quantity = Column(Float)
+    
+    meal = relationship("Meal", back_populates="meal_foods")
+    food = relationship("Food")
+
+class Plan(Base):
+    __tablename__ = "plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    person = Column(String, index=True)  # Sarah or Stuart
+    date = Column(Date, index=True)  # Store actual calendar dates
+    meal_id = Column(Integer, ForeignKey("meals.id"))
+    meal_time = Column(String)  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
+
+    meal = relationship("Meal")
+
+class Template(Base):
+    __tablename__ = "templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+
+    # Relationship to template meals
+    template_meals = relationship("TemplateMeal", back_populates="template")
+
+class TemplateMeal(Base):
+    __tablename__ = "template_meals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("templates.id"))
+    meal_id = Column(Integer, ForeignKey("meals.id"))
+    meal_time = Column(String)  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
+
+    template = relationship("Template", back_populates="template_meals")
+    meal = relationship("Meal")
+
+class WeeklyMenu(Base):
+    __tablename__ = "weekly_menus"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+
+    # Relationship to weekly menu days
+    weekly_menu_days = relationship("WeeklyMenuDay", back_populates="weekly_menu")
+
+class WeeklyMenuDay(Base):
+    __tablename__ = "weekly_menu_days"
+
+    id = Column(Integer, primary_key=True, index=True)
+    weekly_menu_id = Column(Integer, ForeignKey("weekly_menus.id"))
+    day_of_week = Column(Integer)  # 0=Monday, 1=Tuesday, ..., 6=Sunday
+    template_id = Column(Integer, ForeignKey("templates.id"))
+
+    weekly_menu = relationship("WeeklyMenu", back_populates="weekly_menu_days")
+    template = relationship("Template")
+
+class TrackedDay(Base):
+    """Represents a day being tracked (separate from planned days)"""
+    __tablename__ = "tracked_days"
+
+    id = Column(Integer, primary_key=True, index=True)
+    person = Column(String, index=True)  # Sarah or Stuart
+    date = Column(Date, index=True)  # Date being tracked
+    is_modified = Column(Boolean, default=False)  # Whether this day has been modified from original plan
+
+    # Relationship to tracked meals
+    tracked_meals = relationship("TrackedMeal", back_populates="tracked_day")
+
+class TrackedMeal(Base):
+    """Represents a meal tracked for a specific day"""
+    __tablename__ = "tracked_meals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tracked_day_id = Column(Integer, ForeignKey("tracked_days.id"))
+    meal_id = Column(Integer, ForeignKey("meals.id"))
+    meal_time = Column(String)  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
+    quantity = Column(Float, default=1.0)  # Quantity multiplier (e.g., 1.5 for 1.5 servings)
+
+    tracked_day = relationship("TrackedDay", back_populates="tracked_meals")
+    meal = relationship("Meal")
+
+# Pydantic models
+class FoodCreate(BaseModel):
+    name: str
+    serving_size: str
+    serving_unit: str
+    calories: float
+    protein: float
+    carbs: float
+    fat: float
+    fiber: float = 0
+    sugar: float = 0
+    sodium: float = 0
+    calcium: float = 0
+    source: str = "manual"
+    brand: Optional[str] = ""
+
+class FoodResponse(BaseModel):
+    id: int
+    name: str
+    serving_size: str
+    serving_unit: str
+    calories: float
+    protein: float
+    carbs: float
+    fat: float
+    fiber: float
+    sugar: float
+    sodium: float
+    calcium: float
+    source: str
+    brand: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class MealCreate(BaseModel):
+    name: str
+    meal_type: str
+    meal_time: str
+    foods: List[dict]  # [{"food_id": 1, "quantity": 1.5}]
+
+class TrackedDayCreate(BaseModel):
+    person: str
+    date: str  # ISO date string
+
+class TrackedMealCreate(BaseModel):
+    meal_id: int
+    meal_time: str
+    quantity: float = 1.0
+
+class FoodExport(FoodResponse):
+    pass
+
+class MealFoodExport(BaseModel):
+    food_id: int
+    quantity: float
+
+class MealExport(BaseModel):
+    id: int
+    name: str
+    meal_type: str
+    meal_time: str
+    meal_foods: List[MealFoodExport]
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PlanExport(BaseModel):
+    id: int
+    person: str
+    date: date
+    meal_id: int
+    meal_time: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class TemplateMealExport(BaseModel):
+    meal_id: int
+    meal_time: str
+
+class TemplateExport(BaseModel):
+    id: int
+    name: str
+    template_meals: List[TemplateMealExport]
+
+    model_config = ConfigDict(from_attributes=True)
+
+class TemplateMealDetail(BaseModel):
+   meal_id: int
+   meal_time: str
+   meal_name: str
+
+class TemplateDetail(BaseModel):
+   id: int
+   name: str
+   template_meals: List[TemplateMealDetail]
+
+   model_config = ConfigDict(from_attributes=True)
+
+class WeeklyMenuDayExport(BaseModel):
+   day_of_week: int
+   template_id: int
+
+class WeeklyMenuDayDetail(BaseModel):
+    day_of_week: int
+    template_id: int
+    template_name: str
+
+class WeeklyMenuExport(BaseModel):
+    id: int
+    name: str
+    weekly_menu_days: List[WeeklyMenuDayExport]
+
+    model_config = ConfigDict(from_attributes=True)
+
+class WeeklyMenuDetail(BaseModel):
+    id: int
+    name: str
+    weekly_menu_days: List[WeeklyMenuDayDetail]
+
+    model_config = ConfigDict(from_attributes=True)
+
+class TrackedMealExport(BaseModel):
+    meal_id: int
+    meal_time: str
+    quantity: float
+
+class TrackedDayExport(BaseModel):
+    id: int
+    person: str
+    date: date
+    is_modified: bool
+    tracked_meals: List[TrackedMealExport]
+
+    model_config = ConfigDict(from_attributes=True)
+
+class AllData(BaseModel):
+    foods: List[FoodExport]
+    meals: List[MealExport]
+    plans: List[PlanExport]
+    templates: List[TemplateExport]
+    weekly_menus: List[WeeklyMenuExport]
+    tracked_days: List[TrackedDayExport]
+
+# Database dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Utility functions
+def calculate_meal_nutrition(meal, db: Session):
+    """Calculate total nutrition for a meal"""
+    totals = {
+        'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
+        'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
+    }
+    
+    for meal_food in meal.meal_foods:
+        food = meal_food.food
+        quantity = meal_food.quantity
+        
+        totals['calories'] += food.calories * quantity
+        totals['protein'] += food.protein * quantity
+        totals['carbs'] += food.carbs * quantity
+        totals['fat'] += food.fat * quantity
+        totals['fiber'] += (food.fiber or 0) * quantity
+        totals['sugar'] += (food.sugar or 0) * quantity
+        totals['sodium'] += (food.sodium or 0) * quantity
+        totals['calcium'] += (food.calcium or 0) * quantity
+    
+    # Calculate percentages
+    total_cals = totals['calories']
+    if total_cals > 0:
+        totals['protein_pct'] = round((totals['protein'] * 4 / total_cals) * 100, 1)
+        totals['carbs_pct'] = round((totals['carbs'] * 4 / total_cals) * 100, 1)
+        totals['fat_pct'] = round((totals['fat'] * 9 / total_cals) * 100, 1)
+        totals['net_carbs'] = totals['carbs'] - totals['fiber']
+    else:
+        totals['protein_pct'] = 0
+        totals['carbs_pct'] = 0
+        totals['fat_pct'] = 0
+        totals['net_carbs'] = 0
+    
+    return totals
+
+def calculate_day_nutrition(plans, db: Session):
+    """Calculate total nutrition for a day's worth of meals"""
+    day_totals = {
+        'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
+        'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
+    }
+    
+    for plan in plans:
+        meal_nutrition = calculate_meal_nutrition(plan.meal, db)
+        for key in day_totals:
+            if key in meal_nutrition:
+                day_totals[key] += meal_nutrition[key]
+    
+    # Calculate percentages
+    total_cals = day_totals['calories']
+    if total_cals > 0:
+        day_totals['protein_pct'] = round((day_totals['protein'] * 4 / total_cals) * 100, 1)
+        day_totals['carbs_pct'] = round((day_totals['carbs'] * 4 / total_cals) * 100, 1)
+        day_totals['fat_pct'] = round((day_totals['fat'] * 9 / total_cals) * 100, 1)
+        day_totals['net_carbs'] = day_totals['carbs'] - day_totals['fiber']
+    else:
+        day_totals['protein_pct'] = 0
+        day_totals['carbs_pct'] = 0
+        day_totals['fat_pct'] = 0
+        day_totals['net_carbs'] = 0
+    
+    return day_totals
+
+def calculate_day_nutrition_tracked(tracked_meals, db: Session):
+    """Calculate total nutrition for tracked meals"""
+    day_totals = {
+        'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
+        'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
+    }
+    
+    for tracked_meal in tracked_meals:
+        meal_nutrition = calculate_meal_nutrition(tracked_meal.meal, db)
+        quantity = tracked_meal.quantity
+        
+        day_totals['calories'] += meal_nutrition['calories'] * quantity
+        day_totals['protein'] += meal_nutrition['protein'] * quantity
+        day_totals['carbs'] += meal_nutrition['carbs'] * quantity
+        day_totals['fat'] += meal_nutrition['fat'] * quantity
+        day_totals['fiber'] += (meal_nutrition.get('fiber', 0) or 0) * quantity
+        day_totals['sugar'] += (meal_nutrition.get('sugar', 0) or 0) * quantity
+        day_totals['sodium'] += (meal_nutrition.get('sodium', 0) or 0) * quantity
+        day_totals['calcium'] += (meal_nutrition.get('calcium', 0) or 0) * quantity
+    
+    # Calculate percentages
+    total_cals = day_totals['calories']
+    if total_cals > 0:
+        day_totals['protein_pct'] = round((day_totals['protein'] * 4 / total_cals) * 100, 1)
+        day_totals['carbs_pct'] = round((day_totals['carbs'] * 4 / total_cals) * 100, 1)
+        day_totals['fat_pct'] = round((day_totals['fat'] * 9 / total_cals) * 100, 1)
+        day_totals['net_carbs'] = day_totals['carbs'] - day_totals['fiber']
+    else:
+        day_totals['protein_pct'] = 0
+        day_totals['carbs_pct'] = 0
+        day_totals['fat_pct'] = 0
+        day_totals['net_carbs'] = 0
+    
+    return day_totals
