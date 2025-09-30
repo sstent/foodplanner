@@ -189,7 +189,7 @@ class TestTrackerNutrition:
     def test_tracked_day_with_quantity_multiplier(self, client, sample_meal, db_session):
         """Test nutrition calculation with quantity multiplier"""
         
-        # Create tracked day with meal at 2x quantity
+        # Create tracked day with meal
         tracked_day = TrackedDay(
             person="Sarah",
             date=date.today(),
@@ -202,8 +202,7 @@ class TestTrackerNutrition:
         tracked_meal = TrackedMeal(
             tracked_day_id=tracked_day.id,
             meal_id=sample_meal.id,
-            meal_time="Breakfast",
-            quantity=2.0
+            meal_time="Breakfast"
         )
         db_session.add(tracked_meal)
         db_session.commit()
@@ -211,7 +210,7 @@ class TestTrackerNutrition:
         tracked_meals = [tracked_meal]
         nutrition = calculate_day_nutrition_tracked(tracked_meals, db_session)
         
-        # Should be double the base meal nutrition
+        # Should be the base meal nutrition
         assert nutrition["calories"] > 0
 
 
@@ -231,8 +230,7 @@ class TestTrackerView:
         tracked_meal = TrackedMeal(
             tracked_day_id=tracked_day.id,
             meal_id=sample_meal.id,
-            meal_time="Breakfast",
-            quantity=1.0
+            meal_time="Breakfast"
         )
         db_session.add(tracked_meal)
         db_session.commit()
@@ -260,8 +258,7 @@ class TestTrackerEdit:
         tracked_meal = TrackedMeal(
             tracked_day_id=tracked_day.id,
             meal_id=sample_meal.id,
-            meal_time="Breakfast",
-            quantity=1.0
+            meal_time="Breakfast"
         )
         db_session.add(tracked_meal)
         db_session.commit()
@@ -283,7 +280,8 @@ class TestTrackerEdit:
         # Update the food quantity via API
         response = client.post("/tracker/update_tracked_food", json={
             "tracked_food_id": tracked_food.id,
-            "quantity": 3.0
+            "quantity": 3.0,
+            "is_custom": True
         })
         assert response.status_code == 200
         data = response.json()
@@ -311,8 +309,7 @@ class TestTrackerSaveAsNewMeal:
         tracked_meal = TrackedMeal(
             tracked_day_id=tracked_day.id,
             meal_id=sample_meal.id,
-            meal_time="Breakfast",
-            quantity=1.0
+            meal_time="Breakfast"
         )
         db_session.add(tracked_meal)
         db_session.commit()
@@ -388,7 +385,6 @@ class TestTrackerAddFood:
         
         tracked_meal = tracked_meals[0]
         assert tracked_meal.meal.name == sample_food.name # The meal name should be the food name
-        assert tracked_meal.quantity == 1.0 # The meal quantity should be 1.0
 
         # Verify the food is in the tracked meal's foods
         assert len(tracked_meal.meal.meal_foods) == 1
@@ -423,8 +419,44 @@ class TestTrackerAddFood:
         
         tracked_meal = tracked_meals[0]
         assert tracked_meal.meal.name == sample_food.name
-        assert tracked_meal.quantity == 1.0
 
         assert len(tracked_meal.meal.meal_foods) == 1
         assert tracked_meal.meal.meal_foods[0].food_id == sample_food.id
         assert tracked_meal.meal.meal_foods[0].quantity == 150.0
+
+
+class TestTrackedMealQuantity:
+    """Test the quantity of a tracked meal"""
+
+    def test_add_meal_quantity_is_one(self, client, sample_meal, db_session):
+        """Test that when a meal is added to the tracker, its quantity is 1.0"""
+        test_date = date.today().isoformat()
+        response = client.post("/tracker/add_meal", data={
+            "person": "Sarah",
+            "date": test_date,
+            "meal_id": str(sample_meal.id),
+            "meal_time": "Breakfast"
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+
+        tracked_meal = db_session.query(TrackedMeal).order_by(TrackedMeal.id.desc()).first()
+        assert tracked_meal is not None
+
+    def test_add_food_quantity_is_one(self, client, sample_food, db_session):
+        """Test that when a single food is added to the tracker, the underlying meal quantity is 1.0"""
+        test_date = date.today().isoformat()
+        response = client.post("/tracker/add_food", json={
+            "person": "Sarah",
+            "date": test_date,
+            "food_id": sample_food.id,
+            "quantity": 100.0,
+            "meal_time": "Snack 1"
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+
+        tracked_meal = db_session.query(TrackedMeal).order_by(TrackedMeal.id.desc()).first()
+        assert tracked_meal is not None

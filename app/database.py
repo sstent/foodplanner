@@ -134,7 +134,6 @@ class TrackedMeal(Base):
     tracked_day_id = Column(Integer, ForeignKey("tracked_days.id"))
     meal_id = Column(Integer, ForeignKey("meals.id"))
     meal_time = Column(String)  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
-    quantity = Column(Float, default=1.0)  # Quantity multiplier (e.g., 1.5 for 1.5 servings)
 
     tracked_day = relationship("TrackedDay", back_populates="tracked_meals")
     meal = relationship("Meal")
@@ -201,7 +200,6 @@ class TrackedDayCreate(BaseModel):
 class TrackedMealCreate(BaseModel):
     meal_id: int
     meal_time: str
-    quantity: float = 1.0
 
 class FoodExport(FoodResponse):
     pass
@@ -283,7 +281,6 @@ class TrackedMealFoodExport(BaseModel):
 class TrackedMealExport(BaseModel):
     meal_id: int
     meal_time: str
-    quantity: float
     tracked_foods: List[TrackedMealFoodExport] = []
 
 class TrackedDayExport(BaseModel):
@@ -382,12 +379,11 @@ def calculate_tracked_meal_nutrition(tracked_meal, db: Session):
         'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
     }
     
-    # Base meal nutrition scaled by quantity
+    # Base meal nutrition
     base_nutrition = calculate_meal_nutrition(tracked_meal.meal, db)
-    quantity = tracked_meal.quantity
     for key in totals:
         if key in base_nutrition:
-            totals[key] += base_nutrition[key] * quantity
+            totals[key] += base_nutrition[key]
     
     # Add custom tracked foods
     for tracked_food in tracked_meal.tracked_foods:

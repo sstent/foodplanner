@@ -58,7 +58,7 @@ def create_test_data(session: TestingSessionLocal):
     session.commit()
     session.refresh(tracked_day)
 
-    tracked_meal = TrackedMeal(tracked_day_id=tracked_day.id, meal_id=meal1.id, meal_time="Breakfast", quantity=1.0)
+    tracked_meal = TrackedMeal(tracked_day_id=tracked_day.id, meal_id=meal1.id, meal_time="Breakfast")
     session.add(tracked_meal)
     session.commit()
     session.refresh(tracked_meal)

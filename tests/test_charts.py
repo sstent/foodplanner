@@ -60,8 +60,7 @@ def sample_chart_data(db_session):
         tracked_meal = TrackedMeal(
             tracked_day_id=tracked_day.id,
             meal_id=meal.id,
-            meal_time="Breakfast",
-            quantity=1.0
+            meal_time="Breakfast"
         )
         db_session.add(tracked_meal)
         db_session.commit()

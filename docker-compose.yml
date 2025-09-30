@@ -5,3 +5,6 @@ services:
       - "8999:8999"
     environment:
       - DATABASE_URL=sqlite:////app/meal_planner.db
+    volumes:
+      - ./alembic:/app/alembic
+      - ./meal_planner.db:/app/meal_planner.db

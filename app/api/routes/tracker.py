@@ -87,9 +87,8 @@ async def tracker_add_meal(request: Request, db: Session = Depends(get_db)):
         date_str = form_data.get("date")
         meal_id = form_data.get("meal_id")
         meal_time = form_data.get("meal_time")
-        quantity = 1.0  # Default quantity to 1.0 as the field is removed from the UI
         
-        logging.info(f"DEBUG: Adding meal to tracker - person={person}, date={date_str}, meal_id={meal_id}, meal_time={meal_time}, quantity={quantity}")
+        logging.info(f"DEBUG: Adding meal to tracker - person={person}, date={date_str}, meal_id={meal_id}, meal_time={meal_time}")
         
         # Parse date
         from datetime import datetime
@@ -111,8 +110,7 @@ async def tracker_add_meal(request: Request, db: Session = Depends(get_db)):
         tracked_meal = TrackedMeal(
             tracked_day_id=tracked_day.id,
             meal_id=int(meal_id),
-            meal_time=meal_time,
-            quantity=quantity
+            meal_time=meal_time
         )
         db.add(tracked_meal)
         
@@ -259,8 +257,7 @@ async def tracker_apply_template(request: Request, db: Session = Depends(get_db)
             tracked_meal = TrackedMeal(
                 tracked_day_id=tracked_day.id,
                 meal_id=template_meal.meal_id,
-                meal_time=template_meal.meal_time,
-                quantity=1.0
+                meal_time=template_meal.meal_time
             )
             db.add(tracked_meal)
         
@@ -540,7 +537,6 @@ async def save_as_new_meal(data: dict = Body(...), db: Session = Depends(get_db)
 
         # Update the original tracked meal to point to the new meal
         tracked_meal.meal_id = new_meal.id
-        tracked_meal.quantity = 1.0 # Reset quantity to 1.0 as the new meal contains the correct quantities
         
         # Clear custom tracked foods from the original tracked meal
         for tf in tracked_meal.tracked_foods:
@@ -611,8 +607,7 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
         tracked_meal = TrackedMeal(
             tracked_day_id=tracked_day.id,
             meal_id=new_meal.id,
-            meal_time=meal_time,
-            quantity=1.0 # Quantity for single food meals is always 1.0, actual food quantity is in MealFood
+            meal_time=meal_time
         )
         db.add(tracked_meal)
         

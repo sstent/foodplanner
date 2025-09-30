@@ -217,8 +217,7 @@ def sample_tracked_day(db_session, sample_meal):
     tracked_meal = TrackedMeal(
         tracked_day_id=tracked_day.id,
         meal_id=sample_meal.id,
-        meal_time="Breakfast",
-        quantity=1.0
+        meal_time="Breakfast"
     )
     db_session.add(tracked_meal)
     db_session.commit()

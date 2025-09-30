@@ -285,8 +285,7 @@ async def use_template(template_id: int, request: Request, db: Session = Depends
             tracked_meal = TrackedMeal(
                 tracked_day_id=tracked_day.id,
                 meal_id=template_meal.meal_id,
-                meal_time=template_meal.meal_time,
-                quantity=1.0 # Default quantity when applying template
+                meal_time=template_meal.meal_time
             )
             db.add(tracked_meal)
         
