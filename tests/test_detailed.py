@@ -43,7 +43,7 @@ def client_fixture(session):
 def test_detailed_page_no_params(client):
     response = client.get("/detailed")
     assert response.status_code == 200
-    assert "Detailed View for" in response.text
+    assert "Detailed Plan for Sarah" in response.text
 
 
 def test_detailed_page_default_date(client, session):

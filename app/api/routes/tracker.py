@@ -87,7 +87,7 @@ async def tracker_add_meal(request: Request, db: Session = Depends(get_db)):
         date_str = form_data.get("date")
         meal_id = form_data.get("meal_id")
         meal_time = form_data.get("meal_time")
-        quantity = float(form_data.get("quantity", 1.0))
+        quantity = 1.0  # Default quantity to 1.0 as the field is removed from the UI
         
         logging.info(f"DEBUG: Adding meal to tracker - person={person}, date={date_str}, meal_id={meal_id}, meal_time={meal_time}, quantity={quantity}")
         

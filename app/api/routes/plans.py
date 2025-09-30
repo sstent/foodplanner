@@ -290,7 +290,7 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
     
     context = {
         "request": request,
-        "title": f"{person}'s Detailed Plan for {plan_date_obj.strftime('%B %d, %Y')}",
+        "title": f"Detailed Plan for {person} on {plan_date_obj.strftime('%B %d, %Y')}" if person else "Detailed View",
         "meal_details": meal_details,
         "day_totals": day_totals,
         "person": person,
