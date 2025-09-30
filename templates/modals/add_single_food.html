@@ -23,14 +23,7 @@
                         <label class="form-label">Quantity (g)</label>
                         <input type="number" step="0.1" class="form-control" name="quantity" value="1.0" min="0.1" required>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Meal Time</label>
-                        <select class="form-control" name="meal_time" required>
-                            {% for meal_time in meal_times %}
-                            <option value="{{ meal_time }}">{{ meal_time }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                    <input type="hidden" name="meal_time" id="addSingleFoodMealTime">
                 </form>
             </div>
             <div class="modal-footer">

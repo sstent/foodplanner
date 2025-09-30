@@ -477,7 +477,7 @@
     });
     // Show add single food modal and pre-select meal time
     function addSingleFoodToTime(mealTime) {
-        document.querySelector('#addSingleFoodModal select[name="meal_time"]').value = mealTime;
+        document.getElementById('addSingleFoodMealTime').value = mealTime;
         new bootstrap.Modal(document.getElementById('addSingleFoodModal')).show();
     }
 
