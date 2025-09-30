@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Meal Planner", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
-from app.api.routes import foods, meals, plans, templates as templates_router, weekly_menu, tracker, admin, export
+from app.api.routes import foods, meals, plans, templates as templates_router, weekly_menu, tracker, admin, export, charts
 
 app.include_router(foods.router, tags=["foods"])
 app.include_router(meals.router, tags=["meals"])
@@ -60,6 +60,7 @@ app.include_router(weekly_menu.router, tags=["weekly_menu"])
 app.include_router(tracker.router, tags=["tracker"])
 app.include_router(admin.router, tags=["admin"])
 app.include_router(export.router, tags=["export"])
+app.include_router(charts.router, tags=["charts"])
 
 # Add a logging middleware to see incoming requests
 @app.middleware("http")

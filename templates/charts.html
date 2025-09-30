@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Calories Chart{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2><i class="bi bi-graph-up"></i> Daily Calories Chart</h2>
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <label for="daysSelect" class="form-label">Select Time Period:</label>
+                    <select class="form-select" id="daysSelect">
+                        <option value="7">Past 7 Days</option>
+                        <option value="30">Past 30 Days</option>
+                    </select>
+                    <button class="btn btn-primary mt-2" id="loadChartBtn">Load Chart</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Calories Consumed</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="caloriesChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let chart;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const daysSelect = document.getElementById('daysSelect');
+        const loadBtn = document.getElementById('loadChartBtn');
+        const ctx = document.getElementById('caloriesChart').getContext('2d');
+
+        // Default load for 7 days
+        loadChart(7);
+
+        loadBtn.addEventListener('click', function() {
+            const selectedDays = parseInt(daysSelect.value);
+            loadChart(selectedDays);
+        });
+
+        function loadChart(days) {
+            fetch(`/api/charts?person=Sarah&days=${days}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Sort data by date ascending for chart
+                    data.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                    const labels = data.map(item => item.date);
+                    const calories = data.map(item => item.calories);
+
+                    if (chart) {
+                        chart.destroy();
+                    }
+
+                    chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Calories',
+                                data: calories,
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                tension: 0.1,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Calories'
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Date'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading chart data:', error);
+                    alert('Failed to load chart data');
+                });
+        }
+    });
+</script>
+{% endblock %}
