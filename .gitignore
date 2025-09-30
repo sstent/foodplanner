@@ -1,0 +1,5 @@
+*.csv
+*.db
+.kilocode/
+*.pyc
+__pycache__/
