@@ -138,6 +138,21 @@ class TrackedMeal(Base):
 
     tracked_day = relationship("TrackedDay", back_populates="tracked_meals")
     meal = relationship("Meal")
+    tracked_foods = relationship("TrackedMealFood", back_populates="tracked_meal", cascade="all, delete-orphan")
+
+
+class TrackedMealFood(Base):
+    """Custom food entries for a tracked meal (overrides or additions)"""
+    __tablename__ = "tracked_meal_foods"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tracked_meal_id = Column(Integer, ForeignKey("tracked_meals.id"))
+    food_id = Column(Integer, ForeignKey("foods.id"))
+    quantity = Column(Float, default=1.0)  # Custom quantity for this tracked instance
+    is_override = Column(Boolean, default=False)  # True if overriding original meal food, False if addition
+
+    tracked_meal = relationship("TrackedMeal", back_populates="tracked_foods")
+    food = relationship("Food")
 
 # Pydantic models
 class FoodCreate(BaseModel):
@@ -259,10 +274,17 @@ class WeeklyMenuDetail(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class TrackedMealFoodExport(BaseModel):
+    food_id: int
+    quantity: float
+    is_override: bool
+
+
 class TrackedMealExport(BaseModel):
     meal_id: int
     meal_time: str
     quantity: float
+    tracked_foods: List[TrackedMealFoodExport] = []
 
 class TrackedDayExport(BaseModel):
     id: int
@@ -353,6 +375,49 @@ def calculate_day_nutrition(plans, db: Session):
     
     return day_totals
 
+def calculate_tracked_meal_nutrition(tracked_meal, db: Session):
+    """Calculate nutrition for a tracked meal, including custom foods"""
+    totals = {
+        'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
+        'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
+    }
+    
+    # Base meal nutrition scaled by quantity
+    base_nutrition = calculate_meal_nutrition(tracked_meal.meal, db)
+    quantity = tracked_meal.quantity
+    for key in totals:
+        if key in base_nutrition:
+            totals[key] += base_nutrition[key] * quantity
+    
+    # Add custom tracked foods
+    for tracked_food in tracked_meal.tracked_foods:
+        food = tracked_food.food
+        food_quantity = tracked_food.quantity
+        totals['calories'] += food.calories * food_quantity
+        totals['protein'] += food.protein * food_quantity
+        totals['carbs'] += food.carbs * food_quantity
+        totals['fat'] += food.fat * food_quantity
+        totals['fiber'] += (food.fiber or 0) * food_quantity
+        totals['sugar'] += (food.sugar or 0) * food_quantity
+        totals['sodium'] += (food.sodium or 0) * food_quantity
+        totals['calcium'] += (food.calcium or 0) * food_quantity
+    
+    # Calculate percentages
+    total_cals = totals['calories']
+    if total_cals > 0:
+        totals['protein_pct'] = round((totals['protein'] * 4 / total_cals) * 100, 1)
+        totals['carbs_pct'] = round((totals['carbs'] * 4 / total_cals) * 100, 1)
+        totals['fat_pct'] = round((totals['fat'] * 9 / total_cals) * 100, 1)
+        totals['net_carbs'] = totals['carbs'] - totals['fiber']
+    else:
+        totals['protein_pct'] = 0
+        totals['carbs_pct'] = 0
+        totals['fat_pct'] = 0
+        totals['net_carbs'] = 0
+    
+    return totals
+
+
 def calculate_day_nutrition_tracked(tracked_meals, db: Session):
     """Calculate total nutrition for tracked meals"""
     day_totals = {
@@ -361,17 +426,10 @@ def calculate_day_nutrition_tracked(tracked_meals, db: Session):
     }
     
     for tracked_meal in tracked_meals:
-        meal_nutrition = calculate_meal_nutrition(tracked_meal.meal, db)
-        quantity = tracked_meal.quantity
-        
-        day_totals['calories'] += meal_nutrition['calories'] * quantity
-        day_totals['protein'] += meal_nutrition['protein'] * quantity
-        day_totals['carbs'] += meal_nutrition['carbs'] * quantity
-        day_totals['fat'] += meal_nutrition['fat'] * quantity
-        day_totals['fiber'] += (meal_nutrition.get('fiber', 0) or 0) * quantity
-        day_totals['sugar'] += (meal_nutrition.get('sugar', 0) or 0) * quantity
-        day_totals['sodium'] += (meal_nutrition.get('sodium', 0) or 0) * quantity
-        day_totals['calcium'] += (meal_nutrition.get('calcium', 0) or 0) * quantity
+        meal_nutrition = calculate_tracked_meal_nutrition(tracked_meal, db)
+        for key in day_totals:
+            if key in meal_nutrition:
+                day_totals[key] += meal_nutrition[key]
     
     # Calculate percentages
     total_cals = day_totals['calories']
