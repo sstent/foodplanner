@@ -20,31 +20,35 @@
             </button>
         </div>
 
-        <!-- Reset to Plan Button (only show if modified) -->
-        {% if is_modified %}
-        <div class="d-flex justify-content-center mb-4">
-            <button class="btn btn-outline-primary" onclick="resetToPlan()">
-                <i class="bi bi-arrow-counterclockwise"></i> Reset to Plan
-            </button>
-        </div>
-        {% endif %}
-
         <!-- Template Actions -->
-        <div class="d-flex gap-2 mb-4">
+        <div class="d-flex justify-content-center gap-2 mb-4">
             <button class="btn btn-success" onclick="saveAsTemplate()">
                 <i class="bi bi-save"></i> Save as Template
             </button>
             <button class="btn btn-primary" onclick="applyTemplate()">
                 <i class="bi bi-upload"></i> Apply Template
             </button>
+            {% if is_modified %}
+            <button class="btn btn-outline-primary" onclick="resetToPlan()">
+                <i class="bi bi-arrow-counterclockwise"></i> Reset to Plan
+            </button>
+            {% endif %}
         </div>
 
         <!-- Meal Times -->
         {% set meal_times = ["Breakfast", "Lunch", "Dinner", "Snack 1", "Snack 2", "Beverage 1", "Beverage 2"] %}
         {% for meal_time in meal_times %}
         <div class="card mb-3">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">{{ meal_time }}</h5>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-success" onclick="addMealToTime('{{ meal_time }}')">
+                        <i class="bi bi-plus"></i> Add Meal
+                    </button>
+                    <button class="btn btn-sm btn-info text-white" onclick="addSingleFoodToTime('{{ meal_time }}')">
+                        <i class="bi bi-plus-circle"></i> Add Food
+                    </button>
+                </div>
             </div>
             <div class="card-body">
                 <div id="meals-{{ meal_time|lower|replace(' ', '-') }}">
@@ -73,19 +77,17 @@
                             </div>
                             
                             <!-- Food Breakdown -->
-                            <div class="ms-3 row row-cols-2 g-1">
+                            <div class="ms-3">
+                                <div class="row row-cols-1 row-cols-sm-2">
                                 {% for meal_food in tracked_meal.meal.meal_foods %}
                                 <div class="col">
-                                    <div class="small text-muted">
-                                        • {{ meal_food.food.name }}
-                                    </div>
-                                </div>
-                                <div class="col text-end">
-                                    <div class="small text-muted">
-                                        {{ meal_food.food.serving_size }} {{ meal_food.food.serving_unit }}
+                                    <div class="d-flex justify-content-between small text-muted">
+                                        <span>• {{ meal_food.food.name }}</span>
+                                        <span class="text-end">{{ meal_food.food.serving_size }} {{ meal_food.food.serving_unit }}</span>
                                     </div>
                                 </div>
                                 {% endfor %}
+                                </div>
                                 {% if not tracked_meal.meal.meal_foods %}
                                 <div class="col-12">
                                     <div class="small text-muted">No foods in this meal</div>
@@ -99,15 +101,6 @@
                     {% endif %}
                 </div>
 
-                <!-- Add Meal Button -->
-                <div class="d-flex gap-2 mt-2">
-                    <button class="btn btn-sm btn-outline-success" onclick="addMealToTime('{{ meal_time }}')">
-                        <i class="bi bi-plus"></i> Add Meal
-                    </button>
-                    <button class="btn btn-sm btn-info text-white" onclick="addSingleFoodToTime('{{ meal_time }}')">
-                        <i class="bi bi-plus-circle"></i> Add Food
-                    </button>
-                </div>
             </div>
         </div>
         {% endfor %}
