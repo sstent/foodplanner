@@ -31,22 +31,22 @@ class TestTrackerRoutes:
             "person": "Sarah",
             "date": test_date,
             "meal_id": str(sample_meal.id),
-            "meal_time": "Breakfast",
-            "quantity": "1.5"
+            "meal_time": "Breakfast"
         })
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
     
-    def test_tracker_add_meal_default_quantity(self, client, sample_meal):
-        """Test adding meal with default quantity"""
-        test_date = date.today().isoformat()
-        response = client.post("/tracker/add_meal", data={
-            "person": "Stuart",
-            "date": test_date,
-            "meal_id": str(sample_meal.id),
-            "meal_time": "Lunch"
-        })
+    # This test is no longer relevant as quantity is always 1.0
+    # def test_tracker_add_meal_default_quantity(self, client, sample_meal):
+    #     """Test adding meal with default quantity"""
+    #     test_date = date.today().isoformat()
+    #     response = client.post("/tracker/add_meal", data={
+    #         "person": "Stuart",
+    #         "date": test_date,
+    #         "meal_id": str(sample_meal.id),
+    #         "meal_time": "Lunch"
+    #     })
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -394,3 +394,37 @@ class TestTrackerAddFood:
         assert len(tracked_meal.meal.meal_foods) == 1
         assert tracked_meal.meal.meal_foods[0].food_id == sample_food.id
         assert tracked_meal.meal.meal_foods[0].quantity == 100.0
+
+
+    def test_add_food_to_tracker_with_meal_time(self, client, sample_food, db_session):
+        """Test POST /tracker/add_food with a specific meal time"""
+        
+        tracked_day = TrackedDay(person="Sarah", date=date.today(), is_modified=False)
+        db_session.add(tracked_day)
+        db_session.commit()
+        db_session.refresh(tracked_day)
+
+        response = client.post("/tracker/add_food", json={
+            "person": "Sarah",
+            "date": date.today().isoformat(),
+            "food_id": sample_food.id,
+            "quantity": 150.0,
+            "meal_time": "Dinner"
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+
+        tracked_meals = db_session.query(TrackedMeal).filter(
+            TrackedMeal.tracked_day_id == tracked_day.id,
+            TrackedMeal.meal_time == "Dinner"
+        ).all()
+        assert len(tracked_meals) == 1
+        
+        tracked_meal = tracked_meals[0]
+        assert tracked_meal.meal.name == sample_food.name
+        assert tracked_meal.quantity == 1.0
+
+        assert len(tracked_meal.meal.meal_foods) == 1
+        assert tracked_meal.meal.meal_foods[0].food_id == sample_food.id
+        assert tracked_meal.meal.meal_foods[0].quantity == 150.0

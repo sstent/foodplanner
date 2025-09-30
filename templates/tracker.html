@@ -76,18 +76,27 @@
                             </div>
                             
                             <!-- Food Breakdown -->
-                            <div class="ms-3">
+                            <div class="ms-3 row row-cols-2 g-1">
                                 {% for meal_food in tracked_meal.meal.meal_foods %}
                                 {% set effective_quantity = meal_food.quantity * tracked_meal.quantity %}
-                                <div class="small text-muted mb-1">
-                                    • {{ meal_food.food.name }}: {{ "%.1f"|format(effective_quantity) }} {{ meal_food.food.serving_unit }}
-                                    {% if meal_food.food.serving_size %}
-                                    ({{ meal_food.food.serving_size }})
-                                    {% endif %}
+                                <div class="col">
+                                    <div class="small text-muted">
+                                        • {{ meal_food.food.name }}
+                                    </div>
+                                </div>
+                                <div class="col text-end">
+                                    <div class="small text-muted">
+                                        {{ "%.1f"|format(effective_quantity) }} {{ meal_food.food.serving_unit }}
+                                        {% if meal_food.food.serving_size %}
+                                        ({{ meal_food.food.serving_size }})
+                                        {% endif %}
+                                    </div>
                                 </div>
                                 {% endfor %}
                                 {% if not tracked_meal.meal.meal_foods %}
-                                <div class="small text-muted">No foods in this meal</div>
+                                <div class="col-12">
+                                    <div class="small text-muted">No foods in this meal</div>
+                                </div>
                                 {% endif %}
                             </div>
                         </div>
