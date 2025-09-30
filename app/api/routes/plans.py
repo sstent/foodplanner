@@ -179,7 +179,7 @@ async def remove_from_plan(plan_id: int, db: Session = Depends(get_db)):
         db.rollback()
         return {"status": "error", "message": str(e)}
 
-@router.get("/detailed", response_class=HTMLResponse)
+@router.get("/detailed", response_class=HTMLResponse, name="detailed")
 async def detailed(request: Request, person: str = "Sarah", plan_date: str = None, template_id: int = None, db: Session = Depends(get_db)):
     from datetime import datetime, date
     logging.info(f"DEBUG: Detailed page requested with url: {request.url.path}, query_params: {request.query_params}")
