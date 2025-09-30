@@ -82,10 +82,7 @@
                                 </div>
                                 <div class="col text-end">
                                     <div class="small text-muted">
-                                        {{ "%.1f"|format(meal_food.quantity) }} {{ meal_food.food.serving_unit }}
-                                        {% if meal_food.food.serving_size %}
-                                        ({{ meal_food.food.serving_size }})
-                                        {% endif %}
+                                        {{ meal_food.food.serving_size }} {{ meal_food.food.serving_unit }}
                                     </div>
                                 </div>
                                 {% endfor %}
