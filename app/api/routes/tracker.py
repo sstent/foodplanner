@@ -280,10 +280,32 @@ async def update_tracked_food(request: Request, data: dict = Body(...), db: Sess
     try:
         tracked_food_id = data.get("tracked_food_id")
         quantity = float(data.get("quantity", 1.0))
-        
+        is_custom = data.get("is_custom", False)
+
         logging.info(f"DEBUG: Updating tracked food {tracked_food_id} quantity to {quantity}")
-        
-        tracked_food = db.query(TrackedMealFood).filter(TrackedMealFood.id == tracked_food_id).first()
+
+        if is_custom:
+            tracked_food = db.query(TrackedMealFood).filter(TrackedMealFood.id == tracked_food_id).first()
+        else:
+            # It's a MealFood, we need to create a TrackedMealFood for it
+            meal_food = db.query(MealFood).filter(MealFood.id == tracked_food_id).first()
+            if not meal_food:
+                return {"status": "error", "message": "Meal food not found"}
+            
+            tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.meal_id == meal_food.meal_id).first()
+            if not tracked_meal:
+                return {"status": "error", "message": "Tracked meal not found"}
+
+            tracked_food = TrackedMealFood(
+                tracked_meal_id=tracked_meal.id,
+                food_id=meal_food.food_id,
+                quantity=quantity
+            )
+            db.add(tracked_food)
+            
+            # We can now remove the original MealFood to avoid duplication
+            db.delete(meal_food)
+
         if not tracked_food:
             return {"status": "error", "message": "Tracked food not found"}
         
@@ -454,6 +476,33 @@ async def remove_food_from_tracked_meal(meal_food_id: int, db: Session = Depends
     except Exception as e:
         db.rollback()
         logging.error(f"DEBUG: Error removing food from tracked meal: {e}")
+        return {"status": "error", "message": str(e)}
+
+@router.delete("/tracker/remove_custom_food_from_tracked_meal/{tracked_meal_food_id}")
+async def remove_custom_food_from_tracked_meal(tracked_meal_food_id: int, db: Session = Depends(get_db)):
+    """Remove a custom food from a tracked meal"""
+    try:
+        tracked_meal_food = db.query(TrackedMealFood).filter(TrackedMealFood.id == tracked_meal_food_id).first()
+        if not tracked_meal_food:
+            raise HTTPException(status_code=404, detail="Tracked meal food not found")
+
+        # Mark the tracked day as modified
+        tracked_meal = tracked_meal_food.tracked_meal
+        if tracked_meal:
+            tracked_meal.tracked_day.is_modified = True
+
+        db.delete(tracked_meal_food)
+        db.commit()
+
+        return {"status": "success"}
+
+    except HTTPException as he:
+        db.rollback()
+        logging.error(f"DEBUG: HTTP Error removing custom food from tracked meal: {he.detail}")
+        return {"status": "error", "message": he.detail}
+    except Exception as e:
+        db.rollback()
+        logging.error(f"DEBUG: Error removing custom food from tracked meal: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/save_as_new_meal")

@@ -357,10 +357,13 @@
                         const foodDiv = document.createElement('div');
                         foodDiv.className = 'd-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded';
                         foodDiv.innerHTML = `
-                            <span>${food.quantity} × ${food.food_name}</span>
-                            <button class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.id})">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                            <div class="input-group">
+                                <input type="number" step="0.01" class="form-control" value="${food.quantity}" data-food-id="${food.id}" data-is-custom="${food.is_custom}">
+                                <span class="input-group-text">${food.food_name}</span>
+                                <button class="btn btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.id}, ${food.is_custom})">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
                         `;
                         container.appendChild(foodDiv);
                     });
@@ -404,10 +407,11 @@
     }
 
     // Remove food from tracked meal
-    async function removeFoodFromTrackedMeal(mealFoodId) {
+    async function removeFoodFromTrackedMeal(foodId, isCustom) {
         if (confirm('Remove this food from the tracked meal?')) {
+            const url = isCustom ? `/tracker/remove_custom_food_from_tracked_meal/${foodId}` : `/tracker/remove_food_from_tracked_meal/${foodId}`;
             try {
-                const response = await fetch(`/tracker/remove_food_from_tracked_meal/${mealFoodId}`, {
+                const response = await fetch(url, {
                     method: 'DELETE'
                 });
                 
@@ -425,37 +429,10 @@
         }
     }
 
-    // Save tracked meal changes
+    // Save tracked meal changes (No longer needed as updates are real-time)
     async function saveTrackedMeal() {
-        const trackedMealId = document.getElementById('editTrackedMealId').value;
-        const inputs = document.querySelectorAll('#editMealFoodsList input[type="number"]');
-        
-        const updates = [];
-        inputs.forEach(input => {
-            updates.push({
-                tracked_food_id: input.dataset.foodId,
-                quantity: parseFloat(input.value)
-            });
-        });
-        
-        try {
-            const response = await fetch('/tracker/update_tracked_meal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tracked_meal_id: trackedMealId, updates: updates })
-            });
-            
-            const result = await response.json();
-            
-            if (result.status === 'success') {
-                bootstrap.Modal.getInstance(document.getElementById('editTrackedMealModal')).hide();
-                location.reload();
-            } else {
-                alert('Error: ' + result.message);
-            }
-        } catch (error) {
-            alert('Error: ' + error.message);
-        }
+        bootstrap.Modal.getInstance(document.getElementById('editTrackedMealModal')).hide();
+        location.reload();
     }
 
     // Save as new meal
@@ -469,7 +446,7 @@
         const foods = [];
         inputs.forEach(input => {
             foods.push({
-                food_id: input.dataset.foodId,
+                food_id: parseInt(input.dataset.foodId),
                 quantity: parseFloat(input.value)
             });
         });
