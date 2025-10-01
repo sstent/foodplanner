@@ -6,7 +6,7 @@
         <div id="daySelector">
             <form action="{{ url_for('detailed') }}" method="get" class="d-flex">
                 <input type="hidden" name="person" value="{{ person }}">
-                <input type="date" class="form-control me-2" name="plan_date" value="{{ plan_date.isoformat() if plan_date else '' }}" required>
+                <input type="date" class="form-control me-2" name="plan_date" value="{{ plan_date.isoformat() if plan_date else '' }}" onchange="this.form.submit()" required>
                 <button class="btn btn-primary" type="submit">
                     <i class="bi bi-search"></i> View Day
                 </button>
@@ -129,9 +129,17 @@
 <div class="meal-card">
     <div class="meal-header">
         <span>
-            <i class="bi bi-egg-fried"></i> {{ meal_detail.plan.meal.name }} - {{ meal_detail.plan.meal.meal_type.title() }}
-            {% if meal_detail.plan.meal_time %}
-                <small class="text-muted">({{ meal_detail.plan.meal_time }})</small>
+            <i class="bi bi-egg-fried"></i>
+            {% if is_tracked_view %}
+                {{ meal_detail.plan.meal.name }} - {{ meal_detail.plan.meal.meal_type.title() }}
+                {% if meal_detail.plan.meal_time %}
+                    <small class="text-muted">({{ meal_detail.plan.meal_time }})</small>
+                {% endif %}
+            {% else %}
+                {{ meal_detail.plan.meal.name }} - {{ meal_detail.plan.meal.meal_type.title() }}
+                {% if meal_detail.plan.meal_time %}
+                    <small class="text-muted">({{ meal_detail.plan.meal_time }})</small>
+                {% endif %}
             {% endif %}
         </span>
         <span class="badge bg-light text-dark">{{ "%.0f"|format(meal_detail.nutrition.calories) }} cal</span>
@@ -276,7 +284,9 @@
 {% elif not meal_details %}
 <div class="alert alert-info mt-3">
     <i class="bi bi-info-circle"></i>
-    {% if view_mode == 'template' %}
+    {% if is_tracked_view %}
+        No meals tracked for this day.
+    {% elif selected_template_id %}
         This template has no meals.
     {% else %}
         No meals planned for this day.

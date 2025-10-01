@@ -1,0 +1,21 @@
+--- templates/detailed.html
++++ templates/detailed.html
+@@ -1,3 +1,7 @@
++{# Look for the meal details section and ensure it shows food breakdown #}
++{% for meal_detail in meal_details %}
++  {# Existing meal header code... #}
++  
++  {# ADD FOOD BREAKDOWN SECTION: #}
++  <div class="food-breakdown">
++    <h4>Food Breakdown:</h4>
++    <ul>
++      {% for food in meal_detail.foods %}
++        <li>{{ food.quantity }}g {{ food.name }} 
++          {% if food.serving_size and food.serving_unit %}
++            ({{ food.serving_size }}{{ food.serving_unit }})
++          {% endif %}
++        </li>
++      {% endfor %}
++    </ul>
++  </div>
++{% endfor %}

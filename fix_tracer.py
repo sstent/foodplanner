@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""
+Script to fix the incomplete tracker.py file
+"""
+
+def fix_tracker_file():
+    file_path = "app/api/routes/tracker.py"
+    
+    with open(file_path, 'r') as f:
+        content = f.read()
+    
+    # Check if file is incomplete (ends abruptly)
+    if content.strip().endswith('@router.post("/tracker/save_template")'):
+        print("File is incomplete, adding missing content...")
+        
+        missing_content = '''async def tracker_save_template(request: Request, db: Session = Depends(get_db)):
+    """save current day's meals as template"""
+    try:
+        form_data = await request.form()
+        person = form_data.get("person")
+        date_str = form_data.get("date")
+        template_name = form_data.get("template_name")
+        logging.info(f"debug: saving template - name={template_name}, person={person}, date={date_str}")
+        
+        # Parse date
+        from datetime import datetime
+        date = datetime.fromisoformat(date_str).date()
+        
+        # Get tracked day and meals
+        tracked_day = db.query(TrackedDay).filter(
+            TrackedDay.person == person,
+            TrackedDay.date == date
+        ).first()
+        if not tracked_day:
+            return {"status": "error", "message": "No tracked day found"}
+            
+        tracked_meals = db.query(TrackedMeal).filter(
+            TrackedMeal.tracked_day_id == tracked_day.id
+        ).all()
+        
+        if not tracked_meals:
+            return {"status": "error", "message": "No tracked meals found"}
+        
+        # Create new template
+        template = Template(name=template_name)
+        db.add(template)
+        db.flush()
+        
+        # Add meals to template
+        for tracked_meal in tracked_meals:
+            template_meal = TemplateMeal(
+                template_id=template.id,
+                meal_id=tracked_meal.meal_id,
+                meal_time=tracked_meal.meal_time
+            )
+            db.add(template_meal)
+        
+        db.commit()
+        return {"status": "success", "message": "Template saved successfully"}
+    except Exception as e:
+        db.rollback()
+        logging.error(f"debug: error saving template: {e}")
+        return {"status": "error", "message": str(e)}
+
+@router.post("/tracker/apply_template")
+async def tracker_apply_template(request: Request, db: Session = Depends(get_db)):
+    """apply template to current day"""
+    try:
+        form_data = await request.form()
+        person = form_data.get("person")
+        date_str = form_data.get("date")
+        template_id = form_data.get("template_id")
+        logging.info(f"debug: applying template - template_id={template_id}, person={person}, date={date_str}")
+        
+        # Parse date
+        from datetime import datetime
+        date = datetime.fromisoformat(date_str).date()
+        
+        # Get template meals
+        template_meals = db.query(TemplateMeal).filter(
+            TemplateMeal.template_id == template_id
+        ).all()
+        
+        if not template_meals:
+            return {"status": "error", "message": "Template has no meals"}
+        
+        # Get or create tracked day
+        tracked_day = db.query(TrackedDay).filter(
+            TrackedDay.person == person,
+            TrackedDay.date == date
+        ).first()
+        if not tracked_day:
+            tracked_day = TrackedDay(person=person, date=date, is_modified=True)
+            db.add(tracked_day)
+            db.flush()
+        
+        # Clear existing meals and add template meals
+        db.query(TrackedMeal).filter(TrackedMeal.tracked_day_id == tracked_day.id).delete()
+        
+        for template_meal in template_meals:
+            tracked_meal = TrackedMeal(
+                tracked_day_id=tracked_day.id,
+                meal_id=template_meal.meal_id,
+                meal_time=template_meal.meal_time
+            )
+            db.add(tracked_meal)
+        
+        tracked_day.is_modified = True
+        db.commit()
+        return {"status": "success", "message": "Template applied successfully"}
+    except Exception as e:
+        db.rollback()
+        logging.error(f"debug: error applying template: {e}")
+        return {"status": "error", "message": str(e)}'''
+        
+        # Append the missing content
+        with open(file_path, 'a') as f:
+            f.write('\n' + missing_content)
+        
+        print("Tracker.py file fixed successfully!")
+    else:
+        print("Tracker.py file appears to be complete")
+
+if __name__ == "__main__":
+    fix_tracker_file()
