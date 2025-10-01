@@ -10,7 +10,7 @@ def sample_chart_data(db_session):
     # Create sample food
     food = Food(
         name="Sample Food",
-        serving_size="100g",
+        serving_size=100.0,
         serving_unit="g",
         calories=100.0,
         protein=10.0,
@@ -35,7 +35,7 @@ def sample_chart_data(db_session):
     meal_food = MealFood(
         meal_id=meal.id,
         food_id=food.id,
-        quantity=1.0
+        quantity=100.0
     )
     db_session.add(meal_food)
     db_session.commit()

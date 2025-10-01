@@ -26,7 +26,7 @@
                             {% if meal.meal_foods %}
                                 <ul class="list-unstyled">
                                 {% for meal_food in meal.meal_foods %}
-                                    <li>{{ "%.2f" | format(meal_food.quantity) }}g × {{ meal_food.food.name }}</li>
+                                    <li>{{ meal_food.quantity }}g of {{ meal_food.food.name }} ({{ (meal_food.quantity / meal_food.food.serving_size)|round(2) }} servings of {{ meal_food.food.serving_size }}{{ meal_food.food.serving_unit }})</li>
                                 {% endfor %}
                                 </ul>
                             {% else %}

@@ -47,7 +47,6 @@ async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(
                         
                     food_name = row[i].strip()
                     grams = float(row[i+1].strip())
-                    quantity = grams
                     
                     # Try multiple matching strategies for food names
                     food = None
@@ -72,7 +71,7 @@ async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(
                         food_names = [f[0] for f in all_foods]
                         raise ValueError(f"Food '{food_name}' not found. Available foods include: {', '.join(food_names[:5])}...")
                     logging.info(f"Found food '{food_name}' with id {food.id}")
-                    ingredients.append((food.id, quantity))
+                    ingredients.append((food.id, grams))
                 
                 # Create/update meal
                 existing = db.query(Meal).filter(Meal.name == meal_name).first()
@@ -89,11 +88,11 @@ async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(
                 db.flush()  # Get meal ID
                 
                 # Add new ingredients
-                for food_id, quantity in ingredients:
+                for food_id, grams in ingredients:
                     meal_food = MealFood(
                         meal_id=existing.id,
                         food_id=food_id,
-                        quantity=quantity
+                        quantity=grams
                     )
                     db.add(meal_food)
                 
@@ -180,7 +179,7 @@ async def get_meal_foods(meal_id: int, db: Session = Depends(get_db)):
 
 @router.post("/meals/{meal_id}/add_food")
 async def add_food_to_meal(meal_id: int, food_id: int = Form(...),
-                           grams: float = Form(..., alias="quantity"), db: Session = Depends(get_db)):
+                           grams: float = Form(...), db: Session = Depends(get_db)):
     
     try:
         meal_food = MealFood(meal_id=meal_id, food_id=food_id, quantity=grams)
@@ -210,7 +209,7 @@ async def remove_food_from_meal(meal_food_id: int, db: Session = Depends(get_db)
         return {"status": "error", "message": str(e)}
 
 @router.post("/meals/update_food_quantity")
-async def update_meal_food_quantity(meal_food_id: int = Form(...), grams: float = Form(..., alias="quantity"), db: Session = Depends(get_db)):
+async def update_meal_food_quantity(meal_food_id: int = Form(...), grams: float = Form(...), db: Session = Depends(get_db)):
     """Update the quantity of a food in a meal"""
     try:
         meal_food = db.query(MealFood).filter(MealFood.id == meal_food_id).first()

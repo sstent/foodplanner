@@ -92,7 +92,7 @@ class TestMealFoods:
         """Test POST /meals/{meal_id}/add_food"""
         response = client.post(f"/meals/{sample_meal.id}/add_food", data={
             "food_id": sample_food.id,
-            "quantity": 2.5
+            "grams": 250
         })
         assert response.status_code == 200
         data = response.json()

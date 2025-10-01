@@ -276,4 +276,8 @@ async def root(request: Request):
 @app.get("/test")
 async def test_route():
     logging.info("DEBUG: Test route called")
+# Add a test route to check template inheritance
+@app.get("/test_template", response_class=HTMLResponse)
+async def test_template(request: Request):
+    return templates.TemplateResponse("test_template.html", {"request": request, "person": "Sarah"})
     return {"status": "success", "message": "Test route is working"}

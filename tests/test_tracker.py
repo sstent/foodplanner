@@ -280,7 +280,7 @@ class TestTrackerEdit:
         # Update the food quantity via API
         response = client.post("/tracker/update_tracked_food", json={
             "tracked_food_id": tracked_food.id,
-            "quantity": 3.0,
+            "grams": 300.0,
             "is_custom": True
         })
         assert response.status_code == 200
@@ -290,7 +290,7 @@ class TestTrackerEdit:
         # Verify the update
         db_session.commit()
         updated_food = db_session.query(TrackedMealFood).get(tracked_food.id)
-        assert updated_food.quantity == 3.0
+        assert updated_food.quantity == 300.0
         assert updated_food.quantity != original_quantity
 
 
@@ -332,7 +332,7 @@ class TestTrackerSaveAsNewMeal:
             "tracked_meal_id": tracked_meal.id,
             "new_meal_name": new_meal_name,
             "foods": [
-                {"food_id": sample_food.id, "quantity": 3.0}
+                {"food_id": sample_food.id, "grams": 300.0}
             ]
         })
         assert response.status_code == 200
@@ -404,7 +404,7 @@ class TestTrackerAddFood:
             "person": "Sarah",
             "date": date.today().isoformat(),
             "food_id": sample_food.id,
-            "quantity": 150.0,
+            "grams": 150.0,
             "meal_time": "Dinner"
         })
         assert response.status_code == 200
@@ -422,7 +422,7 @@ class TestTrackerAddFood:
 
         assert len(tracked_meal.meal.meal_foods) == 1
         assert tracked_meal.meal.meal_foods[0].food_id == sample_food.id
-        assert tracked_meal.meal.meal_foods[0].quantity == 1.5
+        assert tracked_meal.meal.meal_foods[0].quantity == 150.0
 
     def test_add_food_quantity_is_correctly_converted_to_servings(self, client, db_session):
         """
@@ -449,7 +449,7 @@ class TestTrackerAddFood:
             "person": "Sarah",
             "date": date.today().isoformat(),
             "food_id": food.id,
-            "quantity": grams_to_add,
+            "grams": grams_to_add,
             "meal_time": "Snack 1"
         })
         assert response.status_code == 200
@@ -469,7 +469,7 @@ class TestTrackerAddFood:
         # Verify the food is in the tracked meal's foods and quantity is in servings
         assert len(tracked_meal.meal.meal_foods) == 1
         assert tracked_meal.meal.meal_foods[0].food_id == food.id
-        assert tracked_meal.meal.meal_foods[0].quantity == expected_servings
+        assert tracked_meal.meal.meal_foods[0].quantity == grams_to_add
 
         # Verify nutrition calculation
         day_nutrition = calculate_day_nutrition_tracked([tracked_meal], db_session)

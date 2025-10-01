@@ -166,7 +166,7 @@
                 </td>
                 <td>
                     <div class="serving-info">
-                        {{ "%.1f"|format(meal_food.num_servings) }} × {{ meal_food.serving_size }}{{ meal_food.serving_unit }} ({{ "%.0f"|format(meal_food.total_grams) }}g)
+                        {{ "%.0f"|format(meal_food.total_grams) }}g ({{ "%.2f"|format(meal_food.num_servings) }} servings of {{ meal_food.serving_size }}{{ meal_food.serving_unit }})
                     </div>
                 </td>
                 <td class="nutrient-value">{{ "%.0f"|format(meal_food.calories) }}</td>

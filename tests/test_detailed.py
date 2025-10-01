@@ -25,11 +25,9 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 def session_fixture():
     Base.metadata.create_all(bind=test_engine)
     db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-        Base.metadata.drop_all(bind=test_engine)
+    yield db
+    db.close()
+    Base.metadata.drop_all(bind=test_engine)
 
 @pytest.fixture(name="client")
 def client_fixture(session):
@@ -50,7 +48,7 @@ def test_detailed_page_default_date(client, session):
     # Create mock data for today
     food = Food(
         name="Apple", 
-        serving_size="100", 
+        serving_size=100.0,
         serving_unit="g", 
         calories=52, 
         protein=0.3, 
@@ -71,7 +69,7 @@ def test_detailed_page_default_date(client, session):
     session.commit()
     session.refresh(meal)
 
-    meal_food = MealFood(meal_id=meal.id, food_id=food.id, quantity=1.0)
+    meal_food = MealFood(meal_id=meal.id, food_id=food.id, quantity=100.0)
     session.add(meal_food)
     session.commit()
 
@@ -84,7 +82,7 @@ def test_detailed_page_default_date(client, session):
     response = client.get("/detailed?person=Sarah")
     assert response.status_code == 200
     # Check for the unescaped version or the page title
-    assert "Detailed Plan for" in response.text
+    assert "Detailed Plan for Sarah" in response.text
     assert test_date.strftime('%B %d, %Y') in response.text
     assert "Fruit Snack" in response.text
 
@@ -93,7 +91,7 @@ def test_detailed_page_with_plan_date(client, session):
     # Create mock data
     food = Food(
         name="Apple", 
-        serving_size="100", 
+        serving_size=100.0,
         serving_unit="g", 
         calories=52, 
         protein=0.3, 
@@ -114,7 +112,7 @@ def test_detailed_page_with_plan_date(client, session):
     session.commit()
     session.refresh(meal)
 
-    meal_food = MealFood(meal_id=meal.id, food_id=food.id, quantity=1.0)
+    meal_food = MealFood(meal_id=meal.id, food_id=food.id, quantity=100.0)
     session.add(meal_food)
     session.commit()
 
@@ -126,7 +124,7 @@ def test_detailed_page_with_plan_date(client, session):
     response = client.get(f"/detailed?person=Sarah&plan_date={test_date.isoformat()}")
     assert response.status_code == 200
     # Check for the page content without assuming apostrophe encoding
-    assert "Detailed Plan for" in response.text
+    assert "Detailed Plan for Sarah" in response.text
     assert "Fruit Snack" in response.text
 
 
@@ -134,7 +132,7 @@ def test_detailed_page_with_template_id(client, session):
     # Create mock data
     food = Food(
         name="Banana", 
-        serving_size="100", 
+        serving_size=100.0,
         serving_unit="g", 
         calories=89, 
         protein=1.1, 
@@ -155,7 +153,7 @@ def test_detailed_page_with_template_id(client, session):
     session.commit()
     session.refresh(meal)
 
-    meal_food = MealFood(meal_id=meal.id, food_id=food.id, quantity=1.0)
+    meal_food = MealFood(meal_id=meal.id, food_id=food.id, quantity=100.0)
     session.add(meal_food)
     session.commit()
 
@@ -177,7 +175,7 @@ def test_detailed_page_with_tracked_day_food_breakdown(client, session):
     # Create mock data for a tracked day
     food1 = Food(
         name="Chicken Breast",
-        serving_size="100",
+        serving_size=100.0,
         serving_unit="g",
         calories=165, protein=31, carbs=0, fat=3.6,
         fiber=0, sugar=0, sodium=74, calcium=11,
@@ -185,7 +183,7 @@ def test_detailed_page_with_tracked_day_food_breakdown(client, session):
     )
     food2 = Food(
         name="Broccoli",
-        serving_size="100",
+        serving_size=100.0,
         serving_unit="g",
         calories=55, protein=3.7, carbs=11.2, fat=0.6,
         fiber=5.1, sugar=2.2, sodium=33, calcium=47,
@@ -201,8 +199,8 @@ def test_detailed_page_with_tracked_day_food_breakdown(client, session):
     session.commit()
     session.refresh(meal)
 
-    meal_food1 = MealFood(meal_id=meal.id, food_id=food1.id, quantity=1.5) # 150g chicken
-    meal_food2 = MealFood(meal_id=meal.id, food_id=food2.id, quantity=2.0) # 200g broccoli
+    meal_food1 = MealFood(meal_id=meal.id, food_id=food1.id, quantity=150.0) # 150g chicken
+    meal_food2 = MealFood(meal_id=meal.id, food_id=food2.id, quantity=200.0) # 200g broccoli
     session.add_all([meal_food1, meal_food2])
     session.commit()
 
@@ -230,8 +228,8 @@ def test_detailed_page_with_tracked_day_food_breakdown(client, session):
     assert "Chicken and Broccoli" in response.text
     assert "Chicken Breast" in response.text
     assert "Broccoli" in response.text
-    assert "1.5 × 100g" in response.text # Check quantity and unit for chicken
-    assert "2.0 × 100g" in response.text # Check quantity and unit for broccoli
+    assert "150.0g of Chicken Breast (1.5 servings of 100.0g)" in response.text
+    assert "200.0g of Broccoli (2.0 servings of 100.0g)" in response.text
     assert "248" in response.text # Check calories for chicken (1.5 * 165 = 247.5, rounded to 248)
     assert "110" in response.text # Check calories for broccoli (2.0 * 55 = 110)
 
@@ -240,7 +238,7 @@ def test_detailed_page_with_invalid_plan_date(client):
     response = client.get(f"/detailed?person=Sarah&plan_date={invalid_date.isoformat()}")
     assert response.status_code == 200
     # Check for content that indicates empty plan
-    assert "Detailed Plan for" in response.text
+    assert "Detailed Plan for Sarah" in response.text
     assert "No meals planned for this day." in response.text
 
 

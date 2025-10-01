@@ -280,10 +280,10 @@ async def update_tracked_food(request: Request, data: dict = Body(...), db: Sess
     """Update quantity of a custom food in a tracked meal"""
     try:
         tracked_food_id = data.get("tracked_food_id")
-        quantity = float(data.get("quantity", 1.0))
+        grams = float(data.get("grams", 1.0))
         is_custom = data.get("is_custom", False)
 
-        logging.info(f"DEBUG: Updating tracked food {tracked_food_id} quantity to {quantity}")
+        logging.info(f"DEBUG: Updating tracked food {tracked_food_id} grams to {grams}")
 
         if is_custom:
             tracked_food = db.query(TrackedMealFood).filter(TrackedMealFood.id == tracked_food_id).first()
@@ -300,7 +300,7 @@ async def update_tracked_food(request: Request, data: dict = Body(...), db: Sess
             tracked_food = TrackedMealFood(
                 tracked_meal_id=tracked_meal.id,
                 food_id=meal_food.food_id,
-                quantity=quantity
+                quantity=grams
             )
             db.add(tracked_food)
             
@@ -311,7 +311,7 @@ async def update_tracked_food(request: Request, data: dict = Body(...), db: Sess
             return {"status": "error", "message": "Tracked food not found"}
         
         # Update quantity
-        tracked_food.quantity = quantity
+        tracked_food.quantity = grams
         
         # Mark the tracked day as modified
         tracked_day = tracked_food.tracked_meal.tracked_day
@@ -319,7 +319,7 @@ async def update_tracked_food(request: Request, data: dict = Body(...), db: Sess
         
         db.commit()
         
-        logging.info(f"DEBUG: Successfully updated tracked food quantity")
+        logging.info(f"DEBUG: Successfully updated tracked food grams")
         return {"status": "success"}
         
     except Exception as e:
@@ -440,7 +440,7 @@ async def add_food_to_tracked_meal(data: dict = Body(...), db: Session = Depends
     try:
         tracked_meal_id = data.get("tracked_meal_id")
         food_id = data.get("food_id")
-        quantity = float(data.get("quantity", 1.0))
+        grams = float(data.get("grams", 1.0))
 
         tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.id == tracked_meal_id).first()
         if not tracked_meal:
@@ -454,7 +454,7 @@ async def add_food_to_tracked_meal(data: dict = Body(...), db: Session = Depends
         meal_food = MealFood(
             meal_id=tracked_meal.meal_id,
             food_id=food_id,
-            quantity=quantity
+            quantity=grams
         )
         db.add(meal_food)
 
@@ -489,27 +489,25 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
 
         for food_data in foods_data:
             food_id = food_data.get("food_id")
-            grams = float(food_data.get("quantity", 1.0)) # Assuming quantity is now grams
+            grams = float(food_data.get("grams", 1.0))
             is_custom = food_data.get("is_custom", False)
             item_id = food_data.get("id") # This could be MealFood.id or TrackedMealFood.id
-            logging.info(f"DEBUG: Processing food_id: {food_id}, quantity: {grams}, is_custom: {is_custom}, item_id: {item_id}")
-
-            quantity = grams
+            logging.info(f"DEBUG: Processing food_id: {food_id}, grams: {grams}, is_custom: {is_custom}, item_id: {item_id}")
 
             if is_custom:
                 tracked_food = db.query(TrackedMealFood).filter(TrackedMealFood.id == item_id).first()
                 if tracked_food:
-                    tracked_food.quantity = quantity
-                    logging.info(f"DEBUG: Updated existing custom tracked food {item_id} to quantity {quantity}")
+                    tracked_food.quantity = grams
+                    logging.info(f"DEBUG: Updated existing custom tracked food {item_id} to grams {grams}")
                 else:
                     # If it's a new custom food being added
                     new_tracked_food = TrackedMealFood(
                         tracked_meal_id=tracked_meal.id,
                         food_id=food_id,
-                        quantity=quantity
+                        quantity=grams
                     )
                     db.add(new_tracked_food)
-                    logging.info(f"DEBUG: Added new custom tracked food for food_id {food_id} with quantity {quantity}")
+                    logging.info(f"DEBUG: Added new custom tracked food for food_id {food_id} with grams {grams}")
             else:
                 # This is a food from the original meal definition
                 # We need to check if it's already a TrackedMealFood (meaning it was overridden)
@@ -521,8 +519,8 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
                 logging.info(f"DEBUG: Checking for existing TrackedMealFood for food_id {food_id}: {existing_tracked_food.id if existing_tracked_food else 'None'}")
 
                 if existing_tracked_food:
-                    existing_tracked_food.quantity = quantity
-                    logging.info(f"DEBUG: Updated existing TrackedMealFood {existing_tracked_food.id} (override) to quantity {quantity}")
+                    existing_tracked_food.quantity = float(grams)
+                    logging.info(f"DEBUG: Updated existing TrackedMealFood {existing_tracked_food.id} (override) to grams {grams}")
                 else:
                     # If it's not a TrackedMealFood, it must be a MealFood
                     meal_food = db.query(MealFood).filter(
@@ -531,32 +529,29 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
                     ).first()
                     logging.info(f"DEBUG: Checking for existing MealFood for food_id {food_id}: {meal_food.id if meal_food else 'None'}")
                     if meal_food:
-                        # If quantity changed, convert to TrackedMealFood
-                        # NOTE: meal_food.quantity is already a multiplier,
-                        # but the incoming 'quantity' is a multiplier derived from grams.
-                        # So, we compare the incoming multiplier with the existing multiplier.
-                        if meal_food.quantity != quantity:
+                        # If grams changed, convert to TrackedMealFood
+                        if meal_food.quantity != grams:
                             new_tracked_food = TrackedMealFood(
                                 tracked_meal_id=tracked_meal.id,
                                 food_id=food_id,
-                                quantity=quantity,
+                                quantity=float(grams),
                                 is_override=True
                             )
                             db.add(new_tracked_food)
                             db.delete(meal_food) # Remove original MealFood
-                            logging.info(f"DEBUG: Converted MealFood {meal_food.id} to new TrackedMealFood for food_id {food_id} with quantity {quantity} and deleted original MealFood.")
+                            logging.info(f"DEBUG: Converted MealFood {meal_food.id} to new TrackedMealFood for food_id {food_id} with grams {grams} and deleted original MealFood.")
                         else:
-                            logging.info(f"DEBUG: MealFood {meal_food.id} quantity unchanged, no override needed.")
+                            logging.info(f"DEBUG: MealFood {meal_food.id} grams unchanged, no override needed.")
                     else:
                         # This case should ideally not happen if data is consistent,
                         # but as a fallback, add as a new TrackedMealFood
                         new_tracked_food = TrackedMealFood(
                             tracked_meal_id=tracked_meal.id,
                             food_id=food_id,
-                            quantity=quantity
+                            quantity=float(grams)
                         )
                         db.add(new_tracked_food)
-                        logging.warning(f"DEBUG: Fallback: Added new TrackedMealFood for food_id {food_id} with quantity {quantity}. Original MealFood not found.")
+                        logging.warning(f"DEBUG: Fallback: Added new TrackedMealFood for food_id {food_id} with grams {grams}. Original MealFood not found.")
         
         # Mark the tracked day as modified
         tracked_meal.tracked_day.is_modified = True
@@ -656,7 +651,7 @@ async def save_as_new_meal(data: dict = Body(...), db: Session = Depends(get_db)
             meal_food = MealFood(
                 meal_id=new_meal.id,
                 food_id=food_data["food_id"],
-                quantity=food_data["quantity"]
+                quantity=food_data["grams"]
             )
             db.add(meal_food)
 
@@ -692,7 +687,7 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
         person = data.get("person")
         date_str = data.get("date")
         food_id = data.get("food_id")
-        grams = float(data.get("quantity", 1.0))  # Assuming quantity is now grams
+        grams = float(data.get("grams", 1.0))
         meal_time = data.get("meal_time")
         
         logging.info(f"DEBUG: Adding single food to tracker - person={person}, date={date_str}, food_id={food_id}, grams={grams}, meal_time={meal_time}")
@@ -713,15 +708,12 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
             db.commit()
             db.refresh(tracked_day)
         
-        # Convert grams to a quantity multiplier based on serving size
         food_item = db.query(Food).filter(Food.id == food_id).first()
         if not food_item:
             return {"status": "error", "message": "Food not found"}
 
-        if food_item.serving_size > 0:
-            quantity = grams / food_item.serving_size
-        else:
-            quantity = 1.0  # Default to 1 serving if serving size is not set
+        # Store grams directly
+        quantity = grams
 
         # Create a new Meal for this single food entry
         # This allows it to be treated like any other meal in the tracker view
@@ -730,7 +722,7 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
         db.flush() # Flush to get the new meal ID
 
         # Link the food to the new meal
-        meal_food = MealFood(meal_id=new_meal.id, food_id=food_id, quantity=quantity)
+        meal_food = MealFood(meal_id=new_meal.id, food_id=food_id, quantity=grams)
         db.add(meal_food)
         
         # Create tracked meal entry

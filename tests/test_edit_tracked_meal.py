@@ -107,8 +107,8 @@ def test_edit_tracked_meal_with_override_flow(client: TestClient, session: Testi
 
     # Prepare update data: update food1 quantity (should create a TrackedMealFood and delete original MealFood)
     updated_foods_data = [
-        {"id": original_meal_food1.id, "food_id": food1.id, "quantity": 175.0, "is_custom": False}, # Original MealFood, but quantity changed
-        {"id": None, "food_id": food2.id, "quantity": 100.0, "is_custom": False} # Unchanged original MealFood
+        {"id": original_meal_food1.id, "food_id": food1.id, "grams": 175.0, "is_custom": False}, # Original MealFood, but quantity changed
+        {"id": None, "food_id": food2.id, "grams": 100.0, "is_custom": False} # Unchanged original MealFood
     ]
 
     response_update = client.post(
@@ -169,8 +169,8 @@ def test_update_tracked_meal_foods_endpoint(client: TestClient, session: Testing
 
     # Prepare update data
     updated_foods = [
-        {"id": tracked_meal_food1.id, "food_id": food1.id, "quantity": 200.0, "is_custom": True},
-        {"id": None, "food_id": food2.id, "quantity": 50.0, "is_custom": False} # This represents original meal food
+        {"id": tracked_meal_food1.id, "food_id": food1.id, "grams": 200.0, "is_custom": True},
+        {"id": None, "food_id": food2.id, "grams": 50.0, "is_custom": False} # This represents original meal food
     ]
 
     response = client.post(
@@ -210,7 +210,7 @@ def test_add_food_to_tracked_meal_endpoint(client: TestClient, session: TestingS
         json={
             "tracked_meal_id": tracked_meal.id,
             "food_id": food3.id,
-            "quantity": 200
+            "grams": 200
         }
     )
     assert response.status_code == 200

@@ -1,6 +1,17 @@
 """
 Database models and session management for the meal planner app
 """
+"""
+QUANTITY CONVENTION:
+All quantity fields in this application represent GRAMS.
+
+- Food.serving_size: base serving size in grams (e.g., 100.0)
+- Food nutrition values: per serving_size grams
+- MealFood.quantity: grams of this food in the meal (e.g., 150.0)
+- TrackedMealFood.quantity: grams of this food as tracked (e.g., 200.0)
+
+To calculate nutrition: multiplier = quantity / serving_size
+"""
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, Date, Boolean
 from sqlalchemy import or_
 from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base
@@ -313,7 +324,7 @@ def get_db():
 def calculate_meal_nutrition(meal, db: Session):
     """
     Calculate total nutrition for a meal.
-    Quantities in MealFood are now directly in grams.
+    MealFood.quantity is in GRAMS. Multiplier = quantity / food.serving_size (serving_size in grams).
     """
     totals = {
         'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
@@ -322,12 +333,16 @@ def calculate_meal_nutrition(meal, db: Session):
     
     for meal_food in meal.meal_foods:
         food = meal_food.food
-        multiplier = meal_food.quantity
+        try:
+            serving_size = float(food.serving_size)
+            multiplier = meal_food.quantity / serving_size if serving_size > 0 else 0
+        except (ValueError, TypeError):
+            multiplier = 0
         
-        totals['calories'] += food.calories * multiplier
-        totals['protein'] += food.protein * multiplier
-        totals['carbs'] += food.carbs * multiplier
-        totals['fat'] += food.fat * multiplier
+        totals['calories'] += (food.calories or 0) * multiplier
+        totals['protein'] += (food.protein or 0) * multiplier
+        totals['carbs'] += (food.carbs or 0) * multiplier
+        totals['fat'] += (food.fat or 0) * multiplier
         totals['fiber'] += (food.fiber or 0) * multiplier
         totals['sugar'] += (food.sugar or 0) * multiplier
         totals['sodium'] += (food.sodium or 0) * multiplier
@@ -377,7 +392,11 @@ def calculate_day_nutrition(plans, db: Session):
     return day_totals
 
 def calculate_tracked_meal_nutrition(tracked_meal, db: Session):
-    """Calculate nutrition for a tracked meal, including custom foods"""
+    """
+    Calculate nutrition for a tracked meal, including custom foods.
+    TrackedMealFood.quantity is in GRAMS. Multiplier = quantity / food.serving_size (serving_size in grams).
+    Base meal uses calculate_meal_nutrition which handles grams correctly.
+    """
     totals = {
         'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
         'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
@@ -392,15 +411,15 @@ def calculate_tracked_meal_nutrition(tracked_meal, db: Session):
     # Add custom tracked foods
     for tracked_food in tracked_meal.tracked_foods:
         food = tracked_food.food
-        food_quantity = tracked_food.quantity
-        totals['calories'] += food.calories * food_quantity
-        totals['protein'] += food.protein * food_quantity
-        totals['carbs'] += food.carbs * food_quantity
-        totals['fat'] += food.fat * food_quantity
-        totals['fiber'] += (food.fiber or 0) * food_quantity
-        totals['sugar'] += (food.sugar or 0) * food_quantity
-        totals['sodium'] += (food.sodium or 0) * food_quantity
-        totals['calcium'] += (food.calcium or 0) * food_quantity
+        multiplier = tracked_food.quantity / food.serving_size if food.serving_size and food.serving_size != 0 else 0
+        totals['calories'] += (food.calories or 0) * multiplier
+        totals['protein'] += (food.protein or 0) * multiplier
+        totals['carbs'] += (food.carbs or 0) * multiplier
+        totals['fat'] += (food.fat or 0) * multiplier
+        totals['fiber'] += (food.fiber or 0) * multiplier
+        totals['sugar'] += (food.sugar or 0) * multiplier
+        totals['sodium'] += (food.sodium or 0) * multiplier
+        totals['calcium'] += (food.calcium or 0) * multiplier
     
     # Calculate percentages
     total_cals = totals['calories']
@@ -447,10 +466,11 @@ def calculate_day_nutrition_tracked(tracked_meals, db: Session):
     return day_totals
 
 
-def convert_grams_to_quantity(food_id: int, grams: float, db: Session) -> float:
+def calculate_multiplier_from_grams(food_id: int, grams: float, db: Session) -> float:
     """
-    Converts a given amount in grams to the corresponding quantity multiplier
-    based on the food's serving size.
+    Calculate the multiplier from grams based on the food's serving size.
+    Multiplier = grams / serving_size (both in grams).
+    Used for nutrition calculations when quantity is provided in grams.
     """
     food = db.query(Food).filter(Food.id == food_id).first()
     if not food:

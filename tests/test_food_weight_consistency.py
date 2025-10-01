@@ -1,8 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from app.database import calculate_multiplier_from_grams
 from sqlalchemy.orm import sessionmaker
 from app.database import Base, get_db, Food, Meal, MealFood
+from app.database import TrackedMealFood
+from app.database import TrackedDay, TrackedMeal
 from main import app
 
 # Setup a test database
@@ -47,19 +50,19 @@ def sample_food_50g(session):
 def test_convert_grams_to_quantity_100g_food(session, sample_food_100g):
     """Test convert_grams_to_quantity for a 100g serving size food"""
     grams = 150.0
-    quantity = session.convert_grams_to_quantity(sample_food_100g.id, grams, session)
+    quantity = calculate_multiplier_from_grams(sample_food_100g.id, grams, session)
     assert quantity == 1.5
 
 def test_convert_grams_to_quantity_50g_food(session, sample_food_50g):
     """Test convert_grams_to_quantity for a 50g serving size food"""
     grams = 125.0
-    quantity = session.convert_grams_to_quantity(sample_food_50g.id, grams, session)
+    quantity = calculate_multiplier_from_grams(sample_food_50g.id, grams, session)
     assert quantity == 2.5
 
 def test_convert_grams_to_quantity_invalid_food_id(session):
     """Test convert_grams_to_quantity with an invalid food ID"""
     with pytest.raises(ValueError, match="Food with ID 999 not found."):
-        session.convert_grams_to_quantity(999, 100.0, session)
+        calculate_multiplier_from_grams(999, 100.0, session)
 
 def test_convert_grams_to_quantity_zero_serving_size(session):
     """Test convert_grams_to_quantity with zero serving size"""
@@ -68,7 +71,7 @@ def test_convert_grams_to_quantity_zero_serving_size(session):
     session.commit()
     session.refresh(food)
     with pytest.raises(ValueError, match="Serving size for food ID .* cannot be zero."):
-        session.convert_grams_to_quantity(food.id, 100.0, session)
+        calculate_multiplier_from_grams(food.id, 100.0, session)
 
 def test_add_food_to_meal_grams_input(client, session, sample_food_100g):
     """Test adding food to a meal with grams input"""
@@ -79,14 +82,14 @@ def test_add_food_to_meal_grams_input(client, session, sample_food_100g):
 
     response = client.post(
         f"/meals/{meal.id}/add_food",
-        data={"food_id": sample_food_100g.id, "quantity": 250.0} # 250 grams
+        data={"food_id": sample_food_100g.id, "grams": 250.0} # 250 grams
     )
     assert response.status_code == 200
     assert response.json()["status"] == "success"
 
     meal_food = session.query(MealFood).filter(MealFood.meal_id == meal.id).first()
     assert meal_food.food_id == sample_food_100g.id
-    assert meal_food.quantity == 2.5 # 250g / 100g serving = 2.5 multiplier
+    assert meal_food.quantity == 250.0
 
 def test_update_meal_food_quantity_grams_input(client, session, sample_food_50g):
     """Test updating meal food quantity with grams input"""
@@ -97,8 +100,7 @@ def test_update_meal_food_quantity_grams_input(client, session, sample_food_50g)
 
     # Add initial food with 100g (2.0 multiplier for 50g serving)
     initial_grams = 100.0
-    initial_quantity = session.convert_grams_to_quantity(sample_food_50g.id, initial_grams, session)
-    meal_food = MealFood(meal_id=meal.id, food_id=sample_food_50g.id, quantity=initial_quantity)
+    meal_food = MealFood(meal_id=meal.id, food_id=sample_food_50g.id, quantity=initial_grams)
     session.add(meal_food)
     session.commit()
     session.refresh(meal_food)
@@ -106,14 +108,13 @@ def test_update_meal_food_quantity_grams_input(client, session, sample_food_50g)
     updated_grams = 150.0
     response = client.post(
         "/meals/update_food_quantity",
-        data={"meal_food_id": meal_food.id, "quantity": updated_grams}
+        data={"meal_food_id": meal_food.id, "grams": updated_grams}
     )
     assert response.status_code == 200
     assert response.json()["status"] == "success"
 
     session.refresh(meal_food)
-    expected_quantity = session.convert_grams_to_quantity(sample_food_50g.id, updated_grams, session)
-    assert meal_food.quantity == expected_quantity
+    assert meal_food.quantity == updated_grams
 
 # Test for bulk_upload_meals would require creating a mock UploadFile and CSV content
 # This is more complex and might be deferred or tested manually if the tool's capabilities are limited.
@@ -131,7 +132,7 @@ def test_tracker_add_food_grams_input(client, session, sample_food_100g):
             "person": person,
             "date": date_str,
             "food_id": sample_food_100g.id,
-            "quantity": grams, # 75 grams
+            "grams": grams, # 75 grams
             "meal_time": "Breakfast"
         }
     )
@@ -142,7 +143,7 @@ def test_tracker_add_food_grams_input(client, session, sample_food_100g):
     tracked_meal = session.query(Meal).filter(Meal.name == sample_food_100g.name).first()
     assert tracked_meal is not None
     meal_food = session.query(MealFood).filter(MealFood.meal_id == tracked_meal.id).first()
-    assert meal_food.quantity == 0.75 # 75g / 100g serving = 0.75 multiplier
+    assert meal_food.quantity == grams
 
 def test_update_tracked_meal_foods_grams_input(client, session, sample_food_100g, sample_food_50g):
     """Test updating tracked meal foods with grams input"""
@@ -150,7 +151,8 @@ def test_update_tracked_meal_foods_grams_input(client, session, sample_food_100g
     date_str = "2023-01-02"
 
     # Create a tracked day and meal
-    tracked_day = TrackedDay(person=person, date="2023-01-02", is_modified=False)
+    from datetime import date
+    tracked_day = TrackedDay(person=person, date=date(2023, 1, 2), is_modified=False)
     session.add(tracked_day)
     session.commit()
     session.refresh(tracked_day)
@@ -166,8 +168,8 @@ def test_update_tracked_meal_foods_grams_input(client, session, sample_food_100g
     session.refresh(tracked_meal)
 
     # Add initial foods
-    meal_food_100g = MealFood(meal_id=meal.id, food_id=sample_food_100g.id, quantity=1.0) # 100g
-    meal_food_50g = MealFood(meal_id=meal.id, food_id=sample_food_50g.id, quantity=2.0) # 100g
+    meal_food_100g = MealFood(meal_id=meal.id, food_id=sample_food_100g.id, quantity=100.0) # 100g
+    meal_food_50g = MealFood(meal_id=meal.id, food_id=sample_food_50g.id, quantity=100.0) # 100g
     session.add_all([meal_food_100g, meal_food_50g])
     session.commit()
     session.refresh(meal_food_100g)
@@ -175,8 +177,8 @@ def test_update_tracked_meal_foods_grams_input(client, session, sample_food_100g
 
     # Update quantities: 100g food to 200g, 50g food to 75g
     updated_foods_data = [
-        {"id": meal_food_100g.id, "food_id": sample_food_100g.id, "quantity": 200.0, "is_custom": False},
-        {"id": meal_food_50g.id, "food_id": sample_food_50g.id, "quantity": 75.0, "is_custom": False}
+        {"id": meal_food_100g.id, "food_id": sample_food_100g.id, "grams": 200.0, "is_custom": False},
+        {"id": meal_food_50g.id, "food_id": sample_food_50g.id, "grams": 75.0, "is_custom": False}
     ]
 
     response = client.post(
@@ -194,10 +196,10 @@ def test_update_tracked_meal_foods_grams_input(client, session, sample_food_100g
         TrackedMealFood.tracked_meal_id == tracked_meal.id,
         TrackedMealFood.food_id == sample_food_100g.id
     ).first()
-    assert tracked_food_100g.quantity == 2.0 # 200g / 100g serving = 2.0
+    assert tracked_food_100g.quantity == 200.0
 
     tracked_food_50g = session.query(TrackedMealFood).filter(
         TrackedMealFood.tracked_meal_id == tracked_meal.id,
         TrackedMealFood.food_id == sample_food_50g.id
     ).first()
-    assert tracked_food_50g.quantity == 1.5 # 75g / 50g serving = 1.5
+    assert tracked_food_50g.quantity == 75.0
