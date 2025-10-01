@@ -87,45 +87,75 @@ def test_get_tracked_meal_foods_endpoint(client: TestClient, session: TestingSes
         elif food_data["food_name"] == "Banana":
             assert food_data["quantity"] == 100.0
 
-def test_get_tracked_meal_foods_after_override(client: TestClient, session: TestingSessionLocal):
+def test_edit_tracked_meal_with_override_flow(client: TestClient, session: TestingSessionLocal):
     """
-    Test retrieving foods for a tracked meal after one of its MealFoods has been overridden
-    and converted to a TrackedMealFood. This simulates the bug where the original MealFood
-    might be deleted, causing issues when fetching foods.
+    Test the full flow of editing a tracked meal, overriding a food, and then retrieving its foods.
+    This test aims to reproduce the "Error loading tracked meal foods" bug.
     """
     food1, food2, meal1, tracked_day, tracked_meal = create_test_data(session)
 
-    # Manually create a TrackedMealFood to override food1
-    tracked_meal_food1 = TrackedMealFood(tracked_meal_id=tracked_meal.id, food_id=food1.id, quantity=175.0, is_override=True)
-    session.add(tracked_meal_food1)
-    session.commit()
-    session.refresh(tracked_meal_food1)
-
-    # Manually delete the original MealFood for food1
-    meal_food_to_delete = session.query(MealFood).filter(
+    # 1. Simulate adding a meal (already done by create_test_data, so tracked_meal exists)
+    # 2. Simulate updating a food in the tracked meal to create an override
+    #    This will call /tracker/update_tracked_meal_foods
+    
+    # Get the original MealFood for food1
+    original_meal_food1 = session.query(MealFood).filter(
         MealFood.meal_id == meal1.id,
         MealFood.food_id == food1.id
     ).first()
-    if meal_food_to_delete:
-        session.delete(meal_food_to_delete)
-        session.commit()
+    assert original_meal_food1 is not None
+
+    # Prepare update data: update food1 quantity (should create a TrackedMealFood and delete original MealFood)
+    updated_foods_data = [
+        {"id": original_meal_food1.id, "food_id": food1.id, "quantity": 175.0, "is_custom": False}, # Original MealFood, but quantity changed
+        {"id": None, "food_id": food2.id, "quantity": 100.0, "is_custom": False} # Unchanged original MealFood
+    ]
+
+    response_update = client.post(
+        "/tracker/update_tracked_meal_foods",
+        json={
+            "tracked_meal_id": tracked_meal.id,
+            "foods": updated_foods_data
+        }
+    )
+    assert response_update.status_code == 200
+    assert response_update.json()["status"] == "success"
+
     session.expire_all() # Ensure a fresh load from the database
 
-    # Now, try to get the tracked meal foods
+    # Verify original MealFood for food1 is deleted
+    deleted_meal_food1 = session.query(MealFood).filter(MealFood.id == original_meal_food1.id).first()
+    assert deleted_meal_food1 is None
+
+    # Verify a TrackedMealFood for food1 now exists
+    overridden_tracked_food1 = session.query(TrackedMealFood).filter(
+        TrackedMealFood.tracked_meal_id == tracked_meal.id,
+        TrackedMealFood.food_id == food1.id
+    ).first()
+    assert overridden_tracked_food1 is not None
+    assert overridden_tracked_food1.quantity == 175.0
+
+    # 3. Now, try to get the tracked meal foods again, which is where the bug occurs
+    #    This will call /tracker/get_tracked_meal_foods
     response_get = client.get(f"/tracker/get_tracked_meal_foods/{tracked_meal.id}")
     assert response_get.status_code == 200
     data_get = response_get.json()
     assert data_get["status"] == "success"
     assert len(data_get["meal_foods"]) == 2
 
-    # Verify the updated quantity for food1 and the existence of food2
+    # Verify the contents of the returned meal_foods
+    food_names = [f["food_name"] for f in data_get["meal_foods"]]
+    assert "Apple" in food_names
+    assert "Banana" in food_names
+
     for food_data in data_get["meal_foods"]:
         if food_data["food_name"] == "Apple":
             assert food_data["quantity"] == 175.0
-            assert food_data["is_custom"] == True # It should now be a custom tracked food
+            assert food_data["is_custom"] == True
         elif food_data["food_name"] == "Banana":
             assert food_data["quantity"] == 100.0
-            assert food_data["is_custom"] == False # This one should still be from the original meal definition
+            assert food_data["is_custom"] == False
+
 
 def test_update_tracked_meal_foods_endpoint(client: TestClient, session: TestingSessionLocal):
     """Test updating quantities of foods in a tracked meal"""

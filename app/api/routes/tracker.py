@@ -367,19 +367,23 @@ async def tracker_reset_to_plan(request: Request, db: Session = Depends(get_db))
 @router.get("/tracker/get_tracked_meal_foods/{tracked_meal_id}")
 async def get_tracked_meal_foods(tracked_meal_id: int, db: Session = Depends(get_db)):
     """Get foods associated with a tracked meal"""
+    logging.info(f"DEBUG: get_tracked_meal_foods called for tracked_meal_id: {tracked_meal_id}")
     try:
         tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.id == tracked_meal_id).first()
+        logging.info(f"DEBUG: Tracked meal found: {tracked_meal.id if tracked_meal else 'None'}")
 
         if not tracked_meal:
             raise HTTPException(status_code=404, detail="Tracked meal not found")
 
         # Load the associated Meal and its foods
         meal = db.query(Meal).options(joinedload(Meal.meal_foods).joinedload(MealFood.food)).filter(Meal.id == tracked_meal.meal_id).first()
+        logging.info(f"DEBUG: Associated meal found: {meal.id if meal else 'None'}")
         if not meal:
             raise HTTPException(status_code=404, detail="Associated meal not found")
 
         # Load custom tracked foods for this tracked meal
         tracked_foods = db.query(TrackedMealFood).options(joinedload(TrackedMealFood.food)).filter(TrackedMealFood.tracked_meal_id == tracked_meal_id).all()
+        logging.info(f"DEBUG: Found {len(tracked_foods)} custom tracked foods.")
 
         # Combine foods from the base meal and custom tracked foods, handling overrides
         meal_foods_data = []
@@ -387,6 +391,7 @@ async def get_tracked_meal_foods(tracked_meal_id: int, db: Session = Depends(get
         # Keep track of food_ids that have been overridden by TrackedMealFood entries
         # These should not be added from the base meal definition
         overridden_food_ids = {tf.food_id for tf in tracked_foods}
+        logging.info(f"DEBUG: Overridden food IDs: {overridden_food_ids}")
 
         for meal_food in meal.meal_foods:
             # Only add meal_food if it hasn't been overridden by a TrackedMealFood
@@ -401,6 +406,8 @@ async def get_tracked_meal_foods(tracked_meal_id: int, db: Session = Depends(get
                     "is_custom": False
                 })
         
+        logging.info(f"DEBUG: Added {len(meal_foods_data)} meal foods (excluding overridden).")
+
         for tracked_food in tracked_foods:
             meal_foods_data.append({
                 "id": tracked_food.id,
@@ -411,6 +418,8 @@ async def get_tracked_meal_foods(tracked_meal_id: int, db: Session = Depends(get
                 "serving_size": tracked_food.food.serving_size,
                 "is_custom": True
             })
+        logging.info(f"DEBUG: Added {len(tracked_foods)} custom tracked foods.")
+        logging.info(f"DEBUG: Total meal foods data items: {len(meal_foods_data)}")
 
         return {"status": "success", "meal_foods": meal_foods_data}
 
@@ -463,11 +472,14 @@ async def add_food_to_tracked_meal(data: dict = Body(...), db: Session = Depends
 @router.post("/tracker/update_tracked_meal_foods")
 async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depends(get_db)):
     """Update quantities of multiple foods in a tracked meal"""
+    logging.info(f"DEBUG: update_tracked_meal_foods called for tracked_meal_id: {data.get('tracked_meal_id')}")
     try:
         tracked_meal_id = data.get("tracked_meal_id")
         foods_data = data.get("foods", [])
+        logging.info(f"DEBUG: Foods data received: {foods_data}")
 
         tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.id == tracked_meal_id).first()
+        logging.info(f"DEBUG: Tracked meal found: {tracked_meal.id if tracked_meal else 'None'}")
         if not tracked_meal:
             raise HTTPException(status_code=404, detail="Tracked meal not found")
 
@@ -476,6 +488,7 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
             grams = float(food_data.get("quantity", 1.0)) # Assuming quantity is now grams
             is_custom = food_data.get("is_custom", False)
             item_id = food_data.get("id") # This could be MealFood.id or TrackedMealFood.id
+            logging.info(f"DEBUG: Processing food_id: {food_id}, quantity: {grams}, is_custom: {is_custom}, item_id: {item_id}")
 
             quantity = grams
 
@@ -483,6 +496,7 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
                 tracked_food = db.query(TrackedMealFood).filter(TrackedMealFood.id == item_id).first()
                 if tracked_food:
                     tracked_food.quantity = quantity
+                    logging.info(f"DEBUG: Updated existing custom tracked food {item_id} to quantity {quantity}")
                 else:
                     # If it's a new custom food being added
                     new_tracked_food = TrackedMealFood(
@@ -491,6 +505,7 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
                         quantity=quantity
                     )
                     db.add(new_tracked_food)
+                    logging.info(f"DEBUG: Added new custom tracked food for food_id {food_id} with quantity {quantity}")
             else:
                 # This is a food from the original meal definition
                 # We need to check if it's already a TrackedMealFood (meaning it was overridden)
@@ -499,15 +514,18 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
                     TrackedMealFood.tracked_meal_id == tracked_meal.id,
                     TrackedMealFood.food_id == food_id
                 ).first()
+                logging.info(f"DEBUG: Checking for existing TrackedMealFood for food_id {food_id}: {existing_tracked_food.id if existing_tracked_food else 'None'}")
 
                 if existing_tracked_food:
                     existing_tracked_food.quantity = quantity
+                    logging.info(f"DEBUG: Updated existing TrackedMealFood {existing_tracked_food.id} (override) to quantity {quantity}")
                 else:
                     # If it's not a TrackedMealFood, it must be a MealFood
                     meal_food = db.query(MealFood).filter(
                         MealFood.meal_id == tracked_meal.meal_id,
                         MealFood.food_id == food_id
                     ).first()
+                    logging.info(f"DEBUG: Checking for existing MealFood for food_id {food_id}: {meal_food.id if meal_food else 'None'}")
                     if meal_food:
                         # If quantity changed, convert to TrackedMealFood
                         # NOTE: meal_food.quantity is already a multiplier,
@@ -522,6 +540,9 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
                             )
                             db.add(new_tracked_food)
                             db.delete(meal_food) # Remove original MealFood
+                            logging.info(f"DEBUG: Converted MealFood {meal_food.id} to new TrackedMealFood for food_id {food_id} with quantity {quantity} and deleted original MealFood.")
+                        else:
+                            logging.info(f"DEBUG: MealFood {meal_food.id} quantity unchanged, no override needed.")
                     else:
                         # This case should ideally not happen if data is consistent,
                         # but as a fallback, add as a new TrackedMealFood
@@ -531,6 +552,7 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
                             quantity=quantity
                         )
                         db.add(new_tracked_food)
+                        logging.warning(f"DEBUG: Fallback: Added new TrackedMealFood for food_id {food_id} with quantity {quantity}. Original MealFood not found.")
         
         # Mark the tracked day as modified
         tracked_meal.tracked_day.is_modified = True

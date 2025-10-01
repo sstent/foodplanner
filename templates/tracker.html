@@ -184,9 +184,11 @@
 
     // Add meal to specific time
     function addMealToTime(mealTime) {
+        console.log('addMealToTime called with:', mealTime);
         document.getElementById('mealTimeDisplay').textContent = mealTime;
         document.getElementById('addMealTime').value = mealTime;
         new bootstrap.Modal(document.getElementById('addMealModal')).show();
+        console.log('addMealModal should be shown.');
     }
 
     // Submit add meal form
@@ -327,10 +329,12 @@
 
     // Load foods for editing
     async function loadTrackedMealFoods(trackedMealId) {
+        console.log('loadTrackedMealFoods called with:', trackedMealId);
         document.getElementById('tracked_meal_id_for_food').value = trackedMealId;
         try {
             const response = await fetch(`/tracker/get_tracked_meal_foods/${trackedMealId}`);
             const data = await response.json();
+            console.log('Response from get_tracked_meal_foods:', data);
             
             const container = document.getElementById('editMealFoodsList');
             container.innerHTML = '';
@@ -338,6 +342,7 @@
             if (data.status === 'success') {
                 if (data.meal_foods.length === 0) {
                     container.innerHTML = '<em>No foods added yet</em>';
+                    console.log('No foods found for tracked meal.');
                 } else {
                     data.meal_foods.forEach(food => {
                         const foodDiv = document.createElement('div');
@@ -345,7 +350,7 @@
                         foodDiv.innerHTML = `
                             <span>${food.food_name}</span>
                             <div class="input-group w-50">
-                                <input type="number" step="0.01" class="form-control form-control-sm" value="${food.grams.toFixed(2)}" data-food-id="${food.food_id}" data-item-id="${food.id}" data-is-custom="${food.is_custom}">
+                                <input type="number" step="0.01" class="form-control form-control-sm" value="${food.quantity.toFixed(2)}" data-food-id="${food.food_id}" data-item-id="${food.id}" data-is-custom="${food.is_custom}">
                                 <span class="input-group-text">g</span>
                                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.id}, ${food.is_custom})">
                                     <i class="bi bi-trash"></i>
@@ -353,8 +358,11 @@
                             </div>
                         `;
                         container.appendChild(foodDiv);
+                        console.log('Added food to modal:', food.food_name, 'Quantity:', food.quantity);
                     });
                 }
+            } else {
+                console.error('Error status in response:', data.message);
             }
         } catch (error) {
             console.error('Error loading tracked meal foods:', error);
