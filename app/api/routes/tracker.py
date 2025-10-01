@@ -154,56 +154,60 @@ async def tracker_remove_meal(tracked_meal_id: int, db: Session = Depends(get_db
 
 @router.post("/tracker/save_template")
 async def tracker_save_template(request: Request, db: Session = Depends(get_db)):
-    """Save current day's meals as a template"""
+    """save current day's meals as a new template"""
     try:
         form_data = await request.form()
         person = form_data.get("person")
         date_str = form_data.get("date")
         template_name = form_data.get("template_name")
-        
-        logging.info(f"DEBUG: Saving template - name={template_name}, person={person}, date={date_str}")
-        
-        # Parse date
+
+        if not all([person, date_str, template_name]):
+            raise HTTPException(status_code=400, detail="Missing required form data.")
+
+        logging.info(f"debug: saving template - name={template_name}, person={person}, date={date_str}")
+
+        # 1. Check if template name already exists
+        existing_template = db.query(Template).filter(Template.name == template_name).first()
+        if existing_template:
+            return {"status": "error", "message": f"Template name '{template_name}' already exists."}
+
+        # 2. Find the tracked day and its meals
         from datetime import datetime
-        date = datetime.fromisoformat(date_str).date()
+        target_date = datetime.fromisoformat(date_str).date()
         
-        # Get tracked day and meals
         tracked_day = db.query(TrackedDay).filter(
-            TrackedDay.person == person,
-            TrackedDay.date == date
+            TrackedDay.person == person, TrackedDay.date == target_date
         ).first()
-        
+
         if not tracked_day:
-            return {"status": "error", "message": "No tracked day found"}
-        
-        tracked_meals = db.query(TrackedMeal).filter(
-            TrackedMeal.tracked_day_id == tracked_day.id
-        ).all()
-        
+            return {"status": "error", "message": "Tracked day not found for the given person and date."}
+
+        tracked_meals = db.query(TrackedMeal).filter(TrackedMeal.tracked_day_id == tracked_day.id).all()
+
         if not tracked_meals:
-            return {"status": "error", "message": "No meals to save as template"}
-        
-        # Create template
-        template = Template(name=template_name)
-        db.add(template)
-        db.flush()
-        
-        # Add template meals
-        for tracked_meal in tracked_meals:
-            template_meal = TemplateMeal(
-                template_id=template.id,
-                meal_id=tracked_meal.meal_id,
-                meal_time=tracked_meal.meal_time
+            return {"status": "error", "message": "No meals found on this day to save as a template."}
+
+        # 3. Create the new template
+        new_template = Template(name=template_name)
+        db.add(new_template)
+        db.flush()  # Use flush to get the new_template.id before commit
+
+        # 4. Create template_meal entries for each tracked meal
+        for meal in tracked_meals:
+            template_meal_entry = TemplateMeal(
+                template_id=new_template.id,
+                meal_id=meal.meal_id,
+                meal_time=meal.meal_time
             )
-            db.add(template_meal)
+            db.add(template_meal_entry)
+
         db.commit()
-        
-        logging.info(f"DEBUG: Successfully saved template with {len(tracked_meals)} meals")
-        return {"status": "success"}
-        
+        logging.info(f"debug: successfully saved template '{template_name}' with {len(tracked_meals)} meals.")
+        return {"status": "success", "message": "Template saved successfully."}
+
     except Exception as e:
         db.rollback()
-        logging.error(f"DEBUG: Error saving template: {e}")
+        logging.error(f"debug: error saving template: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/apply_template")

@@ -456,3 +456,23 @@ def calculate_day_nutrition_tracked(tracked_meals, db: Session):
         day_totals['net_carbs'] = 0
     
     return day_totals
+
+
+def convert_grams_to_quantity(food_id: int, grams: float, db: Session) -> float:
+    """
+    Converts a given amount in grams to the corresponding quantity multiplier
+    based on the food's serving size.
+    """
+    food = db.query(Food).filter(Food.id == food_id).first()
+    if not food:
+        raise ValueError(f"Food with ID {food_id} not found.")
+
+    try:
+        serving_size_value = float(food.serving_size)
+    except ValueError:
+        raise ValueError(f"Invalid serving size '{food.serving_size}' for food ID {food_id}. Must be a number.")
+
+    if serving_size_value == 0:
+        raise ValueError(f"Serving size for food ID {food_id} cannot be zero.")
+
+    return grams / serving_size_value
