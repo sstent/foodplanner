@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional
 
 # Import from the database module
-from app.database import get_db, Meal, Template, TemplateMeal, TrackedDay, TrackedMeal, calculate_meal_nutrition, MealFood, TrackedMealFood, Food, calculate_day_nutrition_tracked, convert_grams_to_quantity
+from app.database import get_db, Meal, Template, TemplateMeal, TrackedDay, TrackedMeal, calculate_meal_nutrition, MealFood, TrackedMealFood, Food, calculate_day_nutrition_tracked
 from main import templates
 
 router = APIRouter()
@@ -465,7 +465,7 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
             is_custom = food_data.get("is_custom", False)
             item_id = food_data.get("id") # This could be MealFood.id or TrackedMealFood.id
 
-            quantity = convert_grams_to_quantity(food_id, grams, db)
+            quantity = grams
 
             if is_custom:
                 tracked_food = db.query(TrackedMealFood).filter(TrackedMealFood.id == item_id).first()
@@ -675,8 +675,8 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
             db.commit()
             db.refresh(tracked_day)
         
-        # Get the food and convert grams to quantity multiplier
-        quantity = convert_grams_to_quantity(food_id, grams, db)
+        # The quantity is already in grams, so no conversion needed
+        quantity = grams
         
         # Create a new Meal for this single food entry
         # This allows it to be treated like any other meal in the tracker view
