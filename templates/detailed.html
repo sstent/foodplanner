@@ -166,15 +166,15 @@
                 </td>
                 <td>
                     <div class="serving-info">
-                        {{ meal_food.quantity }} × {{ meal_food.serving_size }}{{ meal_food.serving_unit }}
+                        {{ "%.1f"|format(meal_food.num_servings) }} × {{ meal_food.serving_size }}{{ meal_food.serving_unit }} ({{ "%.0f"|format(meal_food.total_grams) }}g)
                     </div>
                 </td>
                 <td class="nutrient-value">{{ "%.0f"|format(meal_food.calories) }}</td>
                 <td class="nutrient-value">{{ "%.1f"|format(meal_food.protein) }}g</td>
                 <td class="nutrient-value">{{ "%.1f"|format(meal_food.carbs) }}g</td>
                 <td class="nutrient-value">{{ "%.1f"|format(meal_food.fat) }}g</td>
-                <td class="nutrient-value">{{ "%.1f"|format(meal_food['fiber']|float) }}g</td>
-                <td class="nutrient-value">{{ "%.0f"|format(meal_food['sodium']|float) }}mg</td>
+                <td class="nutrient-value">{{ "%.1f"|format(meal_food.fiber) }}g</td>
+                <td class="nutrient-value">{{ "%.0f"|format(meal_food.sodium) }}mg</td>
             </tr>
             {% endfor %}
             <!-- Meal Totals Row -->

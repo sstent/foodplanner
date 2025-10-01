@@ -216,17 +216,24 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
             
             # Show individual foods in template meals
             for mf in tm.meal.meal_foods:
+                try:
+                    serving_size_value = float(mf.food.serving_size)
+                    num_servings = mf.quantity / serving_size_value if serving_size_value != 0 else 0
+                except (ValueError, TypeError):
+                    num_servings = 0 # Fallback for invalid serving_size
+
                 foods.append({
                     'name': mf.food.name,
-                    'quantity': mf.quantity,
+                    'total_grams': mf.quantity,
+                    'num_servings': num_servings,
                     'serving_size': mf.food.serving_size,
                     'serving_unit': mf.food.serving_unit,
-                    'calories': mf.food.calories * mf.quantity,
-                    'protein': mf.food.protein * mf.quantity,
-                    'carbs': mf.food.carbs * mf.quantity,
-                    'fat': mf.food.fat * mf.quantity,
-                    'fiber': (mf.food.fiber or 0) * mf.quantity,
-                    'sodium': (mf.food.sodium or 0) * mf.quantity,
+                    'calories': mf.food.calories * num_servings,
+                    'protein': mf.food.protein * num_servings,
+                    'carbs': mf.food.carbs * num_servings,
+                    'fat': mf.food.fat * num_servings,
+                    'fiber': (mf.food.fiber or 0) * num_servings,
+                    'sodium': (mf.food.sodium or 0) * num_servings,
                 })
             
             meal_details.append({
@@ -298,32 +305,46 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
                 
                 # Show base meal foods
                 for mf in tracked_meal.meal.meal_foods:
+                    try:
+                        serving_size_value = float(mf.food.serving_size)
+                        num_servings = mf.quantity / serving_size_value if serving_size_value != 0 else 0
+                    except (ValueError, TypeError):
+                        num_servings = 0 # Fallback for invalid serving_size
+
                     foods.append({
                         'name': mf.food.name,
-                        'quantity': mf.quantity,
+                        'total_grams': mf.quantity,
+                        'num_servings': num_servings,
                         'serving_size': mf.food.serving_size,
                         'serving_unit': mf.food.serving_unit,
-                        'calories': mf.food.calories * mf.quantity,
-                        'protein': mf.food.protein * mf.quantity,
-                        'carbs': mf.food.carbs * mf.quantity,
-                        'fat': mf.food.fat * mf.quantity,
-                        'fiber': (mf.food.fiber or 0) * mf.quantity,
-                        'sodium': (mf.food.sodium or 0) * mf.quantity,
+                        'calories': mf.food.calories * num_servings,
+                        'protein': mf.food.protein * num_servings,
+                        'carbs': mf.food.carbs * num_servings,
+                        'fat': mf.food.fat * num_servings,
+                        'fiber': (mf.food.fiber or 0) * num_servings,
+                        'sodium': (mf.food.sodium or 0) * num_servings,
                     })
                 
                 # Show custom tracked foods (overrides/additions)
                 for tracked_food in tracked_meal.tracked_foods:
+                    try:
+                        serving_size_value = float(tracked_food.food.serving_size)
+                        num_servings = tracked_food.quantity / serving_size_value if serving_size_value != 0 else 0
+                    except (ValueError, TypeError):
+                        num_servings = 0 # Fallback for invalid serving_size
+
                     foods.append({
                         'name': f"{tracked_food.food.name} {'(override)' if tracked_food.is_override else '(addition)'}",
-                        'quantity': tracked_food.quantity,
+                        'total_grams': tracked_food.quantity,
+                        'num_servings': num_servings,
                         'serving_size': tracked_food.food.serving_size,
                         'serving_unit': tracked_food.food.serving_unit,
-                        'calories': tracked_food.food.calories * tracked_food.quantity,
-                        'protein': tracked_food.food.protein * tracked_food.quantity,
-                        'carbs': tracked_food.food.carbs * tracked_food.quantity,
-                        'fat': tracked_food.food.fat * tracked_food.quantity,
-                        'fiber': (tracked_food.food.fiber or 0) * tracked_food.quantity,
-                        'sodium': (tracked_food.food.sodium or 0) * tracked_food.quantity,
+                        'calories': tracked_food.food.calories * num_servings,
+                        'protein': tracked_food.food.protein * num_servings,
+                        'carbs': tracked_food.food.carbs * num_servings,
+                        'fat': tracked_food.food.fat * num_servings,
+                        'fiber': (tracked_food.food.fiber or 0) * num_servings,
+                        'sodium': (tracked_food.food.sodium or 0) * num_servings,
                     })
                 
                 meal_details.append({
@@ -370,17 +391,24 @@ async def detailed(request: Request, person: str = "Sarah", plan_date: str = Non
             
             foods = []
             for mf in plan.meal.meal_foods:
+                try:
+                    serving_size_value = float(mf.food.serving_size)
+                    num_servings = mf.quantity / serving_size_value if serving_size_value != 0 else 0
+                except (ValueError, TypeError):
+                    num_servings = 0 # Fallback for invalid serving_size
+
                 foods.append({
                     'name': mf.food.name,
-                    'quantity': mf.quantity,
+                    'total_grams': mf.quantity,
+                    'num_servings': num_servings,
                     'serving_size': mf.food.serving_size,
                     'serving_unit': mf.food.serving_unit,
-                    'calories': mf.food.calories * mf.quantity,
-                    'protein': mf.food.protein * mf.quantity,
-                    'carbs': mf.food.carbs * mf.quantity,
-                    'fat': mf.food.fat * mf.quantity,
-                    'fiber': (mf.food.fiber or 0) * mf.quantity,
-                    'sodium': (mf.food.sodium or 0) * mf.quantity,
+                    'calories': mf.food.calories * num_servings,
+                    'protein': mf.food.protein * num_servings,
+                    'carbs': mf.food.carbs * num_servings,
+                    'fat': mf.food.fat * num_servings,
+                    'fiber': (mf.food.fiber or 0) * num_servings,
+                    'sodium': (mf.food.sodium or 0) * num_servings,
                 })
             
             meal_details.append({
