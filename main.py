@@ -166,7 +166,7 @@ def test_sqlite_connection(db_path):
             dir_perm = stat.filemode(dir_stat.st_mode)
             dir_uid = dir_stat.st_uid
             dir_gid = dir_stat.st_gid
-            logging.info(f"DEBUG: Database directory permissions: {dir_perm}, UID:{dir_uid}, GID:{dir_gid}")
+            logging.info(f"DEBUG: Database directory permissions: {dir_perm}, UID:{dir_uid}, GID:{dir_gid}, CWD: {os.getcwd()}")
             
             # Test write access
             test_file = os.path.join(db_dir, "write_test.txt")
@@ -223,36 +223,45 @@ def test_sqlite_connection(db_path):
         logging.error(f"DEBUG: SQLite connection test failed: {e}", exc_info=True)
         return False
 
+def table_exists(engine, table_name):
+    from sqlalchemy import inspect
+    inspector = inspect(engine)
+    return inspector.has_table(table_name)
+
+def table_has_content(engine, table_name):
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        result = conn.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar()
+        return result > 0
+
 def run_migrations():
     logging.info("DEBUG: Starting database setup...")
     try:
-        # Extract database path from URL
-        db_path = DATABASE_URL.split("///")[1]
-        logging.info(f"DEBUG: Database path extracted: {db_path}")
+        alembic_cfg = Config("alembic.ini")
         
-        # Create directory if needed
-        db_dir = os.path.dirname(db_path)
-        logging.info(f"DEBUG: Database directory: {db_dir}")
-        if not os.path.exists(db_dir):
-            logging.info(f"DEBUG: Creating database directory: {db_dir}")
-            os.makedirs(db_dir, exist_ok=True)
-            logging.info(f"DEBUG: Database directory created successfully")
+        # Create a new engine for checking tables
+        from sqlalchemy import create_engine
+        db_url = DATABASE_URL
+        temp_engine = create_engine(db_url)
+        
+        # Check if the database is old and needs to be stamped
+        has_alembic_version = table_exists(temp_engine, 'alembic_version')
+        has_foods = table_exists(temp_engine, 'foods')
+        alembic_version_has_content = has_alembic_version and table_has_content(temp_engine, 'alembic_version')
+        
+        logging.info(f"DEBUG: has_alembic_version: {has_alembic_version}, has_foods: {has_foods}, alembic_version_has_content: {alembic_version_has_content}")
+        
+        if has_foods and (not has_alembic_version or not alembic_version_has_content):
+            logging.info("DEBUG: Existing database detected. Stamping with initial migration.")
+            command.stamp(alembic_cfg, "head")
+            logging.info("DEBUG: Database stamped successfully.")
         else:
-            logging.info(f"DEBUG: Database directory already exists")
-        
-        # Test SQLite connection
-        logging.info("DEBUG: Testing SQLite connection...")
-        if not test_sqlite_connection(db_path):
-            logging.error("DEBUG: SQLite connection test failed")
-            raise Exception("SQLite connection test failed")
-        logging.info("DEBUG: SQLite connection test passed")
-        
-        # Create all tables using SQLAlchemy directly instead of alembic
-        logging.info("DEBUG: Creating database tables using SQLAlchemy...")
-        Base.metadata.create_all(bind=engine)
-        logging.info("DEBUG: Database tables created successfully.")
-        
-        logging.info("DEBUG: Database setup completed, returning to caller")
+            logging.info("DEBUG: No stamping needed or fresh database.")
+
+        # Now, run upgrades
+        logging.info("DEBUG: Running alembic upgrade...")
+        command.upgrade(alembic_cfg, "head")
+        logging.info("DEBUG: Database migrations run successfully.")
     except Exception as e:
         logging.error(f"DEBUG: Failed to setup database: {e}", exc_info=True)
         raise

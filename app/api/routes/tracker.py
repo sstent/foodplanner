@@ -713,19 +713,22 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
             db.commit()
             db.refresh(tracked_day)
         
-        # The quantity is already in grams, so no conversion needed
-        quantity = grams
-        
-        # Create a new Meal for this single food entry
-        # This allows it to be treated like any other meal in the tracker view
+        # Convert grams to a quantity multiplier based on serving size
         food_item = db.query(Food).filter(Food.id == food_id).first()
         if not food_item:
             return {"status": "error", "message": "Food not found"}
-            
+
+        if food_item.serving_size > 0:
+            quantity = grams / food_item.serving_size
+        else:
+            quantity = 1.0  # Default to 1 serving if serving size is not set
+
+        # Create a new Meal for this single food entry
+        # This allows it to be treated like any other meal in the tracker view
         new_meal = Meal(name=food_item.name, meal_type="single_food", meal_time=meal_time)
         db.add(new_meal)
         db.flush() # Flush to get the new meal ID
-        
+
         # Link the food to the new meal
         meal_food = MealFood(meal_id=new_meal.id, food_id=food_id, quantity=quantity)
         db.add(meal_food)

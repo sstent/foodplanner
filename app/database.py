@@ -14,7 +14,7 @@ import os
 # Database setup - Use SQLite for easier setup
 # Use environment variables if set, otherwise use defaults
 # Use current directory for database
-DATABASE_PATH = os.getenv('DATABASE_PATH', '.')
+DATABASE_PATH = os.getenv('DATABASE_PATH', '/app/data')
 DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{DATABASE_PATH}/meal_planner.db')
 
 # For production, use PostgreSQL: DATABASE_URL = "postgresql://username:password@localhost/meal_planner"
@@ -29,7 +29,7 @@ class Food(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
-    serving_size = Column(String)
+    serving_size = Column(Float)
     serving_unit = Column(String)
     calories = Column(Float)
     protein = Column(Float)
@@ -322,18 +322,7 @@ def calculate_meal_nutrition(meal, db: Session):
     
     for meal_food in meal.meal_foods:
         food = meal_food.food
-        grams = meal_food.quantity # quantity is now grams
-        
-        # Convert grams to a multiplier of serving size for nutrition calculation
-        try:
-            serving_size_value = float(food.serving_size)
-        except ValueError:
-            serving_size_value = 1 # Fallback if serving_size is not a number
-        
-        if serving_size_value == 0:
-            multiplier = 0 # Avoid division by zero
-        else:
-            multiplier = grams / serving_size_value
+        multiplier = meal_food.quantity
         
         totals['calories'] += food.calories * multiplier
         totals['protein'] += food.protein * multiplier

@@ -389,7 +389,7 @@ class TestTrackerAddFood:
         # Verify the food is in the tracked meal's foods
         assert len(tracked_meal.meal.meal_foods) == 1
         assert tracked_meal.meal.meal_foods[0].food_id == sample_food.id
-        assert tracked_meal.meal.meal_foods[0].quantity == 100.0
+        assert tracked_meal.meal.meal_foods[0].quantity == 1.0
 
 
     def test_add_food_to_tracker_with_meal_time(self, client, sample_food, db_session):
@@ -422,7 +422,61 @@ class TestTrackerAddFood:
 
         assert len(tracked_meal.meal.meal_foods) == 1
         assert tracked_meal.meal.meal_foods[0].food_id == sample_food.id
-        assert tracked_meal.meal.meal_foods[0].quantity == 150.0
+        assert tracked_meal.meal.meal_foods[0].quantity == 1.5
+
+    def test_add_food_quantity_is_correctly_converted_to_servings(self, client, db_session):
+        """
+        Test that when a single food is added to the tracker, the quantity provided in grams
+        is correctly converted to servings based on the food's serving size.
+        """
+        # Create a food with a known serving size
+        food = Food(name="Apple", serving_size=150, serving_unit="g", calories=52, protein=0.3, carbs=14, fat=0.2, fiber=2.4, sugar=10, sodium=1)
+        db_session.add(food)
+        db_session.commit()
+        db_session.refresh(food)
+
+        # Create a tracked day
+        tracked_day = TrackedDay(person="Sarah", date=date.today(), is_modified=False)
+        db_session.add(tracked_day)
+        db_session.commit()
+        db_session.refresh(tracked_day)
+
+        # Add food directly to tracker with a specific gram quantity
+        grams_to_add = 300.0
+        expected_servings = grams_to_add / float(food.serving_size)
+
+        response = client.post("/tracker/add_food", json={
+            "person": "Sarah",
+            "date": date.today().isoformat(),
+            "food_id": food.id,
+            "quantity": grams_to_add,
+            "meal_time": "Snack 1"
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+
+        # Verify that a new tracked meal was created with the food
+        tracked_meals = db_session.query(TrackedMeal).filter(
+            TrackedMeal.tracked_day_id == tracked_day.id,
+            TrackedMeal.meal_time == "Snack 1"
+        ).all()
+        assert len(tracked_meals) == 1
+        
+        tracked_meal = tracked_meals[0]
+        assert tracked_meal.meal.name == food.name
+
+        # Verify the food is in the tracked meal's foods and quantity is in servings
+        assert len(tracked_meal.meal.meal_foods) == 1
+        assert tracked_meal.meal.meal_foods[0].food_id == food.id
+        assert tracked_meal.meal.meal_foods[0].quantity == expected_servings
+
+        # Verify nutrition calculation
+        day_nutrition = calculate_day_nutrition_tracked([tracked_meal], db_session)
+        assert day_nutrition["calories"] == food.calories * expected_servings
+        assert day_nutrition["protein"] == food.protein * expected_servings
+        assert day_nutrition["carbs"] == food.carbs * expected_servings
+        assert day_nutrition["fat"] == food.fat * expected_servings
 
 
 class TestTrackedMealQuantity:
