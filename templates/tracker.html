@@ -341,12 +341,13 @@
                 } else {
                     data.meal_foods.forEach(food => {
                         const foodDiv = document.createElement('div');
-                        foodDiv.className = 'd-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded';
+                        foodDiv.className = 'd-flex justify-content-between align-items-center mb-2';
                         foodDiv.innerHTML = `
-                            <div class="input-group">
-                                <input type="number" step="0.01" class="form-control" value="${food.quantity}" data-food-id="${food.id}" data-is-custom="${food.is_custom}">
-                                <span class="input-group-text">${food.food_name}</span>
-                                <button class="btn btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.id}, ${food.is_custom})">
+                            <span>${food.food_name}</span>
+                            <div class="input-group w-50">
+                                <input type="number" step="0.01" class="form-control form-control-sm" value="${food.grams.toFixed(2)}" data-food-id="${food.food_id}" data-item-id="${food.id}" data-is-custom="${food.is_custom}">
+                                <span class="input-group-text">g</span>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.id}, ${food.is_custom})">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -356,69 +357,45 @@
                 }
             }
         } catch (error) {
-            console.error('Error loading meal foods:', error);
+            console.error('Error loading tracked meal foods:', error);
+            alert('Error loading tracked meal foods.');
         }
     }
 
-    // Add food to tracked meal
-    async function addFoodToTrackedMeal() {
-        const form = document.getElementById('addFoodToTrackedMealForm');
-        const formData = new FormData(form);
-        const trackedMealId = formData.get('tracked_meal_id');
+    async function saveTrackedMeal() {
+        const trackedMealId = document.getElementById('editTrackedMealId').value;
+        const inputs = document.querySelectorAll('#editMealFoodsList input[type="number"]');
+        
+        const foods = [];
+        inputs.forEach(input => {
+            foods.push({
+                id: parseInt(input.dataset.itemId),
+                food_id: parseInt(input.dataset.foodId),
+                quantity: parseFloat(input.value), // Quantity is now grams
+                is_custom: input.dataset.isCustom === 'true'
+            });
+        });
         
         try {
-            const response = await fetch('/tracker/add_food_to_tracked_meal', {
+            const response = await fetch('/tracker/update_tracked_meal_foods', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    tracked_meal_id: parseInt(formData.get('tracked_meal_id')),
-                    food_id: parseInt(formData.get('food_id')),
-                    quantity: parseFloat(formData.get('quantity'))
+                    tracked_meal_id: trackedMealId,
+                    foods: foods
                 })
             });
-            
             const result = await response.json();
-            
             if (result.status === 'success') {
-                // Reset form and reload current foods
-                form.reset();
-                document.getElementById('tracked_meal_id_for_food').value = trackedMealId;
-                await loadTrackedMealFoods(trackedMealId);
+                bootstrap.Modal.getInstance(document.getElementById('editTrackedMealModal')).hide();
+                location.reload();
             } else {
-                alert('Error adding food: ' + result.message);
+                alert('Error saving tracked meal: ' + result.message);
             }
         } catch (error) {
-            alert('Error adding food: ' + error.message);
+            console.error('Error saving tracked meal:', error);
+            alert('Error saving tracked meal.');
         }
-    }
-
-    // Remove food from tracked meal
-    async function removeFoodFromTrackedMeal(foodId, isCustom) {
-        if (confirm('Remove this food from the tracked meal?')) {
-            const url = isCustom ? `/tracker/remove_custom_food_from_tracked_meal/${foodId}` : `/tracker/remove_food_from_tracked_meal/${foodId}`;
-            try {
-                const response = await fetch(url, {
-                    method: 'DELETE'
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    const trackedMealId = document.getElementById('editTrackedMealId').value;
-                    await loadTrackedMealFoods(trackedMealId);
-                } else {
-                    alert('Error removing food: ' + result.message);
-                }
-            } catch (error) {
-                alert('Error removing food: ' + error.message);
-            }
-        }
-    }
-
-    // Save tracked meal changes (No longer needed as updates are real-time)
-    async function saveTrackedMeal() {
-        bootstrap.Modal.getInstance(document.getElementById('editTrackedMealModal')).hide();
-        location.reload();
     }
 
     // Save as new meal
@@ -433,7 +410,7 @@
         inputs.forEach(input => {
             foods.push({
                 food_id: parseInt(input.dataset.foodId),
-                quantity: parseFloat(input.value)
+                quantity: parseFloat(input.value) // Quantity is now grams
             });
         });
         

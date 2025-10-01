@@ -309,8 +309,43 @@ def get_db():
         db.close()
 
 # Utility functions
+def convert_grams_to_quantity(food_id: int, grams: float, db: Session) -> float:
+    """
+    Converts a given gram value to the quantity multiplier based on the food's serving size.
+    
+    Args:
+        food_id: The ID of the food item.
+        grams: The desired weight in grams.
+        db: The database session.
+        
+    Returns:
+        The quantity multiplier.
+        
+    Raises:
+        ValueError: If the food is not found or its serving size is invalid.
+    """
+    food = db.query(Food).filter(Food.id == food_id).first()
+    if not food:
+        raise ValueError(f"Food with ID {food_id} not found.")
+    
+    try:
+        # Assuming serving_size is stored in grams for simplicity as per the plan
+        # If serving_size can be other units, more complex conversion is needed.
+        serving_size_value = float(food.serving_size)
+    except ValueError:
+        raise ValueError(f"Invalid serving_size '{food.serving_size}' for food ID {food_id}. Expected a numeric value.")
+        
+    if serving_size_value == 0:
+        raise ValueError(f"Serving size for food ID {food_id} cannot be zero.")
+        
+    return grams / serving_size_value
+
 def calculate_meal_nutrition(meal, db: Session):
-    """Calculate total nutrition for a meal"""
+    """
+    Calculate total nutrition for a meal.
+    Quantities in MealFood are now multipliers based on the Food's serving_size,
+    where serving_size is assumed to be in grams.
+    """
     totals = {
         'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
         'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0

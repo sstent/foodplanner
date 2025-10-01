@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional
 
 # Import from the database module
-from app.database import get_db, Food, Meal, MealFood
+from app.database import get_db, Food, Meal, MealFood, convert_grams_to_quantity
 from main import templates
 
 router = APIRouter()
@@ -46,7 +46,8 @@ async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(
                         continue
                         
                     food_name = row[i].strip()
-                    quantity = round(float(row[i+1].strip()) / 100, 3)  # Convert grams to 100g units and round to 3 decimal places
+                    grams = float(row[i+1].strip())
+                    quantity = convert_grams_to_quantity(food.id, grams, db)
                     
                     # Try multiple matching strategies for food names
                     food = None
@@ -178,14 +179,18 @@ async def get_meal_foods(meal_id: int, db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 @router.post("/meals/{meal_id}/add_food")
-async def add_food_to_meal(meal_id: int, food_id: int = Form(...), 
-                          quantity: float = Form(...), db: Session = Depends(get_db)):
+async def add_food_to_meal(meal_id: int, food_id: int = Form(...),
+                           grams: float = Form(..., alias="quantity"), db: Session = Depends(get_db)):
     
     try:
+        quantity = convert_grams_to_quantity(food_id, grams, db)
         meal_food = MealFood(meal_id=meal_id, food_id=food_id, quantity=quantity)
         db.add(meal_food)
         db.commit()
         return {"status": "success"}
+    except ValueError as ve:
+        db.rollback()
+        return {"status": "error", "message": str(ve)}
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
@@ -206,16 +211,20 @@ async def remove_food_from_meal(meal_food_id: int, db: Session = Depends(get_db)
         return {"status": "error", "message": str(e)}
 
 @router.post("/meals/update_food_quantity")
-async def update_meal_food_quantity(meal_food_id: int = Form(...), quantity: float = Form(...), db: Session = Depends(get_db)):
+async def update_meal_food_quantity(meal_food_id: int = Form(...), grams: float = Form(..., alias="quantity"), db: Session = Depends(get_db)):
     """Update the quantity of a food in a meal"""
     try:
         meal_food = db.query(MealFood).filter(MealFood.id == meal_food_id).first()
         if not meal_food:
             return {"status": "error", "message": "Meal food not found"}
         
+        quantity = convert_grams_to_quantity(meal_food.food_id, grams, db)
         meal_food.quantity = quantity
         db.commit()
         return {"status": "success"}
+    except ValueError as ve:
+        db.rollback()
+        return {"status": "error", "message": str(ve)}
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}

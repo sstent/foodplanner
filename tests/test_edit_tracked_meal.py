@@ -87,6 +87,43 @@ def test_get_tracked_meal_foods_endpoint(client: TestClient, session: TestingSes
         elif food_data["food_name"] == "Banana":
             assert food_data["quantity"] == 100.0
 
+def test_update_tracked_meal_foods_endpoint(client: TestClient, session: TestingSessionLocal):
+    """Test updating quantities of foods in a tracked meal"""
+    food1, food2, meal1, tracked_day, tracked_meal = create_test_data(session)
+
+    # Add a tracked meal food for food1 to allow updates
+    tracked_meal_food1 = TrackedMealFood(tracked_meal_id=tracked_meal.id, food_id=food1.id, quantity=150.0)
+    session.add(tracked_meal_food1)
+    session.commit()
+    session.refresh(tracked_meal_food1)
+
+    # Prepare update data
+    updated_foods = [
+        {"id": tracked_meal_food1.id, "food_id": food1.id, "quantity": 200.0, "is_custom": True},
+        {"id": None, "food_id": food2.id, "quantity": 50.0, "is_custom": False} # This represents original meal food
+    ]
+
+    response = client.post(
+        "/tracker/update_tracked_meal_foods",
+        json={
+            "tracked_meal_id": tracked_meal.id,
+            "foods": updated_foods
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+
+    # Verify updates in the database
+    updated_meal_foods = session.query(TrackedMealFood).filter(TrackedMealFood.tracked_meal_id == tracked_meal.id).all()
+    assert len(updated_meal_foods) == 2
+
+    for tmf in updated_meal_foods:
+        if tmf.food_id == food1.id:
+            assert tmf.quantity == 200.0
+        elif tmf.food_id == food2.id:
+            assert tmf.quantity == 50.0
+
 def test_add_food_to_tracked_meal_endpoint(client: TestClient, session: TestingSessionLocal):
     """Test adding a new food to an existing tracked meal"""
     food1, food2, meal1, tracked_day, tracked_meal = create_test_data(session)
