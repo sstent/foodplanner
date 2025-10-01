@@ -26,7 +26,7 @@
                             {% if meal.meal_foods %}
                                 <ul class="list-unstyled">
                                 {% for meal_food in meal.meal_foods %}
-                                    <li>{{ meal_food.quantity }} × {{ meal_food.food.name }}</li>
+                                    <li>{{ "%.2f" | format(meal_food.quantity) }}g × {{ meal_food.food.name }}</li>
                                 {% endfor %}
                                 </ul>
                             {% else %}
@@ -122,8 +122,8 @@ async function loadCurrentMealFoods(mealId) {
             container.innerHTML = foods.map(mf => `
                 <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
                     <div class="input-group">
-                        <input type="number" step="0.01" class="form-control" value="${mf.quantity}" data-meal-food-id="${mf.id}" onchange="updateFoodQuantity(this)">
-                        <span class="input-group-text">${mf.food_name}</span>
+                        <input type="number" step="1" class="form-control" value="${mf.quantity}" data-meal-food-id="${mf.id}" onchange="updateFoodQuantity(this)">
+                        <span class="input-group-text">${mf.food_name} (g)</span>
                         <button class="btn btn-outline-danger" onclick="removeFoodFromMeal(${mf.id})">
                             <i class="bi bi-trash"></i>
                         </button>

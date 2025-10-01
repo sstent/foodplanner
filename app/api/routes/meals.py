@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional
 
 # Import from the database module
-from app.database import get_db, Food, Meal, MealFood, convert_grams_to_quantity
+from app.database import get_db, Food, Meal, MealFood
 from main import templates
 
 router = APIRouter()
@@ -47,7 +47,7 @@ async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(
                         
                     food_name = row[i].strip()
                     grams = float(row[i+1].strip())
-                    quantity = convert_grams_to_quantity(food.id, grams, db)
+                    quantity = grams
                     
                     # Try multiple matching strategies for food names
                     food = None
@@ -183,8 +183,7 @@ async def add_food_to_meal(meal_id: int, food_id: int = Form(...),
                            grams: float = Form(..., alias="quantity"), db: Session = Depends(get_db)):
     
     try:
-        quantity = convert_grams_to_quantity(food_id, grams, db)
-        meal_food = MealFood(meal_id=meal_id, food_id=food_id, quantity=quantity)
+        meal_food = MealFood(meal_id=meal_id, food_id=food_id, quantity=grams)
         db.add(meal_food)
         db.commit()
         return {"status": "success"}
@@ -218,8 +217,7 @@ async def update_meal_food_quantity(meal_food_id: int = Form(...), grams: float 
         if not meal_food:
             return {"status": "error", "message": "Meal food not found"}
         
-        quantity = convert_grams_to_quantity(meal_food.food_id, grams, db)
-        meal_food.quantity = quantity
+        meal_food.quantity = grams
         db.commit()
         return {"status": "success"}
     except ValueError as ve:

@@ -32,11 +32,12 @@ job "foodplanner" {
         sidecar = false
       }
       config {
-        image   = "litestream/litestream:latest"
+        # image   = "litestream/litestream:latest"
+        image   = "litestream/litestream:0.3"
         args = [
           "restore",
-          "-if-replica-exists",
-          "-if-db-not-exists",
+          # "-if-replica-exists",
+          #"-if-db-not-exists",
           "-o", "/alloc/tmp/meal_planner.db",
           "sftp://root:odroid@192.168.4.63/mnt/Shares/litestream/foodplanner.db"
         ]
@@ -85,7 +86,8 @@ job "foodplanner" {
         sidecar = true
       }
       config {
-        image   = "litestream/litestream:latest"
+        # image   = "litestream/litestream:0.5.0-test.10"
+        image   = "litestream/litestream:0.3"
         args = [
           "replicate",
           "/alloc/tmp/meal_planner.db",

@@ -6,6 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base
 from sqlalchemy.orm import joinedload
 from pydantic import BaseModel, ConfigDict
+
 from typing import List, Optional
 from datetime import date, datetime
 import os
@@ -309,42 +310,10 @@ def get_db():
         db.close()
 
 # Utility functions
-def convert_grams_to_quantity(food_id: int, grams: float, db: Session) -> float:
-    """
-    Converts a given gram value to the quantity multiplier based on the food's serving size.
-    
-    Args:
-        food_id: The ID of the food item.
-        grams: The desired weight in grams.
-        db: The database session.
-        
-    Returns:
-        The quantity multiplier.
-        
-    Raises:
-        ValueError: If the food is not found or its serving size is invalid.
-    """
-    food = db.query(Food).filter(Food.id == food_id).first()
-    if not food:
-        raise ValueError(f"Food with ID {food_id} not found.")
-    
-    try:
-        # Assuming serving_size is stored in grams for simplicity as per the plan
-        # If serving_size can be other units, more complex conversion is needed.
-        serving_size_value = float(food.serving_size)
-    except ValueError:
-        raise ValueError(f"Invalid serving_size '{food.serving_size}' for food ID {food_id}. Expected a numeric value.")
-        
-    if serving_size_value == 0:
-        raise ValueError(f"Serving size for food ID {food_id} cannot be zero.")
-        
-    return grams / serving_size_value
-
 def calculate_meal_nutrition(meal, db: Session):
     """
     Calculate total nutrition for a meal.
-    Quantities in MealFood are now multipliers based on the Food's serving_size,
-    where serving_size is assumed to be in grams.
+    Quantities in MealFood are now directly in grams.
     """
     totals = {
         'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
@@ -353,16 +322,27 @@ def calculate_meal_nutrition(meal, db: Session):
     
     for meal_food in meal.meal_foods:
         food = meal_food.food
-        quantity = meal_food.quantity
+        grams = meal_food.quantity # quantity is now grams
         
-        totals['calories'] += food.calories * quantity
-        totals['protein'] += food.protein * quantity
-        totals['carbs'] += food.carbs * quantity
-        totals['fat'] += food.fat * quantity
-        totals['fiber'] += (food.fiber or 0) * quantity
-        totals['sugar'] += (food.sugar or 0) * quantity
-        totals['sodium'] += (food.sodium or 0) * quantity
-        totals['calcium'] += (food.calcium or 0) * quantity
+        # Convert grams to a multiplier of serving size for nutrition calculation
+        try:
+            serving_size_value = float(food.serving_size)
+        except ValueError:
+            serving_size_value = 1 # Fallback if serving_size is not a number
+        
+        if serving_size_value == 0:
+            multiplier = 0 # Avoid division by zero
+        else:
+            multiplier = grams / serving_size_value
+        
+        totals['calories'] += food.calories * multiplier
+        totals['protein'] += food.protein * multiplier
+        totals['carbs'] += food.carbs * multiplier
+        totals['fat'] += food.fat * multiplier
+        totals['fiber'] += (food.fiber or 0) * multiplier
+        totals['sugar'] += (food.sugar or 0) * multiplier
+        totals['sodium'] += (food.sodium or 0) * multiplier
+        totals['calcium'] += (food.calcium or 0) * multiplier
     
     # Calculate percentages
     total_cals = totals['calories']
