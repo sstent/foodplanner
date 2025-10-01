@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime, timedelta
 import logging
-from typing import List, Optional
+from typing import List, Optional, Union
 
 # Import from the database module
 from app.database import get_db, Meal, Template, TemplateMeal, TrackedDay, TrackedMeal, calculate_meal_nutrition, MealFood, TrackedMealFood, Food, calculate_day_nutrition_tracked
@@ -716,3 +716,107 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
         db.rollback()
         logging.error(f"DEBUG: Error adding single food to tracker: {e}")
         return {"status": "error", "message": str(e)}
+
+@router.get("/detailed_tracked_day", response_class=HTMLResponse, name="detailed_tracked_day")
+async def detailed_tracked_day(request: Request, person: str = "Sarah", date: Optional[str] = None, db: Session = Depends(get_db)):
+    """
+    Displays a detailed view of a tracked day, including all meals and their food breakdowns.
+    """
+    logging.info(f"DEBUG: Detailed tracked day page requested with person={person}, date={date}")
+
+    # If no date is provided, default to today's date
+    if not date:
+        current_date = date.today()
+    else:
+        try:
+            current_date = datetime.fromisoformat(date).date()
+        except ValueError:
+            logging.error(f"DEBUG: Invalid date format for date: {date}")
+            return templates.TemplateResponse("detailed.html", {
+                "request": request, "title": "Invalid Date",
+                "error": "Invalid date format. Please use YYYY-MM-DD.",
+                "day_totals": {},
+                "person": person
+            })
+
+    tracked_day = db.query(TrackedDay).filter(
+        TrackedDay.person == person,
+        TrackedDay.date == current_date
+    ).first()
+
+    if not tracked_day:
+        return templates.TemplateResponse("detailed_tracked_day.html", {
+            "request": request, "title": "No Tracked Day Found",
+            "error": "No tracked meals found for this day.",
+            "day_totals": {},
+            "person": person,
+            "plan_date": current_date # Pass current_date for consistent template behavior
+        })
+    
+    tracked_meals = db.query(TrackedMeal).options(
+        joinedload(TrackedMeal.meal).joinedload(Meal.meal_foods).joinedload(MealFood.food),
+        joinedload(TrackedMeal.tracked_foods).joinedload(TrackedMealFood.food)
+    ).filter(
+        TrackedMeal.tracked_day_id == tracked_day.id
+    ).all()
+
+    day_totals = calculate_day_nutrition_tracked(tracked_meals, db)
+
+    meal_details = []
+    for tracked_meal in tracked_meals:
+        meal_nutrition = calculate_meal_nutrition(tracked_meal.meal, db) # Base meal nutrition
+
+        foods = []
+        # Add foods from the base meal definition
+        for mf in tracked_meal.meal.meal_foods:
+            foods.append({
+                'name': mf.food.name,
+                'quantity': mf.quantity,
+                'serving_size': mf.food.serving_size,
+                'serving_unit': mf.food.serving_unit,
+                'calories': mf.food.calories * mf.quantity,
+                'protein': mf.food.protein * mf.quantity,
+                'carbs': mf.food.carbs * mf.quantity,
+                'fat': mf.food.fat * mf.quantity,
+                'fiber': (mf.food.fiber or 0) * mf.quantity,
+                'sugar': (mf.food.sugar or 0) * mf.quantity,
+                'sodium': (mf.food.sodium or 0) * mf.quantity,
+                'calcium': (mf.food.calcium or 0) * mf.quantity,
+            })
+        # Add custom tracked foods (overrides or additions)
+        for tmf in tracked_meal.tracked_foods:
+            foods.append({
+                'name': tmf.food.name,
+                'quantity': tmf.quantity,
+                'serving_size': tmf.food.serving_size,
+                'serving_unit': tmf.food.serving_unit,
+                'calories': tmf.food.calories * tmf.quantity,
+                'protein': tmf.food.protein * tmf.quantity,
+                'carbs': tmf.food.carbs * tmf.quantity,
+                'fat': tmf.food.fat * tmf.quantity,
+                'fiber': (tmf.food.fiber or 0) * tmf.quantity,
+                'sugar': (tmf.food.sugar or 0) * tmf.quantity,
+                'sodium': (tmf.food.sodium or 0) * tmf.quantity,
+                'calcium': (tmf.food.calcium or 0) * tmf.quantity,
+            })
+        
+        meal_details.append({
+            'plan': {'meal': tracked_meal.meal, 'meal_time': tracked_meal.meal_time},
+            'nutrition': meal_nutrition,
+            'foods': foods
+        })
+
+    context = {
+        "request": request,
+        "title": f"Detailed Day for {person} on {current_date.strftime('%B %d, %Y')}",
+        "meal_details": meal_details,
+        "day_totals": day_totals,
+        "person": person,
+        "plan_date": current_date # Renamed from current_date to plan_date for consistency with detailed.html
+    }
+
+    if not meal_details:
+        context["message"] = "No meals tracked for this day."
+
+    logging.info(f"DEBUG: Rendering tracked day details with context: {context}")
+    return templates.TemplateResponse("detailed_tracked_day.html", context)

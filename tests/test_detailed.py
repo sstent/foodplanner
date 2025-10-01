@@ -173,6 +173,67 @@ def test_detailed_page_with_template_id(client, session):
     assert "Morning Boost Template" in response.text
     assert "Banana Smoothie" in response.text
 
+def test_detailed_page_with_tracked_day_food_breakdown(client, session):
+    # Create mock data for a tracked day
+    food1 = Food(
+        name="Chicken Breast",
+        serving_size="100",
+        serving_unit="g",
+        calories=165, protein=31, carbs=0, fat=3.6,
+        fiber=0, sugar=0, sodium=74, calcium=11,
+        source="manual"
+    )
+    food2 = Food(
+        name="Broccoli",
+        serving_size="100",
+        serving_unit="g",
+        calories=55, protein=3.7, carbs=11.2, fat=0.6,
+        fiber=5.1, sugar=2.2, sodium=33, calcium=47,
+        source="manual"
+    )
+    session.add_all([food1, food2])
+    session.commit()
+    session.refresh(food1)
+    session.refresh(food2)
+
+    meal = Meal(name="Chicken and Broccoli", meal_type="dinner", meal_time="Dinner")
+    session.add(meal)
+    session.commit()
+    session.refresh(meal)
+
+    meal_food1 = MealFood(meal_id=meal.id, food_id=food1.id, quantity=1.5) # 150g chicken
+    meal_food2 = MealFood(meal_id=meal.id, food_id=food2.id, quantity=2.0) # 200g broccoli
+    session.add_all([meal_food1, meal_food2])
+    session.commit()
+
+    test_date = date.today()
+    
+    # Simulate adding a tracked meal
+    response_add_meal = client.post(
+        "/tracker/add_meal",
+        data={
+            "person": "Sarah",
+            "date": test_date.isoformat(),
+            "meal_id": meal.id,
+            "meal_time": "Dinner"
+        }
+    )
+    assert response_add_meal.status_code == 200
+    assert response_add_meal.json()["status"] == "success"
+
+    # Now request the detailed view for the tracked day (this will be the new endpoint)
+    response = client.get(f"/detailed_tracked_day?person=Sarah&date={test_date.isoformat()}")
+    assert response.status_code == 200
+
+    # Assert that the meal and individual food items are present
+    assert "Detailed Day for Sarah" in response.text
+    assert "Chicken and Broccoli" in response.text
+    assert "Chicken Breast" in response.text
+    assert "Broccoli" in response.text
+    assert "1.5 × 100g" in response.text # Check quantity and unit for chicken
+    assert "2.0 × 100g" in response.text # Check quantity and unit for broccoli
+    assert "248" in response.text # Check calories for chicken (1.5 * 165 = 247.5, rounded to 248)
+    assert "110" in response.text # Check calories for broccoli (2.0 * 55 = 110)
 
 def test_detailed_page_with_invalid_plan_date(client):
     invalid_date = date.today() + timedelta(days=100)
