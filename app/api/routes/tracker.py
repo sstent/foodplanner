@@ -368,28 +368,40 @@ async def tracker_reset_to_plan(request: Request, db: Session = Depends(get_db))
 async def get_tracked_meal_foods(tracked_meal_id: int, db: Session = Depends(get_db)):
     """Get foods associated with a tracked meal"""
     try:
-        tracked_meal = db.query(TrackedMeal).options(
-            joinedload(TrackedMeal.meal).joinedload(Meal.meal_foods).joinedload(MealFood.food),
-            joinedload(TrackedMeal.tracked_foods).joinedload(TrackedMealFood.food)
-        ).filter(TrackedMeal.id == tracked_meal_id).first()
+        tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.id == tracked_meal_id).first()
 
         if not tracked_meal:
             raise HTTPException(status_code=404, detail="Tracked meal not found")
 
-        # Combine foods from the base meal and custom tracked foods
+        # Load the associated Meal and its foods
+        meal = db.query(Meal).options(joinedload(Meal.meal_foods).joinedload(MealFood.food)).filter(Meal.id == tracked_meal.meal_id).first()
+        if not meal:
+            raise HTTPException(status_code=404, detail="Associated meal not found")
+
+        # Load custom tracked foods for this tracked meal
+        tracked_foods = db.query(TrackedMealFood).options(joinedload(TrackedMealFood.food)).filter(TrackedMealFood.tracked_meal_id == tracked_meal_id).all()
+
+        # Combine foods from the base meal and custom tracked foods, handling overrides
         meal_foods_data = []
-        for meal_food in tracked_meal.meal.meal_foods:
-            meal_foods_data.append({
-                "id": meal_food.id,
-                "food_id": meal_food.food.id,
-                "food_name": meal_food.food.name,
-                "quantity": meal_food.quantity,
-                "serving_unit": meal_food.food.serving_unit,
-                "serving_size": meal_food.food.serving_size,
-                "is_custom": False
-            })
         
-        for tracked_food in tracked_meal.tracked_foods:
+        # Keep track of food_ids that have been overridden by TrackedMealFood entries
+        # These should not be added from the base meal definition
+        overridden_food_ids = {tf.food_id for tf in tracked_foods}
+
+        for meal_food in meal.meal_foods:
+            # Only add meal_food if it hasn't been overridden by a TrackedMealFood
+            if meal_food.food_id not in overridden_food_ids:
+                meal_foods_data.append({
+                    "id": meal_food.id,
+                    "food_id": meal_food.food.id,
+                    "food_name": meal_food.food.name,
+                    "quantity": meal_food.quantity,
+                    "serving_unit": meal_food.food.serving_unit,
+                    "serving_size": meal_food.food.serving_size,
+                    "is_custom": False
+                })
+        
+        for tracked_food in tracked_foods:
             meal_foods_data.append({
                 "id": tracked_food.id,
                 "food_id": tracked_food.food.id,
