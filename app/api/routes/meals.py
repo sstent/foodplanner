@@ -14,23 +14,11 @@ router = APIRouter()
 # Meals tab
 @router.get("/meals", response_class=HTMLResponse)
 async def meals_page(request: Request, db: Session = Depends(get_db)):
-    try:
-        from sqlalchemy.orm import joinedload
-        logging.info("DEBUG: Starting meals query with eager loading")
-        meals = db.query(Meal).options(joinedload(Meal.meal_foods).joinedload(MealFood.food)).all()
-        logging.info(f"DEBUG: Retrieved {len(meals)} meals")
-        foods = db.query(Food).all()
-        logging.info(f"DEBUG: Retrieved {len(foods)} foods")
-        
-        # Test template rendering with a simple test
-        logging.info("DEBUG: Testing template rendering...")
-        test_data = {"request": request, "meals": meals, "foods": foods}
-        return templates.TemplateResponse("meals.html", test_data)
-        
-    except Exception as e:
-        logging.error(f"DEBUG: Error in meals_page: {str(e)}", exc_info=True)
-        # Return a simple error response for debugging
-        return HTMLResponse(f"<h1>Error in meals page</h1><pre>{str(e)}</pre><pre>{type(e).__name__}</pre>")
+    from sqlalchemy.orm import joinedload
+    meals = db.query(Meal).options(joinedload(Meal.meal_foods).joinedload(MealFood.food)).all()
+    foods = db.query(Food).all()
+    return templates.TemplateResponse("meals.html",
+                                    {"request": request, "meals": meals, "foods": foods})
 
 @router.post("/meals/upload")
 async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(get_db)):

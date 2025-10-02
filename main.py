@@ -253,12 +253,11 @@ def run_migrations():
         
         if has_foods and (not has_alembic_version or not alembic_version_has_content):
             logging.info("DEBUG: Existing database detected. Stamping with initial migration.")
-            command.stamp(alembic_cfg, "head")
+            # Stamp with the specific initial migration that creates all tables
+            command.stamp(alembic_cfg, "cf94fca21104")
             logging.info("DEBUG: Database stamped successfully.")
-        else:
-            logging.info("DEBUG: No stamping needed or fresh database.")
 
-        # Now, run upgrades
+        # Now, run upgrades to bring the database to the latest version
         logging.info("DEBUG: Running alembic upgrade...")
         command.upgrade(alembic_cfg, "head")
         logging.info("DEBUG: Database migrations run successfully.")
