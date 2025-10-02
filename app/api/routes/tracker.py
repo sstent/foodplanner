@@ -472,6 +472,9 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
         tracked_meal_id = data.get("tracked_meal_id")
         foods_data = data.get("foods", [])
         removed_food_ids = data.get("removed_food_ids", [])
+        print(f"Received update for tracked_meal_id: {tracked_meal_id}")
+        print(f"  Foods data: {foods_data}")
+        print(f"  Removed food IDs: {removed_food_ids}")
 
         tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.id == tracked_meal_id).first()
         if not tracked_meal:
@@ -479,15 +482,18 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
 
         # Process removals: mark existing foods as deleted
         for food_id_to_remove in removed_food_ids:
+            print(f"  Processing removal for food_id: {food_id_to_remove}")
             # Check if an override already exists
             override = db.query(TrackedMealFood).filter(
                 TrackedMealFood.tracked_meal_id == tracked_meal_id,
                 TrackedMealFood.food_id == food_id_to_remove
             ).first()
             if override:
+                print(f"    Found existing override for food_id {food_id_to_remove}. Marking as deleted.")
                 override.is_deleted = True
             else:
                 # If no override exists, create one to mark the food as deleted
+                print(f"    No existing override for food_id {food_id_to_remove}. Creating new deleted override.")
                 new_override = TrackedMealFood(
                     tracked_meal_id=tracked_meal_id,
                     food_id=food_id_to_remove,
@@ -496,6 +502,7 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
                     is_deleted=True
                 )
                 db.add(new_override)
+                print(f"    New override created: {new_override.is_deleted}")
 
         # Process updates and additions
         for food_data in foods_data:
