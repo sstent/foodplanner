@@ -80,9 +80,11 @@
                             <div class="ms-3">
                                 <div class="row row-cols-1 row-cols-sm-2">
                                 {% set overrides = {} %}
+                                {% set non_deleted_override_ids = [] %}
                                 {% for tmf in tracked_meal.tracked_foods %}
                                     {% if not tmf.is_deleted %}
                                         {% set _ = overrides.update({tmf.food_id: tmf}) %}
+                                        {% set _ = non_deleted_override_ids.append(tmf.food_id) %}
                                     {% endif %}
                                 {% endfor %}
 
@@ -90,7 +92,7 @@
 
                                 {# Display base meal foods, applying overrides #}
                                 {% for meal_food in tracked_meal.meal.meal_foods %}
-                                    {% if meal_food.food_id not in overrides %}
+                                    {% if meal_food.food_id not in non_deleted_override_ids %}
                                         <div class="col">
                                             <div class="d-flex justify-content-between small text-muted">
                                                 <span>• {{ meal_food.food.name }}</span>
@@ -344,7 +346,10 @@
     }
 
     // Edit tracked meal
+    let removedFoodIds = [];
+
     function editTrackedMeal(trackedMealId) {
+        removedFoodIds = []; // Reset the array when a new meal is edited
         document.getElementById('editTrackedMealId').value = trackedMealId;
         loadTrackedMealFoods(trackedMealId);
         new bootstrap.Modal(document.getElementById('editTrackedMealModal')).show();
@@ -375,7 +380,7 @@
                             <div class="input-group w-50">
                                 <input type="number" step="0.01" class="form-control form-control-sm" value="${food.quantity.toFixed(2)}" data-food-id="${food.food_id}" data-item-id="${food.id}" data-is-custom="${food.is_custom}">
                                 <span class="input-group-text">g</span>
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.id}, ${food.is_custom})">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.food_id}, ${food.is_custom})">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -390,6 +395,21 @@
         } catch (error) {
             console.error('Error loading tracked meal foods:', error);
             alert('Error loading tracked meal foods.');
+        }
+    }
+
+    function removeFoodFromTrackedMeal(foodId, isCustom) {
+        // Find the button that was clicked
+        const button = event.target.closest('button');
+        if (button) {
+            // Find the parent div and remove it
+            const foodDiv = button.closest('.d-flex');
+            if (foodDiv) {
+                const foodDataId = parseInt(foodDiv.querySelector('input').dataset.foodId);
+                removedFoodIds.push(foodDataId);
+                foodDiv.remove();
+                console.log('Removed food with ID:', foodDataId, 'and removedFoodIds is now:', removedFoodIds);
+            }
         }
     }
 
@@ -408,19 +428,19 @@
             foods.push(foodData);
         });
 
-        console.log('Payload being sent to /tracker/update_tracked_meal_foods:', JSON.stringify({
+        const payload = {
             tracked_meal_id: trackedMealId,
-            foods: foods
-        }, null, 2));
+            foods: foods,
+            removed_food_ids: removedFoodIds
+        };
+
+        console.log('Payload being sent to /tracker/update_tracked_meal_foods:', JSON.stringify(payload, null, 2));
         
         try {
             const response = await fetch('/tracker/update_tracked_meal_foods', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    tracked_meal_id: trackedMealId,
-                    foods: foods
-                })
+                body: JSON.stringify(payload)
             });
             const result = await response.json();
             if (result.status === 'success') {
