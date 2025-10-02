@@ -79,13 +79,36 @@
                             <!-- Food Breakdown -->
                             <div class="ms-3">
                                 <div class="row row-cols-1 row-cols-sm-2">
+                                {% set overrides = {} %}
+                                {% for tmf in tracked_meal.tracked_foods %}
+                                    {% if not tmf.is_deleted %}
+                                        {% set _ = overrides.update({tmf.food_id: tmf}) %}
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% set displayed_food_ids = [] %}
+
+                                {# Display base meal foods, applying overrides #}
                                 {% for meal_food in tracked_meal.meal.meal_foods %}
-                                <div class="col">
-                                    <div class="d-flex justify-content-between small text-muted">
-                                        <span>• {{ meal_food.food.name }}</span>
-                                        <span class="text-end">{{ meal_food.quantity }} {{ meal_food.food.serving_unit }}</span>
+                                    {% if meal_food.food_id not in overrides %}
+                                        <div class="col">
+                                            <div class="d-flex justify-content-between small text-muted">
+                                                <span>• {{ meal_food.food.name }}</span>
+                                                <span class="text-end">{{ meal_food.quantity }} {{ meal_food.food.serving_unit }}</span>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                    {% set _ = displayed_food_ids.append(meal_food.food_id) %}
+                                {% endfor %}
+
+                                {# Display overridden and new foods #}
+                                {% for food_id, tmf in overrides.items() %}
+                                    <div class="col">
+                                        <div class="d-flex justify-content-between small text-muted">
+                                            <span>• {{ tmf.food.name }}</span>
+                                            <span class="text-end">{{ tmf.quantity }} g</span>
+                                        </div>
                                     </div>
-                                </div>
                                 {% endfor %}
                                 </div>
                                 {% if not tracked_meal.meal.meal_foods %}
@@ -376,13 +399,19 @@
         
         const foods = [];
         inputs.forEach(input => {
-            foods.push({
+            const foodData = {
                 id: parseInt(input.dataset.itemId),
                 food_id: parseInt(input.dataset.foodId),
-                quantity: parseFloat(input.value), // Quantity is now grams
+                grams: parseFloat(input.value), // Renamed to grams to match backend
                 is_custom: input.dataset.isCustom === 'true'
-            });
+            };
+            foods.push(foodData);
         });
+
+        console.log('Payload being sent to /tracker/update_tracked_meal_foods:', JSON.stringify({
+            tracked_meal_id: trackedMealId,
+            foods: foods
+        }, null, 2));
         
         try {
             const response = await fetch('/tracker/update_tracked_meal_foods', {
@@ -447,19 +476,6 @@
         }
     }
 
-    // Update quantity on input change (real-time update)
-    document.addEventListener('input', function(e) {
-        if (e.target.type === 'number' && e.target.dataset.foodId) {
-            const trackedFoodId = e.target.dataset.foodId;
-            const quantity = parseFloat(e.target.value);
-            
-            fetch('/tracker/update_tracked_food', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tracked_food_id: trackedFoodId, quantity: quantity })
-            }).catch(error => console.error('Error updating quantity:', error));
-        }
-    });
     // Show add single food modal and pre-select meal time
     function addSingleFoodToTime(mealTime) {
         document.getElementById('addSingleFoodMealTime').value = mealTime;

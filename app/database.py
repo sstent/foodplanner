@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
 import os
+import logging
 
 # Database setup - Use SQLite for easier setup
 # Use environment variables if set, otherwise use defaults
@@ -161,6 +162,7 @@ class TrackedMealFood(Base):
     food_id = Column(Integer, ForeignKey("foods.id"))
     quantity = Column(Float, default=1.0)  # Custom quantity for this tracked instance
     is_override = Column(Boolean, default=False)  # True if overriding original meal food, False if addition
+    is_deleted = Column(Boolean, default=False) # True if this food has been deleted from the meal
 
     tracked_meal = relationship("TrackedMeal", back_populates="tracked_foods")
     food = relationship("Food")
@@ -401,7 +403,6 @@ def calculate_tracked_meal_nutrition(tracked_meal, db: Session):
         'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
         'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
     }
-    
     # Base meal nutrition
     base_nutrition = calculate_meal_nutrition(tracked_meal.meal, db)
     for key in totals:

@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime, timedelta
-import logging
 from typing import List, Optional, Union
 
 # Import from the database module
@@ -14,68 +13,77 @@ router = APIRouter()
 # Tracker tab - Main page
 @router.get("/tracker", response_class=HTMLResponse)
 async def tracker_page(request: Request, person: str = "Sarah", date: str = None, db: Session = Depends(get_db)):
-    logging.info(f"DEBUG: Tracker page requested with person={person}, date={date}")
-    
-    from datetime import datetime, timedelta
-    
-    # If no date provided, use today
-    if not date:
-        current_date = datetime.now().date()
-    else:
-        current_date = datetime.fromisoformat(date).date()
-    
-    # Calculate previous and next dates
-    prev_date = (current_date - timedelta(days=1)).isoformat()
-    next_date = (current_date + timedelta(days=1)).isoformat()
-    
-    # Get or create tracked day
-    tracked_day = db.query(TrackedDay).filter(
-        TrackedDay.person == person,
-        TrackedDay.date == current_date
-    ).first()
-    
-    if not tracked_day:
-        # Create new tracked day
-        tracked_day = TrackedDay(person=person, date=current_date, is_modified=False)
-        db.add(tracked_day)
-        db.commit()
-        db.refresh(tracked_day)
-        logging.info(f"DEBUG: Created new tracked day for {person} on {current_date}")
-    
-    # Get tracked meals for this day with eager loading of meal foods
-    tracked_meals = db.query(TrackedMeal).options(
-        joinedload(TrackedMeal.meal).joinedload(Meal.meal_foods).joinedload(MealFood.food)
-    ).filter(
-        TrackedMeal.tracked_day_id == tracked_day.id
-    ).all()
-    
-    # Get all meals for dropdown
-    meals = db.query(Meal).all()
-    
-    # Get all templates for template dropdown
-    templates_list = db.query(Template).all()
+    try:
+        from datetime import datetime, timedelta
+        
+        # If no date provided, use today
+        if not date:
+            current_date = datetime.now().date()
+        else:
+            current_date = datetime.fromisoformat(date).date()
+        
+        # Calculate previous and next dates
+        prev_date = (current_date - timedelta(days=1)).isoformat()
+        next_date = (current_date + timedelta(days=1)).isoformat()
+        
+        # Get or create tracked day
+        tracked_day = db.query(TrackedDay).filter(
+            TrackedDay.person == person,
+            TrackedDay.date == current_date
+        ).first()
+        
+        if not tracked_day:
+            # Create new tracked day
+            tracked_day = TrackedDay(person=person, date=current_date, is_modified=False)
+            db.add(tracked_day)
+            db.commit()
+            db.refresh(tracked_day)
+        
+        # Get tracked meals for this day with eager loading of meal foods
+        tracked_meals = db.query(TrackedMeal).options(
+            joinedload(TrackedMeal.meal)
+            .joinedload(Meal.meal_foods)
+            .joinedload(MealFood.food),
+            joinedload(TrackedMeal.tracked_foods)
+            .joinedload(TrackedMealFood.food)
+        ).filter(
+            TrackedMeal.tracked_day_id == tracked_day.id
+        ).all()
+        
+        # Get all meals for dropdown
+        meals = db.query(Meal).all()
+        
+        # Get all templates for template dropdown
+        templates_list = db.query(Template).all()
 
-    # Get all foods for dropdown
-    foods = db.query(Food).all()
+        # Get all foods for dropdown
+        foods = db.query(Food).all()
+        
+        # Calculate day totals
+        day_totals = calculate_day_nutrition_tracked(tracked_meals, db)
+        
+        return templates.TemplateResponse("tracker.html", {
+            "request": request,
+            "person": person,
+            "current_date": current_date,
+            "prev_date": prev_date,
+            "next_date": next_date,
+            "tracked_meals": tracked_meals,
+            "is_modified": tracked_day.is_modified,
+            "day_totals": day_totals,
+            "meals": meals,
+            "templates": templates_list,
+            "foods": foods
+        })
     
-    # Calculate day totals
-    day_totals = calculate_day_nutrition_tracked(tracked_meals, db)
-    
-    logging.info(f"DEBUG: Rendering tracker page with {len(tracked_meals)} tracked meals")
-    
-    return templates.TemplateResponse("tracker.html", {
-        "request": request,
-        "person": person,
-        "current_date": current_date,
-        "prev_date": prev_date,
-        "next_date": next_date,
-        "tracked_meals": tracked_meals,
-        "is_modified": tracked_day.is_modified,
-        "day_totals": day_totals,
-        "meals": meals,
-        "templates": templates_list,
-        "foods": foods
-    })
+    except Exception as e:
+        # Return a detailed error page instead of generic Internal Server Error
+        return templates.TemplateResponse("error.html", {
+            "request": request,
+            "error_title": "Error Loading Tracker",
+            "error_message": f"An error occurred while loading the tracker page: {str(e)}",
+            "error_details": f"Person: {person}, Date: {date}"
+        }, status_code=500)
 
 # Tracker API Routes
 @router.post("/tracker/add_meal")
@@ -88,7 +96,6 @@ async def tracker_add_meal(request: Request, db: Session = Depends(get_db)):
         meal_id = form_data.get("meal_id")
         meal_time = form_data.get("meal_time")
         
-        logging.info(f"DEBUG: Adding meal to tracker - person={person}, date={date_str}, meal_id={meal_id}, meal_time={meal_time}")
         
         # Parse date
         from datetime import datetime
@@ -119,19 +126,16 @@ async def tracker_add_meal(request: Request, db: Session = Depends(get_db)):
         
         db.commit()
         
-        logging.info(f"DEBUG: Successfully added meal to tracker")
         return {"status": "success"}
         
     except Exception as e:
         db.rollback()
-        logging.error(f"DEBUG: Error adding meal to tracker: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.delete("/tracker/remove_meal/{tracked_meal_id}")
 async def tracker_remove_meal(tracked_meal_id: int, db: Session = Depends(get_db)):
     """Remove a meal from the tracker"""
     try:
-        logging.info(f"DEBUG: Removing tracked meal with ID: {tracked_meal_id}")
         
         tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.id == tracked_meal_id).first()
         if not tracked_meal:
@@ -144,12 +148,10 @@ async def tracker_remove_meal(tracked_meal_id: int, db: Session = Depends(get_db
         db.delete(tracked_meal)
         db.commit()
         
-        logging.info(f"DEBUG: Successfully removed tracked meal")
         return {"status": "success"}
         
     except Exception as e:
         db.rollback()
-        logging.error(f"DEBUG: Error removing tracked meal: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/save_template")
@@ -164,7 +166,6 @@ async def tracker_save_template(request: Request, db: Session = Depends(get_db))
         if not all([person, date_str, template_name]):
             raise HTTPException(status_code=400, detail="Missing required form data.")
 
-        logging.info(f"debug: saving template - name={template_name}, person={person}, date={date_str}")
 
         # 1. Check if template name already exists
         existing_template = db.query(Template).filter(Template.name == template_name).first()
@@ -202,12 +203,10 @@ async def tracker_save_template(request: Request, db: Session = Depends(get_db))
             db.add(template_meal_entry)
 
         db.commit()
-        logging.info(f"debug: successfully saved template '{template_name}' with {len(tracked_meals)} meals.")
         return {"status": "success", "message": "Template saved successfully."}
 
     except Exception as e:
         db.rollback()
-        logging.error(f"debug: error saving template: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/apply_template")
@@ -219,7 +218,6 @@ async def tracker_apply_template(request: Request, db: Session = Depends(get_db)
         date_str = form_data.get("date")
         template_id = form_data.get("template_id")
         
-        logging.info(f"DEBUG: Applying template - template_id={template_id}, person={person}, date={date_str}")
         
         # Parse date
         from datetime import datetime
@@ -267,12 +265,10 @@ async def tracker_apply_template(request: Request, db: Session = Depends(get_db)
         
         db.commit()
         
-        logging.info(f"DEBUG: Successfully applied template with {len(template_meals)} meals")
         return {"status": "success"}
         
     except Exception as e:
         db.rollback()
-        logging.error(f"DEBUG: Error applying template: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/update_tracked_food")
@@ -283,7 +279,6 @@ async def update_tracked_food(request: Request, data: dict = Body(...), db: Sess
         grams = float(data.get("grams", 1.0))
         is_custom = data.get("is_custom", False)
 
-        logging.info(f"DEBUG: Updating tracked food {tracked_food_id} grams to {grams}")
 
         if is_custom:
             tracked_food = db.query(TrackedMealFood).filter(TrackedMealFood.id == tracked_food_id).first()
@@ -319,12 +314,10 @@ async def update_tracked_food(request: Request, data: dict = Body(...), db: Sess
         
         db.commit()
         
-        logging.info(f"DEBUG: Successfully updated tracked food grams")
         return {"status": "success"}
         
     except Exception as e:
         db.rollback()
-        logging.error(f"DEBUG: Error updating tracked food: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/reset_to_plan")
@@ -335,7 +328,6 @@ async def tracker_reset_to_plan(request: Request, db: Session = Depends(get_db))
         person = form_data.get("person")
         date_str = form_data.get("date")
         
-        logging.info(f"DEBUG: Resetting to plan - person={person}, date={date_str}")
         
         # Parse date
         from datetime import datetime
@@ -360,83 +352,84 @@ async def tracker_reset_to_plan(request: Request, db: Session = Depends(get_db))
         
         db.commit()
         
-        logging.info(f"DEBUG: Successfully reset to plan")
         return {"status": "success"}
         
     except Exception as e:
         db.rollback()
-        logging.error(f"DEBUG: Error resetting to plan: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.get("/tracker/get_tracked_meal_foods/{tracked_meal_id}")
 async def get_tracked_meal_foods(tracked_meal_id: int, db: Session = Depends(get_db)):
     """Get foods associated with a tracked meal"""
-    logging.info(f"DEBUG: get_tracked_meal_foods called for tracked_meal_id: {tracked_meal_id}")
     try:
         tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.id == tracked_meal_id).first()
-        logging.info(f"DEBUG: Tracked meal found: {tracked_meal.id if tracked_meal else 'None'}")
 
         if not tracked_meal:
             raise HTTPException(status_code=404, detail="Tracked meal not found")
 
         # Load the associated Meal and its foods
         meal = db.query(Meal).options(joinedload(Meal.meal_foods).joinedload(MealFood.food)).filter(Meal.id == tracked_meal.meal_id).first()
-        logging.info(f"DEBUG: Associated meal found: {meal.id if meal else 'None'}")
         if not meal:
             raise HTTPException(status_code=404, detail="Associated meal not found")
 
         # Load custom tracked foods for this tracked meal
         tracked_foods = db.query(TrackedMealFood).options(joinedload(TrackedMealFood.food)).filter(TrackedMealFood.tracked_meal_id == tracked_meal_id).all()
-        logging.info(f"DEBUG: Found {len(tracked_foods)} custom tracked foods.")
 
-        # Combine foods from the base meal and custom tracked foods, handling overrides
+        # New override-based logic
         meal_foods_data = []
-        
-        # Keep track of food_ids that have been overridden by TrackedMealFood entries
-        # These should not be added from the base meal definition
-        overridden_food_ids = {tf.food_id for tf in tracked_foods}
-        logging.info(f"DEBUG: Overridden food IDs: {overridden_food_ids}")
+        base_foods = {mf.food_id: mf for mf in meal.meal_foods}
+        overrides = {tf.food_id: tf for tf in tracked_foods}
 
-        for meal_food in meal.meal_foods:
-            # Only add meal_food if it hasn't been overridden by a TrackedMealFood
-            if meal_food.food_id not in overridden_food_ids:
+        # 1. Handle base meal foods, applying overrides where they exist
+        for food_id, base_meal_food in base_foods.items():
+            if food_id in overrides:
+                override_food = overrides[food_id]
+                if not override_food.is_deleted:
+                    # This food is overridden, use the override's data
+                    meal_foods_data.append({
+                        "id": override_food.id,
+                        "food_id": override_food.food.id,
+                        "food_name": override_food.food.name,
+                        "quantity": override_food.quantity,
+                        "serving_unit": override_food.food.serving_unit,
+                        "serving_size": override_food.food.serving_size,
+                        "is_custom": True  # It's an override, so treat as custom
+                    })
+            else:
+                # No override exists, use the base meal food data
                 meal_foods_data.append({
-                    "id": meal_food.id,
-                    "food_id": meal_food.food.id,
-                    "food_name": meal_food.food.name,
-                    "quantity": meal_food.quantity,
-                    "serving_unit": meal_food.food.serving_unit,
-                    "serving_size": meal_food.food.serving_size,
+                    "id": base_meal_food.id,
+                    "food_id": base_meal_food.food.id,
+                    "food_name": base_meal_food.food.name,
+                    "quantity": base_meal_food.quantity,
+                    "serving_unit": base_meal_food.food.serving_unit,
+                    "serving_size": base_meal_food.food.serving_size,
                     "is_custom": False
                 })
-        
-        logging.info(f"DEBUG: Added {len(meal_foods_data)} meal foods (excluding overridden).")
 
-        for tracked_food in tracked_foods:
-            meal_foods_data.append({
-                "id": tracked_food.id,
-                "food_id": tracked_food.food.id,
-                "food_name": tracked_food.food.name,
-                "quantity": tracked_food.quantity,
-                "serving_unit": tracked_food.food.serving_unit,
-                "serving_size": tracked_food.food.serving_size,
-                "is_custom": True
-            })
-        logging.info(f"DEBUG: Added {len(tracked_foods)} custom tracked foods.")
-        logging.info(f"DEBUG: Total meal foods data items: {len(meal_foods_data)}")
+        # 2. Add new foods that are not in the base meal
+        for food_id, tracked_food in overrides.items():
+            if food_id not in base_foods and not tracked_food.is_deleted:
+                meal_foods_data.append({
+                    "id": tracked_food.id,
+                    "food_id": tracked_food.food.id,
+                    "food_name": tracked_food.food.name,
+                    "quantity": tracked_food.quantity,
+                    "serving_unit": tracked_food.food.serving_unit,
+                    "serving_size": tracked_food.food.serving_size,
+                    "is_custom": True
+                })
 
         return {"status": "success", "meal_foods": meal_foods_data}
 
     except HTTPException as he:
-        logging.error(f"DEBUG: HTTP Error getting tracked meal foods: {he.detail}")
         return {"status": "error", "message": he.detail}
     except Exception as e:
-        logging.error(f"DEBUG: Error getting tracked meal foods: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/add_food_to_tracked_meal")
 async def add_food_to_tracked_meal(data: dict = Body(...), db: Session = Depends(get_db)):
-    """Add a food to an existing tracked meal"""
+    """Add a food to an existing tracked meal by creating a TrackedMealFood entry."""
     try:
         tracked_meal_id = data.get("tracked_meal_id")
         food_id = data.get("food_id")
@@ -450,13 +443,14 @@ async def add_food_to_tracked_meal(data: dict = Body(...), db: Session = Depends
         if not food:
             raise HTTPException(status_code=404, detail="Food not found")
 
-        # Create a new MealFood entry for the tracked meal's associated meal
-        meal_food = MealFood(
-            meal_id=tracked_meal.meal_id,
+        # Create a new TrackedMealFood entry to associate the food with the tracked meal
+        tracked_meal_food = TrackedMealFood(
+            tracked_meal_id=tracked_meal.id,
             food_id=food_id,
-            quantity=grams
+            quantity=grams,
+            is_override=False # This is a new addition, not an override
         )
-        db.add(meal_food)
+        db.add(tracked_meal_food)
 
         # Mark the tracked day as modified
         tracked_meal.tracked_day.is_modified = True
@@ -466,93 +460,78 @@ async def add_food_to_tracked_meal(data: dict = Body(...), db: Session = Depends
 
     except HTTPException as he:
         db.rollback()
-        logging.error(f"DEBUG: HTTP Error adding food to tracked meal: {he.detail}")
         return {"status": "error", "message": he.detail}
     except Exception as e:
         db.rollback()
-        logging.error(f"DEBUG: Error adding food to tracked meal: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/update_tracked_meal_foods")
 async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depends(get_db)):
-    """Update quantities of multiple foods in a tracked meal"""
-    logging.info(f"DEBUG: update_tracked_meal_foods called for tracked_meal_id: {data.get('tracked_meal_id')}")
+    """Update, add, or remove foods from a tracked meal using an override system."""
     try:
         tracked_meal_id = data.get("tracked_meal_id")
         foods_data = data.get("foods", [])
-        logging.info(f"DEBUG: Foods data received: {foods_data}")
+        removed_food_ids = data.get("removed_food_ids", [])
 
         tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.id == tracked_meal_id).first()
-        logging.info(f"DEBUG: Tracked meal found: {tracked_meal.id if tracked_meal else 'None'}")
         if not tracked_meal:
             raise HTTPException(status_code=404, detail="Tracked meal not found")
 
+        # Process removals: mark existing foods as deleted
+        for food_id_to_remove in removed_food_ids:
+            # Check if an override already exists
+            override = db.query(TrackedMealFood).filter(
+                TrackedMealFood.tracked_meal_id == tracked_meal_id,
+                TrackedMealFood.food_id == food_id_to_remove
+            ).first()
+            if override:
+                override.is_deleted = True
+            else:
+                # If no override exists, create one to mark the food as deleted
+                new_override = TrackedMealFood(
+                    tracked_meal_id=tracked_meal_id,
+                    food_id=food_id_to_remove,
+                    quantity=0, # Quantity is irrelevant for a deleted item
+                    is_override=True,
+                    is_deleted=True
+                )
+                db.add(new_override)
+
+        # Process updates and additions
         for food_data in foods_data:
             food_id = food_data.get("food_id")
             grams = float(food_data.get("grams", 1.0))
-            is_custom = food_data.get("is_custom", False)
-            item_id = food_data.get("id") # This could be MealFood.id or TrackedMealFood.id
-            logging.info(f"DEBUG: Processing food_id: {food_id}, grams: {grams}, is_custom: {is_custom}, item_id: {item_id}")
+            print(f"  Processing food_id {food_id} with grams {grams}")
 
-            if is_custom:
-                tracked_food = db.query(TrackedMealFood).filter(TrackedMealFood.id == item_id).first()
-                if tracked_food:
-                    tracked_food.quantity = grams
-                    logging.info(f"DEBUG: Updated existing custom tracked food {item_id} to grams {grams}")
-                else:
-                    # If it's a new custom food being added
-                    new_tracked_food = TrackedMealFood(
-                        tracked_meal_id=tracked_meal.id,
-                        food_id=food_id,
-                        quantity=grams
-                    )
-                    db.add(new_tracked_food)
-                    logging.info(f"DEBUG: Added new custom tracked food for food_id {food_id} with grams {grams}")
+            # Check if an override entry already exists for this food
+            existing_override = db.query(TrackedMealFood).filter(
+                TrackedMealFood.tracked_meal_id == tracked_meal_id,
+                TrackedMealFood.food_id == food_id
+            ).first()
+
+            if existing_override:
+                # If an override exists, update its quantity and ensure it's not marked as deleted
+                print(f"    Found existing override for food_id {food_id}. Updating quantity to {grams}.")
+                existing_override.quantity = grams
+                existing_override.is_deleted = False
             else:
-                # This is a food from the original meal definition
-                # We need to check if it's already a TrackedMealFood (meaning it was overridden)
-                # Or if it's still a MealFood
-                existing_tracked_food = db.query(TrackedMealFood).filter(
-                    TrackedMealFood.tracked_meal_id == tracked_meal.id,
-                    TrackedMealFood.food_id == food_id
+                # If no override exists, it's either a modification of a base food or a new addition
+                print(f"    No existing override for food_id {food_id}. Creating new entry.")
+                base_meal_food = db.query(MealFood).filter(
+                    MealFood.meal_id == tracked_meal.meal_id,
+                    MealFood.food_id == food_id
                 ).first()
-                logging.info(f"DEBUG: Checking for existing TrackedMealFood for food_id {food_id}: {existing_tracked_food.id if existing_tracked_food else 'None'}")
+                
+                is_override = base_meal_food is not None
+                print(f"    Is this an override of a base meal food? {is_override}")
+                new_entry = TrackedMealFood(
+                    tracked_meal_id=tracked_meal_id,
+                    food_id=food_id,
+                    quantity=grams,
+                    is_override=is_override
+                )
+                db.add(new_entry)
 
-                if existing_tracked_food:
-                    existing_tracked_food.quantity = float(grams)
-                    logging.info(f"DEBUG: Updated existing TrackedMealFood {existing_tracked_food.id} (override) to grams {grams}")
-                else:
-                    # If it's not a TrackedMealFood, it must be a MealFood
-                    meal_food = db.query(MealFood).filter(
-                        MealFood.meal_id == tracked_meal.meal_id,
-                        MealFood.food_id == food_id
-                    ).first()
-                    logging.info(f"DEBUG: Checking for existing MealFood for food_id {food_id}: {meal_food.id if meal_food else 'None'}")
-                    if meal_food:
-                        # If grams changed, convert to TrackedMealFood
-                        if meal_food.quantity != grams:
-                            new_tracked_food = TrackedMealFood(
-                                tracked_meal_id=tracked_meal.id,
-                                food_id=food_id,
-                                quantity=float(grams),
-                                is_override=True
-                            )
-                            db.add(new_tracked_food)
-                            db.delete(meal_food) # Remove original MealFood
-                            logging.info(f"DEBUG: Converted MealFood {meal_food.id} to new TrackedMealFood for food_id {food_id} with grams {grams} and deleted original MealFood.")
-                        else:
-                            logging.info(f"DEBUG: MealFood {meal_food.id} grams unchanged, no override needed.")
-                    else:
-                        # This case should ideally not happen if data is consistent,
-                        # but as a fallback, add as a new TrackedMealFood
-                        new_tracked_food = TrackedMealFood(
-                            tracked_meal_id=tracked_meal.id,
-                            food_id=food_id,
-                            quantity=float(grams)
-                        )
-                        db.add(new_tracked_food)
-                        logging.warning(f"DEBUG: Fallback: Added new TrackedMealFood for food_id {food_id} with grams {grams}. Original MealFood not found.")
-        
         # Mark the tracked day as modified
         tracked_meal.tracked_day.is_modified = True
 
@@ -561,66 +540,12 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
 
     except HTTPException as he:
         db.rollback()
-        logging.error(f"DEBUG: HTTP Error updating tracked meal foods: {he.detail}")
         return {"status": "error", "message": he.detail}
     except Exception as e:
         db.rollback()
-        logging.error(f"DEBUG: Error updating tracked meal foods: {e}")
         return {"status": "error", "message": str(e)}
 
-@router.delete("/tracker/remove_food_from_tracked_meal/{meal_food_id}")
-async def remove_food_from_tracked_meal(meal_food_id: int, db: Session = Depends(get_db)):
-    """Remove a food from a tracked meal"""
-    try:
-        meal_food = db.query(MealFood).filter(MealFood.id == meal_food_id).first()
-        if not meal_food:
-            raise HTTPException(status_code=404, detail="Meal food not found")
 
-        # Mark the tracked day as modified
-        tracked_meal = db.query(TrackedMeal).filter(TrackedMeal.meal_id == meal_food.meal_id).first()
-        if tracked_meal:
-            tracked_meal.tracked_day.is_modified = True
-
-        db.delete(meal_food)
-        db.commit()
-
-        return {"status": "success"}
-
-    except HTTPException as he:
-        db.rollback()
-        logging.error(f"DEBUG: HTTP Error removing food from tracked meal: {he.detail}")
-        return {"status": "error", "message": he.detail}
-    except Exception as e:
-        db.rollback()
-        logging.error(f"DEBUG: Error removing food from tracked meal: {e}")
-        return {"status": "error", "message": str(e)}
-
-@router.delete("/tracker/remove_custom_food_from_tracked_meal/{tracked_meal_food_id}")
-async def remove_custom_food_from_tracked_meal(tracked_meal_food_id: int, db: Session = Depends(get_db)):
-    """Remove a custom food from a tracked meal"""
-    try:
-        tracked_meal_food = db.query(TrackedMealFood).filter(TrackedMealFood.id == tracked_meal_food_id).first()
-        if not tracked_meal_food:
-            raise HTTPException(status_code=404, detail="Tracked meal food not found")
-
-        # Mark the tracked day as modified
-        tracked_meal = tracked_meal_food.tracked_meal
-        if tracked_meal:
-            tracked_meal.tracked_day.is_modified = True
-
-        db.delete(tracked_meal_food)
-        db.commit()
-
-        return {"status": "success"}
-
-    except HTTPException as he:
-        db.rollback()
-        logging.error(f"DEBUG: HTTP Error removing custom food from tracked meal: {he.detail}")
-        return {"status": "error", "message": he.detail}
-    except Exception as e:
-        db.rollback()
-        logging.error(f"DEBUG: Error removing custom food from tracked meal: {e}")
-        return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/save_as_new_meal")
 async def save_as_new_meal(data: dict = Body(...), db: Session = Depends(get_db)):
@@ -673,11 +598,9 @@ async def save_as_new_meal(data: dict = Body(...), db: Session = Depends(get_db)
 
     except HTTPException as he:
         db.rollback()
-        logging.error(f"DEBUG: HTTP Error saving as new meal: {he.detail}")
         return {"status": "error", "message": he.detail}
     except Exception as e:
         db.rollback()
-        logging.error(f"DEBUG: Error saving as new meal: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/add_food")
@@ -690,8 +613,6 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
         grams = float(data.get("quantity", 1.0))
         meal_time = data.get("meal_time")
 
-        logging.info(f"BUG HUNT: Received raw data: {data}")
-        logging.info(f"BUG HUNT: Parsed grams: {grams}")
         
         # Parse date
         from datetime import datetime
@@ -739,16 +660,13 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
         
         db.commit()
         
-        logging.info(f"DEBUG: Successfully added single food to tracker")
         return {"status": "success"}
         
     except ValueError as ve:
         db.rollback()
-        logging.error(f"DEBUG: Error adding single food to tracker: {ve}")
         return {"status": "error", "message": str(ve)}
     except Exception as e:
         db.rollback()
-        logging.error(f"DEBUG: Error adding single food to tracker: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.get("/detailed_tracked_day", response_class=HTMLResponse, name="detailed_tracked_day")
@@ -756,115 +674,121 @@ async def detailed_tracked_day(request: Request, person: str = "Sarah", date: Op
     """
     Displays a detailed view of a tracked day, including all meals and their food breakdowns.
     """
-    logging.info(f"DEBUG: Detailed tracked day page requested with person={person}, date={date}")
+    try:
+        # If no date is provided, default to today's date
+        if not date:
+            current_date = date.today()
+        else:
+            try:
+                current_date = datetime.fromisoformat(date).date()
+            except ValueError:
+                return templates.TemplateResponse("error.html", {
+                    "request": request,
+                    "error_title": "Invalid Date Format",
+                    "error_message": "The date format is invalid. Please use YYYY-MM-DD format.",
+                    "error_details": f"Date provided: {date}"
+                }, status_code=400)
 
-    # If no date is provided, default to today's date
-    if not date:
-        current_date = date.today()
-    else:
-        try:
-            current_date = datetime.fromisoformat(date).date()
-        except ValueError:
-            logging.error(f"DEBUG: Invalid date format for date: {date}")
-            return templates.TemplateResponse("detailed.html", {
-                "request": request, "title": "Invalid Date",
-                "error": "Invalid date format. Please use YYYY-MM-DD.",
+        tracked_day = db.query(TrackedDay).filter(
+            TrackedDay.person == person,
+            TrackedDay.date == current_date
+        ).first()
+
+        if not tracked_day:
+            return templates.TemplateResponse("detailed_tracked_day.html", {
+                "request": request, "title": "No Tracked Day Found",
+                "error": "No tracked meals found for this day.",
                 "day_totals": {},
-                "person": person
-            })
-
-    tracked_day = db.query(TrackedDay).filter(
-        TrackedDay.person == person,
-        TrackedDay.date == current_date
-    ).first()
-
-    if not tracked_day:
-        return templates.TemplateResponse("detailed_tracked_day.html", {
-            "request": request, "title": "No Tracked Day Found",
-            "error": "No tracked meals found for this day.",
-            "day_totals": {},
-            "person": person,
-            "plan_date": current_date # Pass current_date for consistent template behavior
-        })
-    
-    tracked_meals = db.query(TrackedMeal).options(
-        joinedload(TrackedMeal.meal).joinedload(Meal.meal_foods).joinedload(MealFood.food),
-        joinedload(TrackedMeal.tracked_foods).joinedload(TrackedMealFood.food)
-    ).filter(
-        TrackedMeal.tracked_day_id == tracked_day.id
-    ).all()
-
-    day_totals = calculate_day_nutrition_tracked(tracked_meals, db)
-
-    meal_details = []
-    for tracked_meal in tracked_meals:
-        meal_nutrition = calculate_meal_nutrition(tracked_meal.meal, db) # Base meal nutrition
-
-        foods = []
-        # Add foods from the base meal definition
-        for mf in tracked_meal.meal.meal_foods:
-            try:
-                serving_size_value = float(mf.food.serving_size)
-                num_servings = mf.quantity / serving_size_value if serving_size_value != 0 else 0
-            except (ValueError, TypeError):
-                num_servings = 0 # Fallback for invalid serving_size
-
-            foods.append({
-                'name': mf.food.name,
-                'total_grams': mf.quantity,
-                'num_servings': num_servings,
-                'serving_size': mf.food.serving_size,
-                'serving_unit': mf.food.serving_unit,
-                'calories': mf.food.calories * num_servings,
-                'protein': mf.food.protein * num_servings,
-                'carbs': mf.food.carbs * num_servings,
-                'fat': mf.food.fat * num_servings,
-                'fiber': (mf.food.fiber or 0) * num_servings,
-                'sugar': (mf.food.sugar or 0) * num_servings,
-                'sodium': (mf.food.sodium or 0) * num_servings,
-                'calcium': (mf.food.calcium or 0) * num_servings,
-            })
-        # Add custom tracked foods (overrides or additions)
-        for tmf in tracked_meal.tracked_foods:
-            try:
-                serving_size_value = float(tmf.food.serving_size)
-                num_servings = tmf.quantity / serving_size_value if serving_size_value != 0 else 0
-            except (ValueError, TypeError):
-                num_servings = 0 # Fallback for invalid serving_size
-
-            foods.append({
-                'name': tmf.food.name,
-                'total_grams': tmf.quantity,
-                'num_servings': num_servings,
-                'serving_size': tmf.food.serving_size,
-                'serving_unit': tmf.food.serving_unit,
-                'calories': tmf.food.calories * num_servings,
-                'protein': tmf.food.protein * num_servings,
-                'carbs': tmf.food.carbs * num_servings,
-                'fat': tmf.food.fat * num_servings,
-                'fiber': (tmf.food.fiber or 0) * num_servings,
-                'sugar': (tmf.food.sugar or 0) * num_servings,
-                'sodium': (tmf.food.sodium or 0) * num_servings,
-                'calcium': (tmf.food.calcium or 0) * num_servings,
+                "person": person,
+                "plan_date": current_date # Pass current_date for consistent template behavior
             })
         
-        meal_details.append({
-            'plan': {'meal': tracked_meal.meal, 'meal_time': tracked_meal.meal_time},
-            'nutrition': meal_nutrition,
-            'foods': foods
-        })
+        tracked_meals = db.query(TrackedMeal).options(
+            joinedload(TrackedMeal.meal).joinedload(Meal.meal_foods).joinedload(MealFood.food),
+            joinedload(TrackedMeal.tracked_foods).joinedload(TrackedMealFood.food)
+        ).filter(
+            TrackedMeal.tracked_day_id == tracked_day.id
+        ).all()
 
-    context = {
-        "request": request,
-        "title": f"Detailed Day for {person} on {current_date.strftime('%B %d, %Y')}",
-        "meal_details": meal_details,
-        "day_totals": day_totals,
-        "person": person,
-        "plan_date": current_date # Renamed from current_date to plan_date for consistency with detailed.html
-    }
+        day_totals = calculate_day_nutrition_tracked(tracked_meals, db)
 
-    if not meal_details:
-        context["message"] = "No meals tracked for this day."
+        meal_details = []
+        for tracked_meal in tracked_meals:
+            meal_nutrition = calculate_meal_nutrition(tracked_meal.meal, db) # Base meal nutrition
 
-    logging.info(f"DEBUG: Rendering tracked day details with context: {context}")
-    return templates.TemplateResponse("detailed_tracked_day.html", context)
+            foods = []
+            # Add foods from the base meal definition
+            for mf in tracked_meal.meal.meal_foods:
+                try:
+                    serving_size_value = float(mf.food.serving_size)
+                    num_servings = mf.quantity / serving_size_value if serving_size_value != 0 else 0
+                except (ValueError, TypeError):
+                    num_servings = 0 # Fallback for invalid serving_size
+
+                foods.append({
+                    'name': mf.food.name,
+                    'total_grams': mf.quantity,
+                    'num_servings': num_servings,
+                    'serving_size': mf.food.serving_size,
+                    'serving_unit': mf.food.serving_unit,
+                    'calories': mf.food.calories * num_servings,
+                    'protein': mf.food.protein * num_servings,
+                    'carbs': mf.food.carbs * num_servings,
+                    'fat': mf.food.fat * num_servings,
+                    'fiber': (mf.food.fiber or 0) * num_servings,
+                    'sugar': (mf.food.sugar or 0) * num_servings,
+                    'sodium': (mf.food.sodium or 0) * num_servings,
+                    'calcium': (mf.food.calcium or 0) * num_servings,
+                })
+            # Add custom tracked foods (overrides or additions)
+            for tmf in tracked_meal.tracked_foods:
+                try:
+                    serving_size_value = float(tmf.food.serving_size)
+                    num_servings = tmf.quantity / serving_size_value if serving_size_value != 0 else 0
+                except (ValueError, TypeError):
+                    num_servings = 0 # Fallback for invalid serving_size
+
+                foods.append({
+                    'name': tmf.food.name,
+                    'total_grams': tmf.quantity,
+                    'num_servings': num_servings,
+                    'serving_size': tmf.food.serving_size,
+                    'serving_unit': tmf.food.serving_unit,
+                    'calories': tmf.food.calories * num_servings,
+                    'protein': tmf.food.protein * num_servings,
+                    'carbs': tmf.food.carbs * num_servings,
+                    'fat': tmf.food.fat * num_servings,
+                    'fiber': (tmf.food.fiber or 0) * num_servings,
+                    'sugar': (tmf.food.sugar or 0) * num_servings,
+                    'sodium': (tmf.food.sodium or 0) * num_servings,
+                    'calcium': (tmf.food.calcium or 0) * num_servings,
+                })
+            
+            meal_details.append({
+                'plan': {'meal': tracked_meal.meal, 'meal_time': tracked_meal.meal_time},
+                'nutrition': meal_nutrition,
+                'foods': foods
+            })
+
+        context = {
+            "request": request,
+            "title": f"Detailed Day for {person} on {current_date.strftime('%B %d, %Y')}",
+            "meal_details": meal_details,
+            "day_totals": day_totals,
+            "person": person,
+            "plan_date": current_date # Renamed from current_date to plan_date for consistency with detailed.html
+        }
+
+        if not meal_details:
+            context["message"] = "No meals tracked for this day."
+
+        return templates.TemplateResponse("detailed_tracked_day.html", context)
+    
+    except Exception as e:
+        # Return a detailed error page instead of generic Internal Server Error
+        return templates.TemplateResponse("error.html", {
+            "request": request,
+            "error_title": "Error Loading Detailed View",
+            "error_message": f"An error occurred while loading the detailed view: {str(e)}",
+            "error_details": f"Person: {person}, Date: {date}"
+        }, status_code=500)

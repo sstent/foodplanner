@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="alert alert-danger">
+        <h4 class="alert-heading">
+            <i class="bi bi-exclamation-triangle-fill"></i> {{ error_title }}
+        </h4>
+        <p>{{ error_message }}</p>
+        {% if error_details %}
+        <hr>
+        <p class="mb-0">
+            <small>Details: {{ error_details }}</small>
+        </p>
+        {% endif %}
+    </div>
+    
+    <div class="card mt-3">
+        <div class="card-header">
+            <h5>What to do next?</h5>
+        </div>
+        <div class="card-body">
+            <ul>
+                <li>Check if the database is properly connected</li>
+                <li>Verify that all required database tables exist</li>
+                <li>Try refreshing the page</li>
+                <li>If the error persists, check the server logs for more details</li>
+            </ul>
+            <button class="btn btn-primary" onclick="window.location.reload()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Page
+            </button>
+            <button class="btn btn-secondary" onclick="window.location.href='/'">
+                <i class="bi bi-house"></i> Go to Home
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

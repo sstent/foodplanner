@@ -89,72 +89,63 @@ def test_get_tracked_meal_foods_endpoint(client: TestClient, session: TestingSes
 
 def test_edit_tracked_meal_with_override_flow(client: TestClient, session: TestingSessionLocal):
     """
-    Test the full flow of editing a tracked meal, overriding a food, and then retrieving its foods.
-    This test aims to reproduce the "Error loading tracked meal foods" bug.
+    Test the full flow of editing a tracked meal, overriding a food's quantity,
+    and verifying the new override system.
     """
     food1, food2, meal1, tracked_day, tracked_meal = create_test_data(session)
 
-    # 1. Simulate adding a meal (already done by create_test_data, so tracked_meal exists)
-    # 2. Simulate updating a food in the tracked meal to create an override
-    #    This will call /tracker/update_tracked_meal_foods
-    
-    # Get the original MealFood for food1
+    # 1. Get the original MealFood for food1 (Apple)
     original_meal_food1 = session.query(MealFood).filter(
         MealFood.meal_id == meal1.id,
         MealFood.food_id == food1.id
     ).first()
     assert original_meal_food1 is not None
 
-    # Prepare update data: update food1 quantity (should create a TrackedMealFood and delete original MealFood)
+    # 2. Prepare update data: update food1's quantity and keep food2 the same.
     updated_foods_data = [
-        {"id": original_meal_food1.id, "food_id": food1.id, "grams": 175.0, "is_custom": False}, # Original MealFood, but quantity changed
-        {"id": None, "food_id": food2.id, "grams": 100.0, "is_custom": False} # Unchanged original MealFood
+        {"id": original_meal_food1.id, "food_id": food1.id, "grams": 175.0, "is_custom": False},
     ]
 
+    # 3. Call the update endpoint
     response_update = client.post(
         "/tracker/update_tracked_meal_foods",
         json={
             "tracked_meal_id": tracked_meal.id,
-            "foods": updated_foods_data
+            "foods": updated_foods_data,
+            "removed_food_ids": []
         }
     )
     assert response_update.status_code == 200
     assert response_update.json()["status"] == "success"
 
-    session.expire_all() # Ensure a fresh load from the database
+    session.expire_all()
 
-    # Verify original MealFood for food1 is deleted
-    deleted_meal_food1 = session.query(MealFood).filter(MealFood.id == original_meal_food1.id).first()
-    assert deleted_meal_food1 is None
-
-    # Verify a TrackedMealFood for food1 now exists
-    overridden_tracked_food1 = session.query(TrackedMealFood).filter(
+    # 4. Verify that a new TrackedMealFood override was created for food1
+    override_food = session.query(TrackedMealFood).filter(
         TrackedMealFood.tracked_meal_id == tracked_meal.id,
         TrackedMealFood.food_id == food1.id
     ).first()
-    assert overridden_tracked_food1 is not None
-    assert overridden_tracked_food1.quantity == 175.0
+    assert override_food is not None
+    assert override_food.quantity == 175.0
+    assert override_food.is_override is True
 
-    # 3. Now, try to get the tracked meal foods again, which is where the bug occurs
-    #    This will call /tracker/get_tracked_meal_foods
+    # 5. Verify the original MealFood still exists
+    assert session.query(MealFood).filter(MealFood.id == original_meal_food1.id).first() is not None
+
+    # 6. Get the foods for the tracked meal and check the final state
     response_get = client.get(f"/tracker/get_tracked_meal_foods/{tracked_meal.id}")
     assert response_get.status_code == 200
     data_get = response_get.json()
     assert data_get["status"] == "success"
     assert len(data_get["meal_foods"]) == 2
 
-    # Verify the contents of the returned meal_foods
-    food_names = [f["food_name"] for f in data_get["meal_foods"]]
-    assert "Apple" in food_names
-    assert "Banana" in food_names
-
-    for food_data in data_get["meal_foods"]:
-        if food_data["food_name"] == "Apple":
-            assert food_data["quantity"] == 175.0
-            assert food_data["is_custom"] == True
-        elif food_data["food_name"] == "Banana":
-            assert food_data["quantity"] == 100.0
-            assert food_data["is_custom"] == False
+    food_map = {f["food_name"]: f for f in data_get["meal_foods"]}
+    assert "Apple" in food_map
+    assert "Banana" in food_map
+    assert food_map["Apple"]["quantity"] == 175.0
+    assert food_map["Apple"]["is_custom"] is True  # It's an override
+    assert food_map["Banana"]["quantity"] == 100.0
+    assert food_map["Banana"]["is_custom"] is False # It's from the base meal
 
 
 def test_update_tracked_meal_foods_endpoint(client: TestClient, session: TestingSessionLocal):
@@ -217,30 +208,120 @@ def test_add_food_to_tracked_meal_endpoint(client: TestClient, session: TestingS
     data = response.json()
     assert data["status"] == "success"
 
-    # Verify the food was added to the meal associated with the tracked meal
-    updated_meal_foods = session.query(MealFood).filter(MealFood.meal_id == meal1.id).all()
-    assert len(updated_meal_foods) == 3 # Original 2 + new 1
-
-    # Check the new food's quantity
-    orange_meal_food = next(mf for mf in updated_meal_foods if mf.food_id == food3.id)
-    assert orange_meal_food.quantity == 200
-
-def test_remove_food_from_tracked_meal_endpoint(client: TestClient, session: TestingSessionLocal):
-    """Test removing a food from a tracked meal"""
-    food1, food2, meal1, tracked_day, tracked_meal = create_test_data(session)
-
-    # Get the meal_food_id for food1
-    meal_food_to_remove = session.query(MealFood).filter(
-        MealFood.meal_id == meal1.id,
-        MealFood.food_id == food1.id
+    # Verify the food was added as a TrackedMealFood, not a MealFood
+    new_tracked_food = session.query(TrackedMealFood).filter(
+        TrackedMealFood.tracked_meal_id == tracked_meal.id,
+        TrackedMealFood.food_id == food3.id
     ).first()
-    
-    response = client.delete(f"/tracker/remove_food_from_tracked_meal/{meal_food_to_remove.id}")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
+    assert new_tracked_food is not None
+    assert new_tracked_food.quantity == 200
+    assert new_tracked_food.is_override is False # It's a new addition
 
-    # Verify the food was removed from the meal associated with the tracked meal
-    updated_meal_foods = session.query(MealFood).filter(MealFood.meal_id == meal1.id).all()
-    assert len(updated_meal_foods) == 1 # Original 2 - removed 1
-    assert updated_meal_foods[0].food_id == food2.id # Only food2 should remain
+    # Verify the base meal is unchanged
+    base_meal_foods = session.query(MealFood).filter(MealFood.meal_id == meal1.id).all()
+    assert len(base_meal_foods) == 2
+
+def test_edit_tracked_meal_bug_scenario(client: TestClient, session: TestingSessionLocal):
+    """
+    Simulates the full bug scenario described:
+    1. Start with a meal with 2 foods.
+    2. Add a 3rd food.
+    3. Delete one of the original foods.
+    4. Update the quantity of the other original food.
+    5. Save and verify the state.
+    """
+    food1, food2, meal1, tracked_day, tracked_meal = create_test_data(session)
+    
+    # 1. Initial state: tracked_meal with food1 (Apple) and food2 (Banana)
+    
+    # 2. Add a 3rd food (Orange)
+    food3 = Food(name="Orange", serving_size=130, serving_unit="g", calories=62, protein=1.2, carbs=15, fat=0.2)
+    session.add(food3)
+    session.commit()
+    session.refresh(food3)
+    
+    add_food_payload = {
+        "tracked_meal_id": tracked_meal.id,
+        "food_id": food3.id,
+        "grams": 200
+    }
+    response_add = client.post("/tracker/add_food_to_tracked_meal", json=add_food_payload)
+    assert response_add.status_code == 200
+    assert response_add.json()["status"] == "success"
+    
+    # Verify Orange was added as a TrackedMealFood
+    orange_tmf = session.query(TrackedMealFood).filter(
+        TrackedMealFood.tracked_meal_id == tracked_meal.id,
+        TrackedMealFood.food_id == food3.id
+    ).first()
+    assert orange_tmf is not None
+    assert orange_tmf.quantity == 200
+    
+    # 3. Delete an original food (Apple, food1)
+    # This requires an update call with the food removed from the list
+    
+    # 4. Update quantity of the other original food (Banana, food2)
+    
+    # Simulate the data sent from the frontend after edits
+    final_foods_payload = [
+        # food1 (Apple) is omitted, signifying deletion
+        {"id": None, "food_id": food2.id, "grams": 125.0, "is_custom": False}, # Banana quantity updated
+        {"id": orange_tmf.id, "food_id": food3.id, "grams": 210.0, "is_custom": True} # Orange quantity updated
+    ]
+    
+    removed_food_ids = [food1.id]
+    
+    update_payload = {
+        "tracked_meal_id": tracked_meal.id,
+        "foods": final_foods_payload,
+        "removed_food_ids": removed_food_ids
+    }
+    
+    response_update = client.post("/tracker/update_tracked_meal_foods", json=update_payload)
+    assert response_update.status_code == 200
+    assert response_update.json()["status"] == "success"
+    
+    session.expire_all()
+    
+    # 5. Verify the final state
+    
+    # There should be one override for the deleted food (Apple)
+    deleted_apple_override = session.query(TrackedMealFood).filter(
+        TrackedMealFood.tracked_meal_id == tracked_meal.id,
+        TrackedMealFood.food_id == food1.id,
+        TrackedMealFood.is_deleted == True
+    ).first()
+    assert deleted_apple_override is not None
+    
+    # There should be one override for the updated food (Banana)
+    updated_banana_override = session.query(TrackedMealFood).filter(
+        TrackedMealFood.tracked_meal_id == tracked_meal.id,
+        TrackedMealFood.food_id == food2.id
+    ).first()
+    assert updated_banana_override is not None
+    assert updated_banana_override.quantity == 125.0
+    
+    # The added food (Orange) should be updated
+    updated_orange_tmf = session.query(TrackedMealFood).filter(
+        TrackedMealFood.id == orange_tmf.id
+    ).first()
+    assert updated_orange_tmf is not None
+    assert updated_orange_tmf.quantity == 210.0
+    
+    # Let's check the get_tracked_meal_foods endpoint to be sure
+    response_get = client.get(f"/tracker/get_tracked_meal_foods/{tracked_meal.id}")
+    assert response_get.status_code == 200
+    data = response_get.json()
+    assert data["status"] == "success"
+    
+    # The final list should contain Banana and Orange, but not Apple
+    final_food_names = [f["food_name"] for f in data["meal_foods"]]
+    assert "Apple" not in final_food_names
+    assert "Banana" in final_food_names
+    assert "Orange" in final_food_names
+    
+    for food_data in data["meal_foods"]:
+        if food_data["food_name"] == "Banana":
+            assert food_data["quantity"] == 125.0
+        elif food_data["food_name"] == "Orange":
+            assert food_data["quantity"] == 210.0

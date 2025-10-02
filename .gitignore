@@ -3,3 +3,4 @@
 .kilocode/
 *.pyc
 __pycache__/
+data/
