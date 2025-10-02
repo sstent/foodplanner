@@ -687,10 +687,11 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
         person = data.get("person")
         date_str = data.get("date")
         food_id = data.get("food_id")
-        grams = float(data.get("grams", 1.0))
+        grams = float(data.get("quantity", 1.0))
         meal_time = data.get("meal_time")
-        
-        logging.info(f"DEBUG: Adding single food to tracker - person={person}, date={date_str}, food_id={food_id}, grams={grams}, meal_time={meal_time}")
+
+        logging.info(f"BUG HUNT: Received raw data: {data}")
+        logging.info(f"BUG HUNT: Parsed grams: {grams}")
         
         # Parse date
         from datetime import datetime

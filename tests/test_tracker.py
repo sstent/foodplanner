@@ -389,7 +389,7 @@ class TestTrackerAddFood:
         # Verify the food is in the tracked meal's foods
         assert len(tracked_meal.meal.meal_foods) == 1
         assert tracked_meal.meal.meal_foods[0].food_id == sample_food.id
-        assert tracked_meal.meal.meal_foods[0].quantity == 1.0
+        assert tracked_meal.meal.meal_foods[0].quantity == 100.0
 
 
     def test_add_food_to_tracker_with_meal_time(self, client, sample_food, db_session):
@@ -404,7 +404,7 @@ class TestTrackerAddFood:
             "person": "Sarah",
             "date": date.today().isoformat(),
             "food_id": sample_food.id,
-            "grams": 150.0,
+            "quantity": 150.0,
             "meal_time": "Dinner"
         })
         assert response.status_code == 200
@@ -449,7 +449,7 @@ class TestTrackerAddFood:
             "person": "Sarah",
             "date": date.today().isoformat(),
             "food_id": food.id,
-            "grams": grams_to_add,
+            "quantity": grams_to_add,
             "meal_time": "Snack 1"
         })
         assert response.status_code == 200

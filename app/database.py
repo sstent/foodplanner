@@ -25,7 +25,7 @@ import os
 # Database setup - Use SQLite for easier setup
 # Use environment variables if set, otherwise use defaults
 # Use current directory for database
-DATABASE_PATH = os.getenv('DATABASE_PATH', '/app/data')
+DATABASE_PATH = os.getenv('DATABASE_PATH', '/app')
 DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{DATABASE_PATH}/meal_planner.db')
 
 # For production, use PostgreSQL: DATABASE_URL = "postgresql://username:password@localhost/meal_planner"

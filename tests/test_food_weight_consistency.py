@@ -132,7 +132,7 @@ def test_tracker_add_food_grams_input(client, session, sample_food_100g):
             "person": person,
             "date": date_str,
             "food_id": sample_food_100g.id,
-            "grams": grams, # 75 grams
+            "quantity": grams, # 75 grams
             "meal_time": "Breakfast"
         }
     )

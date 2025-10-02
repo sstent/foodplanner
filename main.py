@@ -25,8 +25,6 @@ import shutil
 import sqlite3
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 # Import database components from the database module
 from app.database import DATABASE_URL, engine, Base, get_db, SessionLocal, Food, Meal, MealFood, Plan, Template, TemplateMeal, WeeklyMenu, WeeklyMenuDay, TrackedMeal, FoodCreate, FoodResponse, calculate_meal_nutrition, calculate_day_nutrition, calculate_day_nutrition_tracked
 
@@ -36,6 +34,13 @@ async def lifespan(app: FastAPI):
     # Startup
     logging.info("DEBUG: Startup event triggered")
     run_migrations()
+    
+    # Re-apply logging configuration after Alembic might have altered it
+    logging.getLogger().setLevel(logging.INFO)
+    for handler in logging.getLogger().handlers:
+        handler.setLevel(logging.INFO)
+    logging.info("DEBUG: Logging re-configured to INFO level.")
+    
     logging.info("DEBUG: Startup event completed")
 
     # Schedule the backup job - temporarily disabled for debugging
