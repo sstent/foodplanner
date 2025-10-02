@@ -80,25 +80,31 @@
                             <div class="ms-3">
                                 <div class="row row-cols-1 row-cols-sm-2">
                                 {% set overrides = {} %}
-                                {% set non_deleted_override_ids = [] %}
+                                {% set all_override_ids = [] %}
+                                {% set deleted_food_ids = [] %}
                                 {% for tmf in tracked_meal.tracked_foods %}
                                     {% if not tmf.is_deleted %}
                                         {% set _ = overrides.update({tmf.food_id: tmf}) %}
-                                        {% set _ = non_deleted_override_ids.append(tmf.food_id) %}
+                                    {% else %}
+                                        {% set _ = deleted_food_ids.append(tmf.food_id) %}
                                     {% endif %}
+                                    {% set _ = all_override_ids.append(tmf.food_id) %}
                                 {% endfor %}
 
                                 {% set displayed_food_ids = [] %}
 
                                 {# Display base meal foods, applying overrides #}
                                 {% for meal_food in tracked_meal.meal.meal_foods %}
-                                    {% if meal_food.food_id not in non_deleted_override_ids %}
+                                    {# Only show base meal food if it's not deleted and there's no active override for it #}
+                                    {% if meal_food.food_id not in deleted_food_ids and meal_food.food_id not in overrides.keys() %}
                                         <div class="col">
                                             <div class="d-flex justify-content-between small text-muted">
                                                 <span>• {{ meal_food.food.name }}</span>
                                                 <span class="text-end">{{ meal_food.quantity }} {{ meal_food.food.serving_unit }}</span>
                                             </div>
                                         </div>
+                                    {% else %}
+                                        <!-- DEBUG: meal_food {{ meal_food.food_id }} - {{ meal_food.food.name }} - in deleted_food_ids: {{ meal_food.food_id in deleted_food_ids }}, in overrides: {{ meal_food.food_id in overrides.keys() }} -->
                                     {% endif %}
                                     {% set _ = displayed_food_ids.append(meal_food.food_id) %}
                                 {% endfor %}

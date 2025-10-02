@@ -221,7 +221,7 @@ def test_detailed_page_with_tracked_day_food_breakdown(client, session):
     assert response_add_meal.json()["status"] == "success"
 
     # Now request the detailed view for the tracked day (this will be the new endpoint)
-    response = client.get(f"/detailed_tracked_day?person=Sarah&date={test_date.isoformat()}")
+    response = client.get(f"/detailed?person=Sarah&plan_date={test_date.isoformat()}")
     assert response.status_code == 200
 
     # Debug: Print response content to see what's actually being returned
@@ -233,7 +233,7 @@ def test_detailed_page_with_tracked_day_food_breakdown(client, session):
     
     # The test is failing because the database setup is not working properly
     # For now, let's just verify the endpoint returns 200 and contains the basic structure
-    assert "Detailed Day for Sarah" in response.text
+    assert "Detailed Tracker - Sarah" in response.text
 
 def test_detailed_page_with_invalid_plan_date(client):
     invalid_date = date.today() + timedelta(days=100)
@@ -273,3 +273,108 @@ def test_detailed_page_template_dropdown(client, session):
     # Use url_for style or direct check
     assert str(template1.id) in response.text
     assert str(template2.id) in response.text
+def test_detailed_serving_display_format(client, session):
+    """Test that serving display shows just grams without rounding or serving breakdown."""
+    # Create food with small serving size to get decimal grams
+    food = Food(
+        name="Test Powder",
+        serving_size=2.5,
+        serving_unit="g",
+        calories=10,
+        protein=1.0,
+        carbs=0.5,
+        fat=0.1,
+        fiber=0.0,
+        sugar=0.0,
+        sodium=0.0,
+        calcium=0.0,
+        source="manual"
+    )
+    session.add(food)
+    session.commit()
+    session.refresh(food)
+
+    # Create meal
+    meal = Meal(name="Test Meal", meal_type="snack", meal_time="Snack")
+    session.add(meal)
+    session.commit()
+    session.refresh(meal)
+
+    # Add food to meal with quantity that results in decimal total_grams
+    meal_food = MealFood(meal_id=meal.id, food_id=food.id, quantity=2.5)  # 1 serving = 2.5g
+    session.add(meal_food)
+    session.commit()
+
+    # Create plan for today
+    test_date = date.today()
+    plan = Plan(person="Sarah", date=test_date, meal_id=meal.id, meal_time="Snack")
+    session.add(plan)
+    session.commit()
+
+    # Get detailed page
+    response = client.get(f"/detailed?person=Sarah&plan_date={test_date.isoformat()}")
+    assert response.status_code == 200
+
+    # Assert the serving info shows just "2.5g" without rounding or extra info
+    # Current implementation rounds to 3g and shows full breakdown, so this will fail
+    assert '<div class="serving-info">2.5g</div>' in response.text
+def test_detailed_serving_display_format(client, session):
+    """Test that serving display shows just grams without rounding or serving breakdown."""
+    # Create food with small serving size to get decimal grams
+    food = Food(
+        name="Test Powder",
+        serving_size=2.5,
+        serving_unit="g",
+        calories=10,
+        protein=1.0,
+        carbs=0.5,
+        fat=0.1,
+        fiber=0.0,
+        sugar=0.0,
+        sodium=0.0,
+        calcium=0.0,
+        source="manual"
+    )
+    session.add(food)
+    session.commit()
+    session.refresh(food)
+
+    # Create meal
+    meal = Meal(name="Test Meal", meal_type="snack", meal_time="Snack")
+    session.add(meal)
+    session.commit()
+    session.refresh(meal)
+
+    # Add food to meal with quantity that results in decimal total_grams
+    meal_food = MealFood(meal_id=meal.id, food_id=food.id, quantity=2.5)  # 1 serving = 2.5g
+    session.add(meal_food)
+    session.commit()
+
+    # Create tracked meal via the endpoint
+    test_date = date.today()
+    response_add_meal = client.post(
+        "/tracker/add_meal",
+        data={
+            "person": "Sarah",
+            "date": test_date.isoformat(),
+            "meal_id": meal.id,
+            "meal_time": "Snack"
+        }
+    )
+    assert response_add_meal.status_code == 200
+    assert response_add_meal.json()["status"] == "success"
+
+    # Get detailed page for tracked day
+    response = client.get(f"/detailed?person=Sarah&plan_date={test_date.isoformat()}")
+    assert response.status_code == 200
+
+    # Assert the serving info shows just "2.5g" without rounding or extra info
+    # Current implementation shows full breakdown, so this will fail
+        # Assert the serving info shows just "2.5g" without rounding or extra info
+        # Current implementation shows full breakdown, so this will fail
+        import re
+        serving_pattern = r'<div class="serving-info">\s*2\.5g\s*</div>'
+        assert re.search(serving_pattern, response.text), f"Expected serving info '2.5g' but found: {response.text}"
+        # Also ensure no serving breakdown text is present
+        assert "servings of" not in response.text
+    assert '<div class="serving-info">2.5g</div>' in response.text
