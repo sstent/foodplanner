@@ -45,3 +45,44 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Function to add food dynamically to the edit meal list
+    async function addFoodToTrackedMeal() {
+        const foodSelect = document.getElementById('foodSelectTrackedMeal');
+        const foodId = foodSelect.value;
+        const foodName = foodSelect.options[foodSelect.selectedIndex].text;
+        const quantityInput = document.querySelector('#addFoodToTrackedMealForm input[name="quantity"]');
+        const quantity = quantityInput.value;
+
+        if (!foodId || !quantity) {
+            alert('Please select a food and enter a quantity.');
+            return;
+        }
+
+        const container = document.getElementById('editMealFoodsList');
+        // If "No foods added yet" message exists, remove it
+        const noFoodsMessage = container.querySelector('em');
+        if (noFoodsMessage) {
+            noFoodsMessage.remove();
+        }
+
+        const foodDiv = document.createElement('div');
+        foodDiv.className = 'd-flex justify-content-between align-items-center mb-2';
+        foodDiv.innerHTML = `
+            <span>${foodName}</span>
+            <div class="input-group w-50">
+                <input type="number" step="0.01" class="form-control form-control-sm" value="${parseFloat(quantity).toFixed(2)}" data-food-id="${foodId}" data-item-id="0" data-is-custom="true" data-testid="food-quantity-${foodId}">
+                <span class="input-group-text">g</span>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${foodId}, true)" data-testid="delete-food-${foodId}">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(foodDiv);
+
+        // Clear the form for next entry
+        foodSelect.value = '';
+        quantityInput.value = '100'; // Reset to default
+    }
+</script>

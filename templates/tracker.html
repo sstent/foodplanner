@@ -4,35 +4,38 @@
     <div class="col-md-8">
         <!-- Date Navigation -->
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <button class="btn btn-outline-secondary" onclick="navigateDate('{{ prev_date }}')">
+            <button class="btn btn-outline-secondary" onclick="navigateDate('{{ prev_date }}')" data-testid="navigate-yesterday">
                 <i class="bi bi-chevron-left"></i> Yesterday
             </button>
             <div class="text-center">
-                <h3>{{ current_date.strftime('%A, %B %d, %Y') }}</h3>
+                <h3 data-testid="current-date-display">{{ current_date.strftime('%A, %B %d, %Y') }}</h3>
                 {% if is_modified %}
                 <span class="badge bg-warning text-dark">Custom</span>
                 {% else %}
                 <span class="badge bg-success">As Planned</span>
                 {% endif %}
             </div>
-            <button class="btn btn-outline-secondary" onclick="navigateDate('{{ next_date }}')">
+            <button class="btn btn-outline-secondary" onclick="navigateDate('{{ next_date }}')" data-testid="navigate-tomorrow">
                 Tomorrow <i class="bi bi-chevron-right"></i>
             </button>
         </div>
 
         <!-- Template Actions -->
         <div class="d-flex justify-content-center gap-2 mb-4">
-            <button class="btn btn-success" onclick="saveAsTemplate()">
+            <button class="btn btn-success" onclick="saveAsTemplate()" data-testid="save-as-template">
                 <i class="bi bi-save"></i> Save as Template
             </button>
-            <button class="btn btn-primary" onclick="applyTemplate()">
+            <button class="btn btn-primary" onclick="applyTemplate()" data-testid="apply-template">
                 <i class="bi bi-upload"></i> Apply Template
             </button>
             {% if is_modified %}
-            <button class="btn btn-outline-primary" onclick="resetToPlan()">
+            <button class="btn btn-outline-primary" onclick="resetToPlan()" data-testid="reset-to-plan">
                 <i class="bi bi-arrow-counterclockwise"></i> Reset to Plan
             </button>
             {% endif %}
+            <button class="btn btn-outline-danger" onclick="resetPage()" data-testid="reset-page">
+                <i class="bi bi-x-circle"></i> Reset Page
+            </button>
         </div>
 
         <!-- Meal Times -->
@@ -42,16 +45,16 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">{{ meal_time }}</h5>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-success" onclick="addMealToTime('{{ meal_time }}')">
+                    <button class="btn btn-sm btn-outline-success" onclick="addMealToTime('{{ meal_time }}')" data-testid="add-meal-{{ meal_time|slugify }}">
                         <i class="bi bi-plus"></i> Add Meal
                     </button>
-                    <button class="btn btn-sm btn-info text-white" onclick="addSingleFoodToTime('{{ meal_time }}')">
+                    <button class="btn btn-sm btn-info text-white" onclick="addSingleFoodToTime('{{ meal_time }}')" data-testid="add-food-{{ meal_time|slugify }}">
                         <i class="bi bi-plus-circle"></i> Add Food
                     </button>
                 </div>
             </div>
             <div class="card-body">
-                <div id="meals-{{ meal_time|lower|replace(' ', '-') }}">
+                <div id="meals-{{ meal_time|slugify }}">
                     {% set meals_for_time = [] %}
                     {% for tracked_meal in tracked_meals %}
                         {% if tracked_meal.meal_time == meal_time %}
@@ -60,25 +63,31 @@
                     {% endfor %}
 
                     {% if meals_for_time %}
-                        {% for tracked_meal in meals_for_time %}
-                        <div class="mb-3 p-3 bg-light rounded">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div>
-                                    <strong>{{ tracked_meal.meal.name }}</strong>
-                                </div>
-                                <div>
-                                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="editTrackedMeal('{{ tracked_meal.id }}')" title="Edit Meal">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="removeMeal('{{ tracked_meal.id }}')">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <!-- Food Breakdown -->
-                            <div class="ms-3">
-                                <div class="row row-cols-1 row-cols-sm-2">
+{% for tracked_meal in meals_for_time %}
+    {# 1. Create stable slugs #}
+    {% set meal_time_slug = meal_time|slugify %}
+    {% set meal_name_safe = tracked_meal.meal.name|slugify %}
+    
+    {# 2. Construct the core Unique Meal ID for non-ambiguous locating #}
+    {% set unique_meal_id = meal_time_slug + '-' + meal_name_safe + '-' + loop.index|string %}
+<div class="mb-3 p-3 bg-light rounded" data-testid="meal-card-{{ unique_meal_id }}">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+            <strong data-testid="meal-name-{{ unique_meal_id }}">{{ tracked_meal.meal.name }}</strong>
+        </div>
+        <div>
+            <button class="btn btn-sm btn-outline-secondary me-1" onclick="editTrackedMeal('{{ tracked_meal.id }}')" title="Edit Meal" data-testid="edit-meal-{{ unique_meal_id }}">
+                <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" onclick="removeMeal('{{ tracked_meal.id }}')" data-testid="delete-meal-{{ unique_meal_id }}">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Food Breakdown -->
+    <div class="ms-3">
+        <div class="row row-cols-1 row-cols-sm-2">
                                 {% set overrides = {} %}
                                 {% set all_override_ids = [] %}
                                 {% set deleted_food_ids = [] %}
@@ -98,7 +107,8 @@
                                     {# Only show base meal food if it's not deleted and there's no active override for it #}
                                     {% if meal_food.food_id not in deleted_food_ids and meal_food.food_id not in overrides.keys() %}
                                         <div class="col">
-                                            <div class="d-flex justify-content-between small text-muted">
+                                            {% set food_name_safe = meal_food.food.name|slugify %}
+                                            <div class="d-flex justify-content-between small text-muted" data-testid="food-display-{{ unique_meal_id }}-{{ food_name_safe }}-{{ loop.index }}">
                                                 <span>• {{ meal_food.food.name }}</span>
                                                 <span class="text-end">{{ meal_food.quantity }} {{ meal_food.food.serving_unit }}</span>
                                             </div>
@@ -111,8 +121,9 @@
 
                                 {# Display overridden and new foods #}
                                 {% for food_id, tmf in overrides.items() %}
+                                    {% set food_name_safe = tmf.food.name|slugify %}
                                     <div class="col">
-                                        <div class="d-flex justify-content-between small text-muted">
+                                        <div class="d-flex justify-content-between small text-muted" data-testid="food-display-{{ unique_meal_id }}-{{ food_name_safe }}-{{ loop.index }}">
                                             <span>• {{ tmf.food.name }}</span>
                                             <span class="text-end">{{ tmf.quantity }} g</span>
                                         </div>
@@ -384,9 +395,9 @@
                         foodDiv.innerHTML = `
                             <span>${food.food_name}</span>
                             <div class="input-group w-50">
-                                <input type="number" step="0.01" class="form-control form-control-sm" value="${food.quantity.toFixed(2)}" data-food-id="${food.food_id}" data-item-id="${food.id}" data-is-custom="${food.is_custom}">
+                                <input type="number" step="0.01" class="form-control form-control-sm" value="${food.quantity.toFixed(2)}" data-food-id="${food.food_id}" data-item-id="${food.id}" data-is-custom="${food.is_custom}" data-testid="food-quantity-${food.food_id}">
                                 <span class="input-group-text">g</span>
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.food_id}, ${food.is_custom})">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.food_id}, ${food.id}, ${food.is_custom})" data-testid="delete-food-${food.food_id}">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -404,17 +415,18 @@
         }
     }
 
-    function removeFoodFromTrackedMeal(foodId, isCustom) {
+    function removeFoodFromTrackedMeal(foodId, itemId, isCustom) {
         // Find the button that was clicked
         const button = event.target.closest('button');
         if (button) {
             // Find the parent div and remove it
             const foodDiv = button.closest('.d-flex');
             if (foodDiv) {
-                const foodDataId = parseInt(foodDiv.querySelector('input').dataset.foodId);
-                removedFoodIds.push(foodDataId);
+                // We need to push the foodId, not the itemId, to the removedFoodIds array
+                // The backend expects food_id for removals to mark the correct override
+                removedFoodIds.push(foodId);
                 foodDiv.remove();
-                console.log('Removed food with ID:', foodDataId, 'and removedFoodIds is now:', removedFoodIds);
+                console.log('Removed food with foodId:', foodId, 'itemId:', itemId, 'isCustom:', isCustom, 'and removedFoodIds is now:', removedFoodIds);
             }
         }
     }
@@ -426,7 +438,7 @@
         const foods = [];
         inputs.forEach(input => {
             const foodData = {
-                id: parseInt(input.dataset.itemId),
+                id: parseInt(input.dataset.itemId), // Pass the item ID to the backend
                 food_id: parseInt(input.dataset.foodId),
                 grams: parseFloat(input.value), // Renamed to grams to match backend
                 is_custom: input.dataset.isCustom === 'true'
@@ -531,6 +543,32 @@
             }
         } catch (error) {
             alert('Error: ' + error.message);
+        }
+    }
+    
+    // Reset page (clear all meals and foods)
+    async function resetPage() {
+        if (confirm('Are you sure you want to clear all meals and foods for this day? This action cannot be undone.')) {
+            const formData = new FormData();
+            formData.append('person', '{{ person }}');
+            formData.append('date', '{{ current_date.isoformat() }}');
+
+            try {
+                const response = await fetch('/tracker/clear_page', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
         }
     }
 </script>

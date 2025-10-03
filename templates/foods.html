@@ -2,7 +2,7 @@
 {% block content %}
 <div class="row">
     <div class="col-md-12">
-        <button type="button" class="btn btn-primary btn-lg mb-4" data-bs-toggle="modal" data-bs-target="#addFoodModal">
+        <button type="button" class="btn btn-primary btn-lg mb-4" data-bs-toggle="modal" data-bs-target="#addFoodModal" data-testid="add-new-food">
             <i class="bi bi-plus-circle"></i> Add New Food
         </button>
         
@@ -27,21 +27,22 @@
                 </thead>
                 <tbody>
                     {% for food in foods %}
-                    <tr>
-                        <td><input type="checkbox" name="selected_foods" value="{{ food.id }}"></td>
-                        <td>{{ food.name }}</td>
-                        <td>{{ food.brand or '' }}</td>
-                        <td>{{ food.serving_size }} {{ food.serving_unit }}</td>
-                        <td>{{ "%.2f"|format(food.calories) }}</td>
-                        <td>{{ "%.2f"|format(food.protein) }}g</td>
-                        <td>{{ "%.2f"|format(food.carbs) }}g</td>
-                        <td>{{ "%.2f"|format(food.fat) }}g</td>
-                        <td>{{ "%.2f"|format(food.fiber) }}g</td>
-                        <td>{{ "%.2f"|format(food.sodium) }}mg</td>
-                        <td>{{ "%.2f"|format(food.calcium) }}mg</td>
+                    {% set food_name_slug = food.name|lower|replace(' ', '-')|replace(',', '')|replace('.', '') %}
+                    <tr data-testid="food-row-{{ food_name_slug }}-{{ loop.index }}">
+                        <td><input type="checkbox" name="selected_foods" value="{{ food.id }}" data-testid="select-food-{{ food_name_slug }}-{{ loop.index }}"></td>
+                        <td data-testid="food-name-{{ food_name_slug }}-{{ loop.index }}">{{ food.name }}</td>
+                        <td data-testid="food-brand-{{ food_name_slug }}-{{ loop.index }}">{{ food.brand or '' }}</td>
+                        <td data-testid="food-serving-{{ food_name_slug }}-{{ loop.index }}">{{ food.serving_size }} {{ food.serving_unit }}</td>
+                        <td data-testid="food-calories-{{ food_name_slug }}-{{ loop.index }}">{{ "%.2f"|format(food.calories) }}</td>
+                        <td data-testid="food-protein-{{ food_name_slug }}-{{ loop.index }}">{{ "%.2f"|format(food.protein) }}g</td>
+                        <td data-testid="food-carbs-{{ food_name_slug }}-{{ loop.index }}">{{ "%.2f"|format(food.carbs) }}g</td>
+                        <td data-testid="food-fat-{{ food_name_slug }}-{{ loop.index }}">{{ "%.2f"|format(food.fat) }}g</td>
+                        <td data-testid="food-fiber-{{ food_name_slug }}-{{ loop.index }}">{{ "%.2f"|format(food.fiber) }}g</td>
+                        <td data-testid="food-sodium-{{ food_name_slug }}-{{ loop.index }}">{{ "%.2f"|format(food.sodium) }}mg</td>
+                        <td data-testid="food-calcium-{{ food_name_slug }}-{{ loop.index }}">{{ "%.2f"|format(food.calcium) }}mg</td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary"
-                                    onclick="editFood({{ food.id }})">
+                                    onclick="editFood({{ food.id }})" data-testid="edit-food-{{ food_name_slug }}-{{ loop.index }}">
                                 <i class="bi bi-pencil"></i> Edit
                             </button>
                         </td>
@@ -50,7 +51,7 @@
                 </tbody>
             </table>
         </div>
-        <button class="btn btn-danger mt-3" onclick="deleteSelectedFoods()">
+        <button class="btn btn-danger mt-3" onclick="deleteSelectedFoods()" data-testid="delete-selected-foods">
             <i class="bi bi-trash"></i> Delete Selected Foods
         </button>
     </div>

@@ -1,0 +1,18 @@
+{
+  "name": "food-planner-tests",
+  "version": "1.0.0",
+  "description": "Playwright tests for Food Planner",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.44.0"
+  },
+  "dependencies": {
+    "playwright": "^1.55.1"
+  }
+}

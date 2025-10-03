@@ -2,7 +2,7 @@
 {% block content %}
 <div class="row">
     <div class="col-md-12">
-        <button type="button" class="btn btn-primary btn-lg mb-4" data-bs-toggle="modal" data-bs-target="#addMealModal">
+        <button type="button" class="btn btn-primary btn-lg mb-4" data-bs-toggle="modal" data-bs-target="#addMealModal" data-testid="create-new-meal">
             <i class="bi bi-plus-circle"></i> Create New Meal
         </button>
         
@@ -19,14 +19,16 @@
                 </thead>
                 <tbody>
                     {% for meal in meals %}
-                    <tr>
-                        <td><input type="checkbox" name="selected_meals" value="{{ meal.id }}"></td>
-                        <td>{{ meal.name }}</td>
+                    {% set meal_name_slug = meal.name|lower|replace(' ', '-')|replace(',', '')|replace('.', '') %}
+                    <tr data-testid="meal-row-{{ meal_name_slug }}-{{ loop.index }}">
+                        <td><input type="checkbox" name="selected_meals" value="{{ meal.id }}" data-testid="select-meal-{{ meal_name_slug }}-{{ loop.index }}"></td>
+                        <td data-testid="meal-name-{{ meal_name_slug }}-{{ loop.index }}">{{ meal.name }}</td>
                         <td>
                             {% if meal.meal_foods %}
                                 <ul class="list-unstyled">
                                 {% for meal_food in meal.meal_foods %}
-                                    <li>{{ meal_food.quantity }}g of {{ meal_food.food.name }} ({{ (meal_food.quantity / meal_food.food.serving_size)|round(2) }} servings of {{ meal_food.food.serving_size }}{{ meal_food.food.serving_unit }})</li>
+                                    {% set food_name_slug = meal_food.food.name|lower|replace(' ', '-')|replace(',', '')|replace('.', '') %}
+                                    <li data-testid="meal-food-{{ meal_name_slug }}-{{ loop.index }}-{{ food_name_slug }}-{{ loop.index }}">{{ meal_food.quantity }}g of {{ meal_food.food.name }} ({{ (meal_food.quantity / meal_food.food.serving_size)|round(2) }} servings of {{ meal_food.food.serving_size }}{{ meal_food.food.serving_unit }})</li>
                                 {% endfor %}
                                 </ul>
                             {% else %}
@@ -35,11 +37,11 @@
                         </td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary"
-                                    onclick="manageMeal({{ meal.id }})">
+                                    onclick="manageMeal({{ meal.id }})" data-testid="manage-meal-{{ meal_name_slug }}-{{ loop.index }}">
                                 <i class="bi bi-pencil-square"></i> Manage
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-info"
-                                    onclick="cloneMeal({{ meal.id }})">
+                                    onclick="cloneMeal({{ meal.id }})" data-testid="clone-meal-{{ meal_name_slug }}-{{ loop.index }}">
                                 <i class="bi bi-front"></i> Clone
                             </button>
                         </td>
@@ -48,7 +50,7 @@
                 </tbody>
             </table>
         </div>
-        <button class="btn btn-danger mt-3" onclick="deleteSelectedMeals()">
+        <button class="btn btn-danger mt-3" onclick="deleteSelectedMeals()" data-testid="delete-selected-meals">
             <i class="bi bi-trash"></i> Delete Selected Meals
         </button>
     </div>

@@ -55,6 +55,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Meal Planner", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
+# Import custom filters
+from app.utils import slugify
+
+# Add custom filters to Jinja2 environment
+templates.env.filters['slugify'] = slugify
+
 from app.api.routes import foods, meals, plans, templates as templates_router, weekly_menu, tracker, admin, export, charts
 
 app.include_router(foods.router, tags=["foods"])

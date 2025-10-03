@@ -1,0 +1,350 @@
+const { test, expect } = require('@playwright/test');
+
+test('add breakfast meal', async ({ page }) => {
+  await page.goto('/detailed');
+
+  await page.getByRole('button', { name: 'View Template' }).click();
+  // Wait for and click the specific link
+  // This tells the locator to find an element where the text is *exactly* "Sarah-Day 1"
+  await page.locator('a.dropdown-item')
+          .filter({ hasText: /^Sarah-Day 1$/ })
+          .click();
+
+
+
+  await expect(page.locator('body')).toMatchAriaSnapshot(`
+    - heading "Sarah-Day 1 Template" [level=4]
+    - textbox
+    - button " View Day"
+    - button "View Template"
+    - text: / Morning Green Tea - SDZ - Custom \\(Beverage 1\\) \\d+ cal/
+    - table:
+      - rowgroup:
+        - row "Food Item Serving Cal Protein Carbs Fat Fiber Sodium":
+          - cell "Food Item"
+          - cell "Serving"
+          - cell "Cal"
+          - cell "Protein"
+          - cell "Carbs"
+          - cell "Fat"
+          - cell "Fiber"
+          - cell "Sodium"
+      - rowgroup:
+        - row /Green Tea \\d+\\.0g 0 0\\.0g 0\\.0g 0\\.0g 0\\.0g 0mg/:
+          - cell "Green Tea"
+          - cell /\\d+\\.0g/
+          - cell "0"
+          - cell "0.0g"
+          - cell "0.0g"
+          - cell "0.0g"
+          - cell "0.0g"
+          - cell "0mg"
+        - row /Organic Coconut Oil \\d+\\.0g \\d+ 0\\.0g 0\\.0g \\d+\\.0g 0\\.0g 0mg/:
+          - cell "Organic Coconut Oil"
+          - cell /\\d+\\.0g/
+          - cell /\\d+/
+          - cell "0.0g"
+          - cell "0.0g"
+          - cell /\\d+\\.0g/
+          - cell "0.0g"
+          - cell "0mg"
+        - row / Meal Totals - \\d+ 0\\.0g \\(0%\\) 0\\.0g \\(0%\\) \\d+\\.0g \\(\\d+\\.\\d+%\\) 0\\.0g 0mg/:
+          - cell " Meal Totals":
+            - strong:  Meal Totals
+          - cell "-"
+          - cell /\\d+/
+          - cell "0.0g (0%)"
+          - cell "0.0g (0%)"
+          - cell /\\d+\\.0g \\(\\d+\\.\\d+%\\)/
+          - cell "0.0g"
+          - cell "0mg"
+    - strong: "Net Carbs:"
+    - text: 0.0g
+    - strong: "Sugar:"
+    - text: 0.0g
+    - strong: "Calcium:"
+    - text: 0mg
+    - strong: "Ratio:"
+    - text: /0:0:\\d+\\.\\d+  Protein Shake - Pea - SDZ - Custom \\(Breakfast\\) \\d+ cal/
+    - table:
+      - rowgroup:
+        - row "Food Item Serving Cal Protein Carbs Fat Fiber Sodium":
+          - cell "Food Item"
+          - cell "Serving"
+          - cell "Cal"
+          - cell "Protein"
+          - cell "Carbs"
+          - cell "Fat"
+          - cell "Fiber"
+          - cell "Sodium"
+      - rowgroup:
+        - row /Pea Protein Concentrate \\d+\\.0g \\d+ \\d+\\.0g 1\\.0g 1\\.0g 1\\.0g 500mg/:
+          - cell "Pea Protein Concentrate"
+          - cell /\\d+\\.0g/
+          - cell /\\d+/
+          - cell /\\d+\\.0g/
+          - cell "1.0g"
+          - cell "1.0g"
+          - cell "1.0g"
+          - cell "500mg"
+        - row /Organic Strawberry Powder 3\\.0g \\d+ 0\\.0g 2\\.5g 0\\.0g 1\\.0g 0mg/:
+          - cell "Organic Strawberry Powder"
+          - cell "3.0g"
+          - cell /\\d+/
+          - cell "0.0g"
+          - cell "2.5g"
+          - cell "0.0g"
+          - cell "1.0g"
+          - cell "0mg"
+        - row /Organic Blueberry Powder 0\\.8g \\d+ 0\\.0g 2\\.5g 0\\.0g 1\\.0g 0mg/:
+          - cell "Organic Blueberry Powder"
+          - cell "0.8g"
+          - cell /\\d+/
+          - cell "0.0g"
+          - cell "2.5g"
+          - cell "0.0g"
+          - cell "1.0g"
+          - cell "0mg"
+        - row /Organic Pomegranate Powder 2\\.5g \\d+ 0\\.0g 2\\.5g 0\\.0g 0\\.0g 0mg/:
+          - cell "Organic Pomegranate Powder"
+          - cell "2.5g"
+          - cell /\\d+/
+          - cell "0.0g"
+          - cell "2.5g"
+          - cell "0.0g"
+          - cell "0.0g"
+          - cell "0mg"
+        - row "Organic Cranberry Powder 2.5g 8 0.0g 1.9g 0.0g 1.9g 0mg":
+          - cell "Organic Cranberry Powder"
+          - cell "2.5g"
+          - cell "8"
+          - cell "0.0g"
+          - cell "1.9g"
+          - cell "0.0g"
+          - cell "1.9g"
+          - cell "0mg"
+        - row / Meal Totals - \\d+ \\d+\\.0g \\(\\d+\\.\\d+%\\) \\d+\\.4g \\(\\d+\\.\\d+%\\) 1\\.0g \\(5\\.5%\\) 4\\.9g 500mg/:
+          - cell " Meal Totals":
+            - strong:  Meal Totals
+          - cell "-"
+          - cell /\\d+/
+          - cell /\\d+\\.0g \\(\\d+\\.\\d+%\\)/
+          - cell /\\d+\\.4g \\(\\d+\\.\\d+%\\)/
+          - cell "1.0g (5.5%)"
+          - cell "4.9g"
+          - cell "500mg"
+    - strong: "Net Carbs:"
+    - text: 5.5g
+    - strong: "Sugar:"
+    - text: 0.0g
+    - strong: "Calcium:"
+    - text: 13mg
+    - strong: "Ratio:"
+    - text: /\\d+\\.\\d+:\\d+\\.\\d+:5\\.5  Salad - Tuna - Custom \\(Lunch\\) \\d+ cal/
+    - table:
+      - rowgroup:
+        - row "Food Item Serving Cal Protein Carbs Fat Fiber Sodium":
+          - cell "Food Item"
+          - cell "Serving"
+          - cell "Cal"
+          - cell "Protein"
+          - cell "Carbs"
+          - cell "Fat"
+          - cell "Fiber"
+          - cell "Sodium"
+      - rowgroup:
+        - row /Tuna \\d+\\.5g \\d+ \\d+\\.0g 0\\.0g 1\\.5g 0\\.0g 330mg/:
+          - cell "Tuna"
+          - cell /\\d+\\.5g/
+          - cell /\\d+/
+          - cell /\\d+\\.0g/
+          - cell "0.0g"
+          - cell "1.5g"
+          - cell "0.0g"
+          - cell "330mg"
+        - row /Protein Greens \\d+\\.0g 8 1\\.1g 1\\.1g 0\\.0g 0\\.6g 8mg/:
+          - cell "Protein Greens"
+          - cell /\\d+\\.0g/
+          - cell "8"
+          - cell "1.1g"
+          - cell "1.1g"
+          - cell "0.0g"
+          - cell "0.6g"
+          - cell "8mg"
+        - row /Avocado \\d+\\.0g \\d+ 1\\.2g 5\\.1g 8\\.8g 4\\.0g 4mg/:
+          - cell "Avocado"
+          - cell /\\d+\\.0g/
+          - cell /\\d+/
+          - cell "1.2g"
+          - cell "5.1g"
+          - cell "8.8g"
+          - cell "4.0g"
+          - cell "4mg"
+        - row /Cucumber \\d+\\.0g \\d+ 0\\.5g 2\\.6g 0\\.0g 0\\.3g 2mg/:
+          - cell "Cucumber"
+          - cell /\\d+\\.0g/
+          - cell /\\d+/
+          - cell "0.5g"
+          - cell "2.6g"
+          - cell "0.0g"
+          - cell "0.3g"
+          - cell "2mg"
+        - row /Balsamic Vinegar \\d+\\.0g \\d+ 0\\.0g 3\\.0g 0\\.0g 0\\.0g 0mg/:
+          - cell "Balsamic Vinegar"
+          - cell /\\d+\\.0g/
+          - cell /\\d+/
+          - cell "0.0g"
+          - cell "3.0g"
+          - cell "0.0g"
+          - cell "0.0g"
+          - cell "0mg"
+        - row / Meal Totals - \\d+ \\d+\\.7g \\(\\d+\\.\\d+%\\) \\d+\\.7g \\(\\d+\\.\\d+%\\) \\d+\\.3g \\(\\d+\\.\\d+%\\) 5\\.0g 344mg/:
+          - cell " Meal Totals":
+            - strong:  Meal Totals
+          - cell "-"
+          - cell /\\d+/
+          - cell /\\d+\\.7g \\(\\d+\\.\\d+%\\)/
+          - cell /\\d+\\.7g \\(\\d+\\.\\d+%\\)/
+          - cell /\\d+\\.3g \\(\\d+\\.\\d+%\\)/
+          - cell "5.0g"
+          - cell "344mg"
+    - strong: "Net Carbs:"
+    - text: 6.8g
+    - strong: "Sugar:"
+    - text: 0.0g
+    - strong: "Calcium:"
+    - text: 69mg
+    - strong: "Ratio:"
+    - text: /\\d+\\.\\d+:\\d+\\.\\d+:\\d+\\.\\d+  Snack - Almond Milk & Protein - Custom \\(Dinner\\) \\d+ cal/
+    - table:
+      - rowgroup:
+        - row "Food Item Serving Cal Protein Carbs Fat Fiber Sodium":
+          - cell "Food Item"
+          - cell "Serving"
+          - cell "Cal"
+          - cell "Protein"
+          - cell "Carbs"
+          - cell "Fat"
+          - cell "Fiber"
+          - cell "Sodium"
+      - rowgroup:
+        - row /Almond Milk \\d+\\.0g \\d+ 1\\.0g 1\\.0g 2\\.5g 0\\.0g 170mg/:
+          - cell "Almond Milk"
+          - cell /\\d+\\.0g/
+          - cell /\\d+/
+          - cell "1.0g"
+          - cell "1.0g"
+          - cell "2.5g"
+          - cell "0.0g"
+          - cell "170mg"
+        - row /Pea Protein Concentrate \\d+\\.0g \\d+ \\d+\\.0g 1\\.0g 1\\.0g 1\\.0g 500mg/:
+          - cell "Pea Protein Concentrate"
+          - cell /\\d+\\.0g/
+          - cell /\\d+/
+          - cell /\\d+\\.0g/
+          - cell "1.0g"
+          - cell "1.0g"
+          - cell "1.0g"
+          - cell "500mg"
+        - row / Meal Totals - \\d+ \\d+\\.0g \\(\\d+\\.\\d+%\\) 2\\.0g \\(5\\.1%\\) 3\\.5g \\(\\d+\\.\\d+%\\) 1\\.0g 670mg/:
+          - cell " Meal Totals":
+            - strong:  Meal Totals
+          - cell "-"
+          - cell /\\d+/
+          - cell /\\d+\\.0g \\(\\d+\\.\\d+%\\)/
+          - cell "2.0g (5.1%)"
+          - cell /3\\.5g \\(\\d+\\.\\d+%\\)/
+          - cell "1.0g"
+          - cell "670mg"
+    - strong: "Net Carbs:"
+    - text: 1.0g
+    - strong: "Sugar:"
+    - text: 0.0g
+    - strong: "Calcium:"
+    - text: 450mg
+    - strong: "Ratio:"
+    - text: /\\d+\\.\\d+:5\\.1:\\d+\\.\\d+  Seabass - SDZ - Custom \\(Snack 1\\) \\d+ cal/
+    - table:
+      - rowgroup:
+        - row "Food Item Serving Cal Protein Carbs Fat Fiber Sodium":
+          - cell "Food Item"
+          - cell "Serving"
+          - cell "Cal"
+          - cell "Protein"
+          - cell "Carbs"
+          - cell "Fat"
+          - cell "Fiber"
+          - cell "Sodium"
+      - rowgroup:
+        - row /Seabass Cooked \\d+\\.0g \\d+ \\d+\\.4g 0\\.0g 3\\.9g 0\\.0g 130mg/:
+          - cell "Seabass Cooked"
+          - cell /\\d+\\.0g/
+          - cell /\\d+/
+          - cell /\\d+\\.4g/
+          - cell "0.0g"
+          - cell "3.9g"
+          - cell "0.0g"
+          - cell "130mg"
+        - row /Asparagus \\d+\\.0g \\d+ 3\\.5g 5\\.9g 0\\.3g 2\\.9g 20mg/:
+          - cell "Asparagus"
+          - cell /\\d+\\.0g/
+          - cell /\\d+/
+          - cell "3.5g"
+          - cell "5.9g"
+          - cell "0.3g"
+          - cell "2.9g"
+          - cell "20mg"
+        - row "Garlic Clove 5.0g 5 0.0g 1.2g 0.0g 0.0g 0mg":
+          - cell "Garlic Clove"
+          - cell "5.0g"
+          - cell "5"
+          - cell "0.0g"
+          - cell "1.2g"
+          - cell "0.0g"
+          - cell "0.0g"
+          - cell "0mg"
+        - row / Meal Totals - \\d+ \\d+\\.9g \\(\\d+\\.\\d+%\\) 7\\.2g \\(\\d+\\.\\d+%\\) 4\\.2g \\(\\d+\\.\\d+%\\) 2\\.9g 151mg/:
+          - cell " Meal Totals":
+            - strong:  Meal Totals
+          - cell "-"
+          - cell /\\d+/
+          - cell /\\d+\\.9g \\(\\d+\\.\\d+%\\)/
+          - cell /7\\.2g \\(\\d+\\.\\d+%\\)/
+          - cell /4\\.2g \\(\\d+\\.\\d+%\\)/
+          - cell "2.9g"
+          - cell "151mg"
+    - strong: "Net Carbs:"
+    - text: 4.3g
+    - strong: "Sugar:"
+    - text: 0.0g
+    - strong: "Calcium:"
+    - text: 3mg
+    - strong: "Ratio:"
+    - text: /\\d+\\.\\d+:\\d+\\.\\d+:\\d+\\.\\d+/
+    - heading / Daily Totals - \\d+ Total Calories/ [level=5]
+    - table:
+      - rowgroup:
+        - row "Calories Protein Carbs Fat Fiber Net Carbs Sodium Calcium":
+          - cell "Calories"
+          - cell "Protein"
+          - cell "Carbs"
+          - cell "Fat"
+          - cell "Fiber"
+          - cell "Net Carbs"
+          - cell "Sodium"
+          - cell "Calcium"
+      - rowgroup:
+        - row /\\d+ \\d+\\.6g \\(\\d+\\.\\d+%\\) \\d+\\.3g \\(\\d+\\.\\d+%\\) \\d+\\.0g \\(\\d+\\.\\d+%\\) \\d+\\.8g \\d+\\.6g 1665mg 536mg/:
+          - cell /\\d+/
+          - cell /\\d+\\.6g \\(\\d+\\.\\d+%\\)/
+          - cell /\\d+\\.3g \\(\\d+\\.\\d+%\\)/
+          - cell /\\d+\\.0g \\(\\d+\\.\\d+%\\)/
+          - cell /\\d+\\.8g/
+          - cell /\\d+\\.6g/
+          - cell "1665mg"
+          - cell "536mg"
+    - strong: "Daily Macro Ratio:"
+    - text: "/\\\\d+\\\\.\\\\d+% Protein : \\\\d+\\\\.\\\\d+% Carbs : \\\\d+\\\\.\\\\d+% Fat/"
+    `);
+
+});

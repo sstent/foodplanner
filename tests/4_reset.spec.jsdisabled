@@ -1,0 +1,21 @@
+const { test, expect } = require('@playwright/test');
+
+test('reset tracker page', async ({ page }) => {
+  await page.goto('/tracker');
+
+  // Add a meal to ensure there is something to reset
+  await page.locator('.btn.btn-sm').first().click();
+  await page.locator('select[name="meal_id"]').selectOption('3');
+  await page.getByRole('button', { name: 'Add Meal', exact: true }).click();
+  await expect(page.locator('#meals-breakfast').getByText('Protein Shake - Pea - SDZ')).toBeVisible();
+
+  // Confirm the dialog
+  page.on('dialog', dialog => dialog.accept());
+
+  // Click the reset button
+  await page.getByRole('button', { name: 'Reset Page' }).click();
+
+
+  // The meal should no longer be visible
+  await expect(page.locator('#meals-breakfast').getByText('No meals tracked')).toBeVisible();
+});

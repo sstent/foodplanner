@@ -321,6 +321,50 @@ async def update_tracked_food(request: Request, data: dict = Body(...), db: Sess
         db.rollback()
         return {"status": "error", "message": str(e)}
 
+@router.post("/tracker/clear_page")
+async def tracker_clear_page(request: Request, db: Session = Depends(get_db)):
+    """Clear all meals and foods from the tracker page for a given day"""
+    try:
+        form_data = await request.form()
+        person = form_data.get("person")
+        date_str = form_data.get("date")
+        
+        # Parse date
+        from datetime import datetime
+        date = datetime.fromisoformat(date_str).date()
+        
+        # Get tracked day
+        tracked_day = db.query(TrackedDay).filter(
+            TrackedDay.person == person,
+            TrackedDay.date == date
+        ).first()
+        
+        if not tracked_day:
+            return {"status": "success", "message": "No tracked day found to clear."} # Already clear
+        
+        # Delete all tracked meals associated with the tracked day
+        db.query(TrackedMeal).filter(
+            TrackedMeal.tracked_day_id == tracked_day.id
+        ).delete()
+
+        # Delete all tracked foods associated with the tracked day through meals
+        # This handles directly added foods that might not be part of a meal
+        db.query(TrackedMealFood).filter(
+            TrackedMealFood.tracked_meal_id.in_(
+                db.query(TrackedMeal.id).filter(TrackedMeal.tracked_day_id == tracked_day.id)
+            )
+        ).delete(synchronize_session=False) # Use synchronize_session=False for bulk delete
+
+        # Mark the tracked day as not modified and commit
+        tracked_day.is_modified = False
+        db.commit()
+        
+        return {"status": "success", "message": "Tracker page cleared successfully."}
+        
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
 @router.post("/tracker/reset_to_plan")
 async def tracker_reset_to_plan(request: Request, db: Session = Depends(get_db)):
     """Reset tracked day back to original plan"""
@@ -502,36 +546,52 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
         for food_data in foods_data:
             food_id = food_data.get("food_id")
             grams = float(food_data.get("grams", 1.0))
-            print(f"  Processing food_id {food_id} with grams {grams}")
+            item_id = food_data.get("id") # This is the id from the frontend (TrackedMealFood.id or MealFood.id)
+            is_custom = food_data.get("is_custom")
 
-            # Check if an override entry already exists for this food
-            existing_override = db.query(TrackedMealFood).filter(
-                TrackedMealFood.tracked_meal_id == tracked_meal_id,
-                TrackedMealFood.food_id == food_id
-            ).first()
+            print(f"  Processing food_id {food_id} (item_id: {item_id}, is_custom: {is_custom}) with grams {grams}")
 
-            if existing_override:
-                # If an override exists, update its quantity and ensure it's not marked as deleted
-                print(f"    Found existing override for food_id {food_id}. Updating quantity to {grams}.")
-                existing_override.quantity = grams
-                existing_override.is_deleted = False
-            else:
-                # If no override exists, it's either a modification of a base food or a new addition
-                print(f"    No existing override for food_id {food_id}. Creating new entry.")
-                base_meal_food = db.query(MealFood).filter(
-                    MealFood.meal_id == tracked_meal.meal_id,
-                    MealFood.food_id == food_id
+            if is_custom and item_id and item_id != 0: # Existing TrackedMealFood (custom or override)
+                tracked_food_entry = db.query(TrackedMealFood).filter(TrackedMealFood.id == item_id).first()
+                if tracked_food_entry:
+                    tracked_food_entry.quantity = grams
+                    tracked_food_entry.is_deleted = False # Ensure it's not marked as deleted if being updated
+                    print(f"    Updated existing TrackedMealFood (id: {item_id}) quantity to {grams}.")
+                else:
+                    print(f"    Error: TrackedMealFood with id {item_id} not found for update.")
+                    # This case should ideally not happen if frontend sends correct IDs
+            else: # New addition (from modal) or modification of a base MealFood
+                # Check if an override (TrackedMealFood) already exists for this food_id
+                existing_override = db.query(TrackedMealFood).filter(
+                    TrackedMealFood.tracked_meal_id == tracked_meal_id,
+                    TrackedMealFood.food_id == food_id
                 ).first()
-                
-                is_override = base_meal_food is not None
-                print(f"    Is this an override of a base meal food? {is_override}")
-                new_entry = TrackedMealFood(
-                    tracked_meal_id=tracked_meal_id,
-                    food_id=food_id,
-                    quantity=grams,
-                    is_override=is_override
-                )
-                db.add(new_entry)
+
+                if existing_override:
+                    # Update existing override
+                    existing_override.quantity = grams
+                    existing_override.is_deleted = False
+                    existing_override.is_override = True # Ensure it's marked as an override
+                    print(f"    Updated existing override for food_id {food_id}. Quantity: {grams}.")
+                else:
+                    # Create new TrackedMealFood entry
+                    # Determine if it's an override of a base meal food or a completely new food
+                    base_meal_food_exists = db.query(MealFood).filter(
+                        MealFood.meal_id == tracked_meal.meal_id,
+                        MealFood.food_id == food_id
+                    ).first()
+                    
+                    is_override_flag = base_meal_food_exists is not None
+                    
+                    new_entry = TrackedMealFood(
+                        tracked_meal_id=tracked_meal_id,
+                        food_id=food_id,
+                        quantity=grams,
+                        is_override=is_override_flag,
+                        is_deleted=False
+                    )
+                    db.add(new_entry)
+                    print(f"    Created new TrackedMealFood for food_id {food_id}. Quantity: {grams}, is_override: {is_override_flag}.")
 
         # Mark the tracked day as modified
         tracked_meal.tracked_day.is_modified = True

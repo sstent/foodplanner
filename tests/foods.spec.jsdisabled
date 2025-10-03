@@ -1,0 +1,52 @@
+const { test, expect } = require('@playwright/test');
+
+test('create food', async ({ page }) => {
+  await page.goto('/foods');
+
+  // Create a new food
+  await page.getByRole('button', { name: ' Add New Food' }).click();
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="name"]').fill('TESTFOOD');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="name"]').press('Tab');
+  await page.getByRole('textbox', { name: 'Optional' }).press('Tab');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="serving_size"]').fill('100');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="serving_size"]').press('Tab');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="serving_unit"]').fill('g');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="serving_unit"]').press('Tab');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="calories"]').fill('1');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="calories"]').press('Tab');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="protein"]').fill('1');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="protein"]').press('Tab');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="carbs"]').fill('1');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="carbs"]').press('Tab');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="fat"]').fill('2');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="fat"]').press('Tab');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="fiber"]').fill('2');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="fiber"]').press('Tab');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="sugar"]').fill('4');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="sugar"]').press('Tab');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="sodium"]').fill('5');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="sodium"]').press('Tab');
+  await page.getByRole('dialog', { name: 'Add New Food' }).locator('input[name="calcium"]').fill('5');
+  await page.getByRole('button', { name: 'Add Food' }).click();
+
+  // Verify the food was created
+  const newFoodRow = page.getByRole('row').filter({ hasText: 'TESTFOOD' });
+  await expect(newFoodRow).toBeVisible();
+
+
+  await page.getByRole('row', { name: 'TESTFOOD 100.0 g 1.00 1.00g 1' }).getByRole('button').click();
+  await page.locator('#edit_serving_size').click();
+  await page.locator('#edit_serving_size').fill('200');
+  await page.getByRole('button', { name: 'Update Food' }).click();
+
+  //delete it
+  await page.getByRole('row', { name: 'TESTFOOD 200.0 g 1.00 1.00g 1' }).getByRole('checkbox').check();
+  // Set up dialog handler BEFORE clicking delete
+  page.on('dialog', async dialog => {
+    console.log(`Dialog message: ${dialog.message()}`);
+    await dialog.accept(); // or dialog.dismiss()
+  });
+  await page.getByRole('button', { name: ' Delete Selected Foods' }).click();
+  await expect(page.getByRole('row', { name: /Test Food/ })).not.toBeVisible();
+
+});
