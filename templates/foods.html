@@ -6,6 +6,10 @@
             <i class="bi bi-plus-circle"></i> Add New Food
         </button>
         
+        <button type="button" class="btn btn-secondary btn-lg mb-4" data-bs-toggle="modal" data-bs-target="#addFromOpenFoodFactsModal" data-testid="add-from-open-food-facts">
+            <i class="bi bi-search"></i> Add from Open Food Facts
+        </button>
+        
         <h3>Foods Database</h3>
         <div class="table-responsive">
             <table class="table table-striped">
@@ -56,6 +60,8 @@
         </button>
     </div>
 </div>
+
+{% include 'modals/add_from_open_food_facts.html' %}
 
 <!-- Add Food Modal -->
 <div class="modal fade" id="addFoodModal" tabindex="-1" aria-labelledby="addFoodModalLabel" aria-hidden="true">
@@ -325,5 +331,79 @@ document.addEventListener('DOMContentLoaded', function() {
         new bootstrap.Modal(document.getElementById('editFoodModal')).show();
     };
 });
+</script>
+
+<script>
+// Open Food Facts Modal Logic
+async function searchOpenFoodFacts() {
+    const query = document.querySelector('#addFromOpenFoodFactsModal input[name="openfoodfacts_query"]').value;
+    const resultsContainer = document.getElementById('openFoodFactsResults');
+    resultsContainer.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+    try {
+        const response = await fetch(`/foods/search_openfoodfacts?query=${query}`);
+        const data = await response.json();
+        
+        resultsContainer.innerHTML = ''; // Clear spinner here, before populating or showing "no results"
+
+        if (data.status === 'success' && data.results.length > 0) {
+            data.results.forEach(food => {
+                const item = document.createElement('a');
+                item.href = '#';
+                item.className = 'list-group-item list-group-item-action';
+                item.textContent = `${food.name} - ${food.brand}`;
+                item.onclick = (e) => {
+                    e.preventDefault();
+                    selectOpenFoodFactsProduct(food);
+                };
+                resultsContainer.appendChild(item);
+            });
+        } else {
+            resultsContainer.innerHTML = `<div class="list-group-item">No results found.</div>`;
+        }
+    } catch (error) {
+        resultsContainer.innerHTML = `<div class="list-group-item">Error: ${error.message}</div>`;
+    }
+}
+
+function selectOpenFoodFactsProduct(food) {
+    const form = document.getElementById('addOpenFoodFactsForm');
+    form.querySelector('input[name="name"]').value = food.name;
+    form.querySelector('input[name="brand"]').value = food.brand;
+    form.querySelector('input[name="serving_size"]').value = food.serving_size;
+    form.querySelector('input[name="serving_unit"]').value = food.serving_unit;
+    form.querySelector('input[name="calories"]').value = food.calories;
+    form.querySelector('input[name="protein"]').value = food.protein;
+    form.querySelector('input[name="carbs"]').value = food.carbs;
+    form.querySelector('input[name="fat"]').value = food.fat;
+    form.querySelector('input[name="fiber"]').value = food.fiber;
+    form.querySelector('input[name="sugar"]').value = food.sugar;
+    form.querySelector('input[name="sodium"]').value = food.sodium;
+    form.querySelector('input[name="calcium"]').value = food.calcium;
+    form.querySelector('input[name="openfoodfacts_id"]').value = food.openfoodfacts_id;
+}
+
+async function submitOpenFoodFactsForm() {
+    const form = document.getElementById('addOpenFoodFactsForm');
+    const formData = new FormData(form);
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('addFromOpenFoodFactsModal')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        alert('Error submitting form: ' + error.message);
+    }
+}
 </script>
 {% endblock %}

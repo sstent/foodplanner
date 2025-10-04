@@ -119,6 +119,15 @@ class TestFoodsRoutes:
         # Should either succeed or fail gracefully if module not installed
         assert "status" in data
 
+    def test_search_openfoodfacts_results(self, client):
+        """Test GET /foods/search_openfoodfacts returns actual results"""
+        response = client.get("/foods/search_openfoodfacts?query=yogurt&limit=1")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "results" in data
+        assert len(data["results"]) > 0
+        assert "name" in data["results"][0]
 
 class TestFoodsBulkUpload:
     """Test bulk food upload functionality"""
