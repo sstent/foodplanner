@@ -29,7 +29,7 @@
                 <div class="card-header">
                     <h5 class="mb-0">Calories Consumed</h5>
                 </div>
-                <div class="card-body p-2 h-100">
+                <div class="card-body p-2 h-100" id="chartContainer">
                     <div class="position-relative h-100">
                         <canvas id="caloriesChart" class="w-100 h-100"></canvas>
                     </div>
@@ -43,10 +43,22 @@
 <script>
     let chart;
 
+    function resizeChart() {
+        const container = document.getElementById('chartContainer');
+        if (container) {
+            const rect = container.getBoundingClientRect();
+            container.style.height = (window.innerHeight - rect.top) + 'px';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         const daysSelect = document.getElementById('daysSelect');
         const loadBtn = document.getElementById('loadChartBtn');
         const ctx = document.getElementById('caloriesChart').getContext('2d');
+
+        // Resize chart container to fit viewport
+        resizeChart();
+        window.addEventListener('resize', resizeChart);
 
         // Default load for 7 days
         loadChart(7);
@@ -69,6 +81,9 @@
                     if (chart) {
                         chart.destroy();
                     }
+
+                    // Resize container before creating chart
+                    resizeChart();
 
                     chart = new Chart(ctx, {
                         type: 'line',

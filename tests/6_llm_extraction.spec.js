@@ -187,4 +187,58 @@ test.describe('LLM Food Extraction', () => {
     // Verify save was attempted (mocked, so no actual redirect)
     // In a real test, you might check for a success message or redirect
   });
+
+  test('should handle null fields from LLM extraction', async ({ page }) => {
+    await page.goto('/llm');
+
+    // Fill in the webpage URL
+    await page.fill('#webpageUrl', 'https://example.com/recipe');
+
+    // Mock the API response with nulls
+    await page.route('/llm/extract', route => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          name: null,
+          brand: null,
+          serving_size_g: null,
+          calories: null,
+          protein_g: null,
+          carbohydrate_g: null,
+          fat_g: null,
+          fiber_g: null,
+          sugar_g: null,
+          sodium_mg: null,
+          calcium_mg: null,
+          potassium_mg: null,
+          cholesterol_mg: null
+        }),
+      });
+    });
+
+    // Submit the form
+    await page.click('button[type="submit"]');
+
+    // Verify the result container is visible
+    const resultContainer = page.locator('#resultContainer');
+    await expect(resultContainer).toBeVisible();
+
+    // Verify the raw JSON is rendered
+    const extractedJson = page.locator('#extractedJson');
+    await expect(extractedJson).toContainText('null');
+
+    // Verify editable form fields are blank for null values
+    await expect(page.locator('#foodName')).toHaveValue('');
+    await expect(page.locator('#foodBrand')).toHaveValue('');
+    await expect(page.locator('#servingSizeG')).toHaveValue('');
+    await expect(page.locator('#calories')).toHaveValue('');
+    await expect(page.locator('#proteinG')).toHaveValue('');
+    await expect(page.locator('#carbohydrateG')).toHaveValue('');
+    await expect(page.locator('#fatG')).toHaveValue('');
+    await expect(page.locator('#fiberG')).toHaveValue('');
+    await expect(page.locator('#sugarG')).toHaveValue('');
+    await expect(page.locator('#sodiumMg')).toHaveValue('');
+    await expect(page.locator('#calciumMg')).toHaveValue('');
+  });
 });

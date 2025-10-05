@@ -25,7 +25,7 @@ async def llm_food_extractor_page(request: Request):
 class FoodItem(BaseModel):
     name: Optional[str] = Field(None, description="Name of the food item")
     brand: Optional[str] = Field(None, description="Brand name of the food item")
-    serving_size_g: float = Field(description="Actual serving size in grams as labeled on the page")
+    serving_size_g: Optional[float] = Field(None, description="Actual serving size in grams as labeled on the page")
     calories: Optional[int] = Field(None, description="Calories per actual serving")
     protein_g: Optional[float] = Field(None, description="Protein in grams per actual serving")
     carbohydrate_g: Optional[float] = Field(None, description="Carbohydrates in grams per actual serving")
@@ -88,7 +88,7 @@ async def extract_food_data_from_llm(
        "cholesterol_mg": "integer"
      }
 
-     The food name is usually the most prominent header or title on the page. Brand is the manufacturer or brand name if available. serving_size_g should be the actual grams for the serving size shown (e.g., 240 for 1 cup). If the food name is not available, set it to "unknown". If any of the nutritional values are not available, set them to null. Do not include any text or explanations outside of the JSON object in your response.
+     The food name is usually the most prominent header or title on the page. Brand is the manufacturer or brand name if available. serving_size_g should be the actual grams for the serving size shown (e.g., 240 for 1 cup). If any of the fields are not available, set them to null. Do not include any text or explanations outside of the JSON object in your response.
      """
     messages = [{"role": "system", "content": prompt}]
 
