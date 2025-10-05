@@ -13,11 +13,14 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date, datetime
+import time
 import os
 import csv
 import requests
 from fastapi import File, UploadFile
 import logging
+from logging.config import fileConfig
+import sys
 from alembic.config import Config
 from alembic import command
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -25,6 +28,8 @@ import shutil
 import sqlite3
 
 # Configure logging
+fileConfig('logging.ini', disable_existing_loggers=False)
+
 # Import database components from the database module
 from app.database import DATABASE_URL, engine, Base, get_db, SessionLocal, Food, Meal, MealFood, Plan, Template, TemplateMeal, WeeklyMenu, WeeklyMenuDay, TrackedMeal, FoodCreate, FoodResponse, calculate_meal_nutrition, calculate_day_nutrition, calculate_day_nutrition_tracked
 
@@ -33,13 +38,8 @@ from app.database import DATABASE_URL, engine, Base, get_db, SessionLocal, Food,
 async def lifespan(app: FastAPI):
     # Startup
     logging.info("DEBUG: Startup event triggered")
+    time.sleep(5)
     run_migrations()
-    
-    # Re-apply logging configuration after Alembic might have altered it
-    logging.getLogger().setLevel(logging.INFO)
-    for handler in logging.getLogger().handlers:
-        handler.setLevel(logging.INFO)
-    logging.info("DEBUG: Logging re-configured to INFO level.")
     
     logging.info("DEBUG: Startup event completed")
 
@@ -61,17 +61,9 @@ from app.utils import slugify
 # Add custom filters to Jinja2 environment
 templates.env.filters['slugify'] = slugify
 
-from app.api.routes import foods, meals, plans, templates as templates_router, weekly_menu, tracker, admin, export, charts
+from app.api.routes import api_router
 
-app.include_router(foods.router, tags=["foods"])
-app.include_router(meals.router, tags=["meals"])
-app.include_router(plans.router, tags=["plans"])
-app.include_router(templates_router.router, tags=["templates"])
-app.include_router(weekly_menu.router, tags=["weekly_menu"])
-app.include_router(tracker.router, tags=["tracker"])
-app.include_router(admin.router, tags=["admin"])
-app.include_router(export.router, tags=["export"])
-app.include_router(charts.router, tags=["charts"])
+app.include_router(api_router)
 
 # Add a logging middleware to see incoming requests
 @app.middleware("http")
@@ -86,7 +78,7 @@ PORT = int(os.getenv("PORT", 8999))
 # This will be called if running directly with Python
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run(app, host="0.0.0.0", port=PORT, log_config=None)
     
 # Import Pydantic models from the database module
 from app.database import FoodCreate, FoodResponse, MealCreate, TrackedDayCreate, TrackedMealCreate, FoodExport, MealFoodExport, MealExport, PlanExport, TemplateMealExport, TemplateExport, TemplateMealDetail, TemplateDetail, WeeklyMenuDayExport, WeeklyMenuDayDetail, WeeklyMenuExport, WeeklyMenuDetail, TrackedMealExport, TrackedDayExport, AllData, TrackedDay
@@ -274,7 +266,6 @@ def run_migrations():
         logging.info("DEBUG: Database migrations run successfully.")
     except Exception as e:
         logging.error(f"DEBUG: Failed to setup database: {e}", exc_info=True)
-        raise
 
 # Routes
 @app.get("/", response_class=HTMLResponse)

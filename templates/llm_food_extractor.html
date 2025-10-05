@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}LLM Food Extractor{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Extract Food Data using LLM</h2>
+    <form id="llm-food-form" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="urlInput" class="form-label">Enter Image URL:</label>
+            <input type="text" class="form-control" id="urlInput" name="url" placeholder="e.g., https://example.com/food.jpg">
+        </div>
+        <div class="mb-3">
+            <label for="webpageUrl" class="form-label">Enter Webpage URL:</label>
+            <input type="text" class="form-control" id="webpageUrl" name="webpage_url" placeholder="e.g., https://example.com/recipe.html">
+        </div>
+        <div class="mb-3">
+            <label for="imageUpload" class="form-label">Or Upload Image:</label>
+            <input type="file" class="form-control" id="imageUpload" name="image" accept="image/*">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Or Paste Image:</label>
+            <div id="paste-container" class="border rounded p-3 text-center" style="min-height: 150px; cursor: pointer;" contenteditable="true" tabindex="0" role="textbox" aria-label="Paste image area; click then press Ctrl+V">
+                <p>Click here and paste an image</p>
+                <img id="pasted-image-preview" src="" alt="Pasted Image Preview" style="max-width: 100%; max-height: 200px; display: none;">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Extract Data</button>
+    </form>
+
+    <div id="loadingSpinner" class="text-center mt-3" style="display:none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p>Extracting food data, please wait...</p>
+    </div>
+
+    <div id="resultContainer" class="mt-4" style="display:none;">
+        <h3>Extracted Food Data:</h3>
+        <form id="editFoodForm" class="mb-4">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="foodName" class="form-label">Name:</label>
+                        <input type="text" class="form-control" id="foodName" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="foodBrand" class="form-label">Brand:</label>
+                        <input type="text" class="form-control" id="foodBrand" name="brand">
+                    </div>
+                    <div class="mb-3">
+                        <label for="servingSizeG" class="form-label">Serving Size (g):</label>
+                        <input type="number" step="0.1" class="form-control" id="servingSizeG" name="serving_size_g" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="calories" class="form-label">Calories:</label>
+                        <input type="number" class="form-control" id="calories" name="calories">
+                    </div>
+                    <div class="mb-3">
+                        <label for="proteinG" class="form-label">Protein (g):</label>
+                        <input type="number" step="0.1" class="form-control" id="proteinG" name="protein_g">
+                    </div>
+                    <div class="mb-3">
+                        <label for="carbohydrateG" class="form-label">Carbohydrates (g):</label>
+                        <input type="number" step="0.1" class="form-control" id="carbohydrateG" name="carbohydrate_g">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="fatG" class="form-label">Fat (g):</label>
+                        <input type="number" step="0.1" class="form-control" id="fatG" name="fat_g">
+                    </div>
+                    <div class="mb-3">
+                        <label for="fiberG" class="form-label">Fiber (g):</label>
+                        <input type="number" step="0.1" class="form-control" id="fiberG" name="fiber_g">
+                    </div>
+                    <div class="mb-3">
+                        <label for="sugarG" class="form-label">Sugar (g):</label>
+                        <input type="number" step="0.1" class="form-control" id="sugarG" name="sugar_g">
+                    </div>
+                    <div class="mb-3">
+                        <label for="sodiumMg" class="form-label">Sodium (mg):</label>
+                        <input type="number" class="form-control" id="sodiumMg" name="sodium_mg">
+                    </div>
+                    <div class="mb-3">
+                        <label for="calciumMg" class="form-label">Calcium (mg):</label>
+                        <input type="number" class="form-control" id="calciumMg" name="calcium_mg">
+                    </div>
+                </div>
+            </div>
+        </form>
+        <h4>Raw JSON Response:</h4>
+        <pre id="extractedJson" class="bg-light p-3 border rounded"></pre>
+        <button id="confirmAndSave" class="btn btn-success mt-3">Confirm and Save</button>
+    </div>
+
+    <div id="errorContainer" class="mt-4 alert alert-danger" style="display:none;">
+        <h4>Error:</h4>
+        <p id="errorMessage"></p>
+    </div>
+</div>
+
+<script>
+    let pastedImageBlob = null;
+    let pasteContainer;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('[LLM Paste] DOM ready');
+        pasteContainer = document.getElementById('paste-container');
+
+        // Click-to-focus for paste area to enable paste in browsers/headless
+        pasteContainer.addEventListener('click', function() {
+            console.log('[LLM Paste] paste container clicked; focusing');
+            pasteContainer.focus();
+            pasteContainer.classList.add('border-primary');
+            // Optional hint update to guide user
+            const hint = pasteContainer.querySelector('p');
+            if (hint) hint.textContent = 'Ready to paste (Ctrl+V)';
+        });
+
+        pasteContainer.addEventListener('paste', function(event) {
+            const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+            console.log('[LLM Paste] paste event received; items length=', items ? items.length : 'n/a');
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file') {
+                    event.preventDefault();
+                    const blob = item.getAsFile();
+                    pastedImageBlob = blob;
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const preview = document.getElementById('pasted-image-preview');
+                        preview.src = e.target.result;
+                        preview.style.display = 'block';
+                        pasteContainer.querySelector('p').style.display = 'none';
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        });
+    });
+
+    function populateForm(data) {
+        document.getElementById('foodName').value = data.name || '';
+        document.getElementById('foodBrand').value = data.brand || '';
+        document.getElementById('servingSizeG').value = data.serving_size_g || '';
+        document.getElementById('calories').value = data.calories || '';
+        document.getElementById('proteinG').value = data.protein_g || '';
+        document.getElementById('carbohydrateG').value = data.carbohydrate_g || '';
+        document.getElementById('fatG').value = data.fat_g || '';
+        document.getElementById('fiberG').value = data.fiber_g || '';
+        document.getElementById('sugarG').value = data.sugar_g || '';
+        document.getElementById('sodiumMg').value = data.sodium_mg || '';
+        document.getElementById('calciumMg').value = data.calcium_mg || '';
+    }
+
+    document.getElementById('llm-food-form').addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        const urlInput = document.getElementById('urlInput');
+        const webpageUrlInput = document.getElementById('webpageUrl');
+        const imageUpload = document.getElementById('imageUpload');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const resultContainer = document.getElementById('resultContainer');
+        const extractedJson = document.getElementById('extractedJson');
+        const errorContainer = document.getElementById('errorContainer');
+        const errorMessage = document.getElementById('errorMessage');
+
+        loadingSpinner.style.display = 'block';
+        resultContainer.style.display = 'none';
+        errorContainer.style.display = 'none';
+
+        const formData = new FormData();
+        if (urlInput.value) {
+            formData.append('url', urlInput.value);
+        } else if (webpageUrlInput.value) {
+            formData.append('webpage_url', webpageUrlInput.value);
+        } else if (imageUpload.files.length > 0) {
+            formData.append('image', imageUpload.files[0]);
+        } else if (pastedImageBlob) {
+            formData.append('image', pastedImageBlob, 'pasted-image.png');
+        }
+
+        try {
+            const response = await fetch('/llm/extract', {
+                method: 'POST',
+                body: formData
+            });
+
+            const contentType = response.headers.get('content-type') || '';
+            let data = null;
+            let text = null;
+
+            // Prefer JSON parsing only when server indicates JSON. Fallback to text.
+            if (contentType.includes('application/json')) {
+                try {
+                    data = await response.json();
+                } catch (parseErr) {
+                    // If JSON parsing fails despite content-type hint, fallback to text
+                    try {
+                        text = await response.text();
+                    } catch {
+                        text = null;
+                    }
+                }
+            } else {
+                try {
+                    text = await response.text();
+                } catch {
+                    text = null;
+                }
+            }
+
+            if (response.ok) {
+                // Successful responses from backend should be JSON payloads
+                if (data) {
+                    extractedJson.textContent = JSON.stringify(data, null, 2);
+                    resultContainer.style.display = 'block';
+                    // Store data globally or in a hidden input for confirmation
+                    window.extractedFoodData = data;
+                    // Populate editable form with extracted values
+                    populateForm(data);
+                } else {
+                    // Unexpected non-JSON success; show raw text to aid debugging
+                    extractedJson.textContent = text ?? 'Success with unknown content type.';
+                    resultContainer.style.display = 'block';
+                    window.extractedFoodData = null;
+                }
+            } else {
+                // Non-OK: show JSON detail if present; otherwise show raw text; otherwise generic
+                const detail = data && (data.detail || data.message || data.error);
+                errorMessage.textContent = detail || text || 'An unknown error occurred.';
+                errorContainer.style.display = 'block';
+            }
+        } catch (error) {
+            errorMessage.textContent = 'Network error or server unreachable.';
+            errorContainer.style.display = 'block';
+            console.error('Error:', error);
+        } finally {
+            loadingSpinner.style.display = 'none';
+        }
+    });
+
+    document.getElementById('confirmAndSave').addEventListener('click', async function() {
+        const form = document.getElementById('editFoodForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        // Map LLM-extracted fields to backend Food model fields.
+        // Units: serving_size in grams (string), serving_unit='g'; nutrition per serving (grams/mg as labeled).
+        // Backend expects: name, serving_size (str), serving_unit, calories (int), protein/carbs/fat/fiber/sugar (float g),
+        // sodium/calcium (float mg), source, brand.
+        const data = {
+            name: formData.get('name'),
+            brand: formData.get('brand') || '',
+            serving_size: formData.get('serving_size_g'), // stringified grams
+            serving_unit: 'g',
+            calories: parseInt(formData.get('calories')) || 0,
+            protein: parseFloat(formData.get('protein_g')) || 0,
+            carbs: parseFloat(formData.get('carbohydrate_g')) || 0,
+            fat: parseFloat(formData.get('fat_g')) || 0,
+            fiber: parseFloat(formData.get('fiber_g')) || 0,
+            sugar: parseFloat(formData.get('sugar_g')) || 0,
+            sodium: parseInt(formData.get('sodium_mg')) || 0,
+            calcium: parseInt(formData.get('calcium_mg')) || 0,
+            source: 'llm'
+        };
+
+        try {
+            const response = await fetch('/foods/add', {
+                method: 'POST',
+                body: new URLSearchParams(data) // FormData equivalent for POST
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                alert('Food saved successfully!');
+                window.location.href = '/foods'; // Redirect to foods list
+            } else {
+                alert('Failed to save food: ' + (result.message || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error saving food: Network error or server unreachable.');
+            console.error('Save error:', error);
+        }
+    });
+
+</script>
+{% endblock %}

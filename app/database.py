@@ -35,6 +35,9 @@ engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} i
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# Import all models to ensure they are registered with Base
+from app.models.llm_config import LLMConfig
+
 # Database Models
 class Food(Base):
     __tablename__ = "foods"

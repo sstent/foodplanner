@@ -6,12 +6,20 @@ import shutil
 import sqlite3
 import logging
 from datetime import datetime
+from typing import Optional
 
 # Import from the database module
 from app.database import get_db, DATABASE_URL, engine
 from main import templates
+from app.models.llm_config import LLMConfig
+from pydantic import BaseModel
 
 router = APIRouter()
+
+class LLMConfigUpdate(BaseModel):
+    openrouter_api_key: Optional[str] = None
+    preferred_model: str
+    browserless_api_key: Optional[str] = None
 
 def backup_database(source_db_path, backup_db_path):
     """Backs up an SQLite database using the online backup API."""
@@ -80,6 +88,56 @@ async def admin_page(request: Request):
 @router.get("/admin/imports", response_class=HTMLResponse)
 async def admin_imports_page(request: Request):
     return templates.TemplateResponse(request, "admin/imports.html", {"request": request})
+
+@router.get("/admin/llm_config", response_class=HTMLResponse)
+async def admin_llm_config_page(request: Request, db: Session = Depends(get_db)):
+    logging.info("DEBUG: Starting llm_config route")
+    try:
+        llm_config = db.query(LLMConfig).first()
+        logging.info(f"DEBUG: LLMConfig query result: {llm_config}")
+        if not llm_config:
+            logging.info("DEBUG: No LLMConfig found, creating new one")
+            llm_config = LLMConfig()
+            db.add(llm_config)
+            db.commit()
+            db.refresh(llm_config)
+            logging.info(f"DEBUG: Created new LLMConfig: {llm_config}")
+        logging.info(f"DEBUG: Final llm_config object: {llm_config}")
+
+        logging.info("DEBUG: About to render llm_config.html template")
+        response = templates.TemplateResponse(
+            request,
+            "admin/llm_config.html",
+            {"request": request, "llm_config": llm_config}
+        )
+        logging.info("DEBUG: Template rendered successfully")
+        return response
+    except Exception as e:
+        logging.error(f"DEBUG: Error in llm_config route: {e}", exc_info=True)
+        raise
+
+@router.post("/admin/llm_config", response_class=RedirectResponse)
+async def update_llm_config(
+    request: Request,
+    openrouter_api_key: Optional[str] = Form(None),
+    preferred_model: str = Form(...),
+    browserless_api_key: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    llm_config = db.query(LLMConfig).first()
+    if not llm_config:
+        llm_config = LLMConfig()
+        db.add(llm_config)
+        db.commit()
+        db.refresh(llm_config)
+
+    llm_config.openrouter_api_key = openrouter_api_key
+    llm_config.preferred_model = preferred_model
+    llm_config.browserless_api_key = browserless_api_key
+    db.commit()
+    db.refresh(llm_config)
+    
+    return RedirectResponse(url="/admin/llm_config", status_code=303)
 
 @router.get("/admin/backups", response_class=HTMLResponse)
 async def admin_backups_page(request: Request):

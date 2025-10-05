@@ -1,0 +1,38 @@
+{% extends "admin/index.html" %}
+
+{% block admin_content %}
+<div class="tab-pane fade show active" id="llm-config" role="tabpanel" aria-labelledby="llm-config-tab">
+    <h3>LLM Configuration</h3>
+    <form action="/admin/llm_config" method="POST">
+        <div class="mb-3">
+            <label for="openrouter_api_key" class="form-label">OpenRouter API Key:</label>
+            <input type="text" class="form-control" id="openrouter_api_key" name="openrouter_api_key" value="{{ llm_config.openrouter_api_key or '' }}">
+            <small class="form-text text-muted">Your API key for OpenRouter.ai</small>
+        </div>
+        <div class="mb-3">
+            <label for="preferred_model" class="form-label">Preferred LLM Model:</label>
+            <input type="text" class="form-control" id="preferred_model" name="preferred_model" value="{{ llm_config.preferred_model or 'anthropic/claude-3.5-sonnet' }}" required>
+            <small class="form-text text-muted">e.g., anthropic/claude-3.5-sonnet, openai/gpt-4o</small>
+        </div>
+        <div class="mb-3">
+            <label for="browserless_api_key" class="form-label">Browserless API Key:</label>
+            <input type="text" class="form-control" id="browserless_api_key" name="browserless_api_key" value="{{ llm_config.browserless_api_key or '' }}">
+            <small class="form-text text-muted">Your API key for Browserless.io</small>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentPath = window.location.pathname;
+        if (currentPath === '/admin/llm_config') {
+            document.getElementById('llm-config-tab').classList.add('active');
+        } else {
+            document.getElementById('llm-config-tab').classList.remove('active');
+        }
+    });
+</script>
+{% endblock %}
