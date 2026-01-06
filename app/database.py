@@ -406,16 +406,50 @@ def calculate_tracked_meal_nutrition(tracked_meal, db: Session):
         'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0,
         'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
     }
-    # Base meal nutrition
-    base_nutrition = calculate_meal_nutrition(tracked_meal.meal, db)
-    for key in totals:
-        if key in base_nutrition:
-            totals[key] += base_nutrition[key]
     
-    # Add custom tracked foods
-    for tracked_food in tracked_meal.tracked_foods:
-        food = tracked_food.food
-        multiplier = tracked_food.quantity / food.serving_size if food.serving_size and food.serving_size != 0 else 0
+    # 1. Get base foods from the meal
+    # access via relationship, assume eager loading or lazy loading
+    base_foods = {mf.food_id: mf for mf in tracked_meal.meal.meal_foods}
+    
+    # 2. Get tracked foods (overrides, deletions, additions)
+    tracked_foods = tracked_meal.tracked_foods
+    
+    # 3. Determine effective foods
+    # Start with base foods
+    final_foods = {}
+    for food_id, mf in base_foods.items():
+        final_foods[food_id] = {
+            'food': mf.food,
+            'quantity': mf.quantity
+        }
+        
+    # Apply tracked changes
+    for tf in tracked_foods:
+        if tf.is_deleted:
+            # If deleted, remove from final_foods if it exists
+            if tf.food_id in final_foods:
+                del final_foods[tf.food_id]
+        else:
+            # Overrides or Additions
+            # This handles both:
+            # - Overriding a base food (replaces entry with same food_id)
+            # - Adding a new food (adds new entry with new food_id)
+            final_foods[tf.food_id] = {
+                'food': tf.food,
+                'quantity': tf.quantity
+            }
+            
+    # 4. Calculate totals
+    for food_id, item in final_foods.items():
+        food = item['food']
+        quantity = item['quantity']
+        
+        try:
+             serving_size = float(food.serving_size)
+             multiplier = quantity / serving_size if serving_size > 0 else 0
+        except (ValueError, TypeError):
+             multiplier = 0
+        
         totals['calories'] += (food.calories or 0) * multiplier
         totals['protein'] += (food.protein or 0) * multiplier
         totals['carbs'] += (food.carbs or 0) * multiplier

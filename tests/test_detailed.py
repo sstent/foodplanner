@@ -11,11 +11,11 @@ import os
 from pathlib import Path
 
 # Create test database directory if it doesn't exist
-test_db_dir = "/app/data"
+test_db_dir = "./test_data"
 os.makedirs(test_db_dir, exist_ok=True)
 
 # Use the same database path as Docker container
-SQLALCHEMY_DATABASE_URL = "sqlite:////app/data/test_detailed.db"
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{test_db_dir}/test_detailed.db"
 print(f"Using test database at: {SQLALCHEMY_DATABASE_URL}")
 
 test_engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
@@ -317,64 +317,4 @@ def test_detailed_serving_display_format(client, session):
 
     # Assert the serving info shows just "2.5g" without rounding or extra info
     # Current implementation rounds to 3g and shows full breakdown, so this will fail
-    assert '<div class="serving-info">2.5g</div>' in response.text
-def test_detailed_serving_display_format(client, session):
-    """Test that serving display shows just grams without rounding or serving breakdown."""
-    # Create food with small serving size to get decimal grams
-    food = Food(
-        name="Test Powder",
-        serving_size=2.5,
-        serving_unit="g",
-        calories=10,
-        protein=1.0,
-        carbs=0.5,
-        fat=0.1,
-        fiber=0.0,
-        sugar=0.0,
-        sodium=0.0,
-        calcium=0.0,
-        source="manual"
-    )
-    session.add(food)
-    session.commit()
-    session.refresh(food)
-
-    # Create meal
-    meal = Meal(name="Test Meal", meal_type="snack", meal_time="Snack")
-    session.add(meal)
-    session.commit()
-    session.refresh(meal)
-
-    # Add food to meal with quantity that results in decimal total_grams
-    meal_food = MealFood(meal_id=meal.id, food_id=food.id, quantity=2.5)  # 1 serving = 2.5g
-    session.add(meal_food)
-    session.commit()
-
-    # Create tracked meal via the endpoint
-    test_date = date.today()
-    response_add_meal = client.post(
-        "/tracker/add_meal",
-        data={
-            "person": "Sarah",
-            "date": test_date.isoformat(),
-            "meal_id": meal.id,
-            "meal_time": "Snack"
-        }
-    )
-    assert response_add_meal.status_code == 200
-    assert response_add_meal.json()["status"] == "success"
-
-    # Get detailed page for tracked day
-    response = client.get(f"/detailed?person=Sarah&plan_date={test_date.isoformat()}")
-    assert response.status_code == 200
-
-    # Assert the serving info shows just "2.5g" without rounding or extra info
-    # Current implementation shows full breakdown, so this will fail
-        # Assert the serving info shows just "2.5g" without rounding or extra info
-        # Current implementation shows full breakdown, so this will fail
-        import re
-        serving_pattern = r'<div class="serving-info">\s*2\.5g\s*</div>'
-        assert re.search(serving_pattern, response.text), f"Expected serving info '2.5g' but found: {response.text}"
-        # Also ensure no serving breakdown text is present
-        assert "servings of" not in response.text
     assert '<div class="serving-info">2.5g</div>' in response.text
