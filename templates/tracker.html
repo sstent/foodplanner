@@ -4,7 +4,8 @@
     <div class="col-md-8">
         <!-- Date Navigation -->
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <button class="btn btn-outline-secondary" onclick="navigateDate('{{ prev_date }}')" data-testid="navigate-yesterday">
+            <button class="btn btn-outline-secondary" onclick="navigateDate('{{ prev_date }}')"
+                data-testid="navigate-yesterday">
                 <i class="bi bi-chevron-left"></i> Yesterday
             </button>
             <div class="text-center">
@@ -15,7 +16,8 @@
                 <span class="badge bg-success">As Planned</span>
                 {% endif %}
             </div>
-            <button class="btn btn-outline-secondary" onclick="navigateDate('{{ next_date }}')" data-testid="navigate-tomorrow">
+            <button class="btn btn-outline-secondary" onclick="navigateDate('{{ next_date }}')"
+                data-testid="navigate-tomorrow">
                 Tomorrow <i class="bi bi-chevron-right"></i>
             </button>
         </div>
@@ -45,10 +47,12 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">{{ meal_time }}</h5>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-success" onclick="addMealToTime('{{ meal_time }}')" data-testid="add-meal-{{ meal_time|slugify }}">
+                    <button class="btn btn-sm btn-outline-success" onclick="addMealToTime('{{ meal_time }}')"
+                        data-testid="add-meal-{{ meal_time|slugify }}">
                         <i class="bi bi-plus"></i> Add Meal
                     </button>
-                    <button class="btn btn-sm btn-info text-white" onclick="addSingleFoodToTime('{{ meal_time }}')" data-testid="add-food-{{ meal_time|slugify }}">
+                    <button class="btn btn-sm btn-info text-white" onclick="addSingleFoodToTime('{{ meal_time }}')"
+                        data-testid="add-food-{{ meal_time|slugify }}">
                         <i class="bi bi-plus-circle"></i> Add Food
                     </button>
                 </div>
@@ -57,89 +61,166 @@
                 <div id="meals-{{ meal_time|slugify }}">
                     {% set meals_for_time = [] %}
                     {% for tracked_meal in tracked_meals %}
-                        {% if tracked_meal.meal_time == meal_time %}
-                            {% set _ = meals_for_time.append(tracked_meal) %}
-                        {% endif %}
+                    {% if tracked_meal.meal_time == meal_time %}
+                    {% set _ = meals_for_time.append(tracked_meal) %}
+                    {% endif %}
                     {% endfor %}
 
                     {% if meals_for_time %}
-{% for tracked_meal in meals_for_time %}
-    {# 1. Create stable slugs #}
-    {% set meal_time_slug = meal_time|slugify %}
-    {% set meal_name_safe = tracked_meal.meal.name|slugify %}
-    
-    {# 2. Construct the core Unique Meal ID for non-ambiguous locating #}
-    {% set unique_meal_id = meal_time_slug + '-' + meal_name_safe + '-' + loop.index|string %}
-<div class="mb-3 p-3 bg-light rounded" data-testid="meal-card-{{ unique_meal_id }}">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <div>
-            <strong data-testid="meal-name-{{ unique_meal_id }}">{{ tracked_meal.meal.name }}</strong>
-        </div>
-        <div>
-            <button class="btn btn-sm btn-outline-secondary me-1" onclick="editTrackedMeal('{{ tracked_meal.id }}')" title="Edit Meal" data-testid="edit-meal-{{ unique_meal_id }}">
-                <i class="bi bi-pencil"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-danger" onclick="removeMeal('{{ tracked_meal.id }}')" data-testid="delete-meal-{{ unique_meal_id }}">
-                <i class="bi bi-trash"></i>
-            </button>
-        </div>
-    </div>
-    
-    <!-- Food Breakdown -->
-    <div class="ms-3">
-        <div class="row row-cols-1 row-cols-sm-2">
-                                {% set overrides = {} %}
-                                {% set all_override_ids = [] %}
-                                {% set deleted_food_ids = [] %}
-                                {% for tmf in tracked_meal.tracked_foods %}
-                                    {% if not tmf.is_deleted %}
-                                        {% set _ = overrides.update({tmf.food_id: tmf}) %}
-                                    {% else %}
-                                        {% set _ = deleted_food_ids.append(tmf.food_id) %}
-                                    {% endif %}
-                                    {% set _ = all_override_ids.append(tmf.food_id) %}
-                                {% endfor %}
+                    {% for tracked_meal in meals_for_time %}
+                    {# 1. Create stable slugs #}
+                    {% set meal_time_slug = meal_time|slugify %}
+                    {% set meal_name_safe = tracked_meal.meal.name|slugify %}
 
-                                {% set displayed_food_ids = [] %}
-
-                                {# Display base meal foods, applying overrides #}
-                                {% for meal_food in tracked_meal.meal.meal_foods %}
-                                    {# Only show base meal food if it's not deleted and there's no active override for it #}
-                                    {% if meal_food.food_id not in deleted_food_ids and meal_food.food_id not in overrides.keys() %}
-                                        <div class="col">
-                                            {% set food_name_safe = meal_food.food.name|slugify %}
-                                            <div class="d-flex justify-content-between small text-muted" data-testid="food-display-{{ unique_meal_id }}-{{ food_name_safe }}-{{ loop.index }}">
-                                                <span>• {{ meal_food.food.name }}</span>
-                                                <span class="text-end">{{ meal_food.quantity }} {{ meal_food.food.serving_unit }}</span>
-                                            </div>
-                                        </div>
-                                    {% else %}
-                                        <!-- DEBUG: meal_food {{ meal_food.food_id }} - {{ meal_food.food.name }} - in deleted_food_ids: {{ meal_food.food_id in deleted_food_ids }}, in overrides: {{ meal_food.food_id in overrides.keys() }} -->
-                                    {% endif %}
-                                    {% set _ = displayed_food_ids.append(meal_food.food_id) %}
-                                {% endfor %}
-
-                                {# Display overridden and new foods #}
-                                {% for food_id, tmf in overrides.items() %}
-                                    {% set food_name_safe = tmf.food.name|slugify %}
-                                    <div class="col">
-                                        <div class="d-flex justify-content-between small text-muted" data-testid="food-display-{{ unique_meal_id }}-{{ food_name_safe }}-{{ loop.index }}">
-                                            <span>• {{ tmf.food.name }}</span>
-                                            <span class="text-end">{{ tmf.quantity }} g</span>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                                </div>
-                                {% if not tracked_meal.meal.meal_foods %}
-                                <div class="col-12">
-                                    <div class="small text-muted">No foods in this meal</div>
-                                </div>
-                                {% endif %}
+                    {# 2. Construct the core Unique Meal ID for non-ambiguous locating #}
+                    {% set unique_meal_id = meal_time_slug + '-' + meal_name_safe + '-' + loop.index|string %}
+                    <div class="mb-3 p-3 bg-light rounded" data-testid="meal-card-{{ unique_meal_id }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong data-testid="meal-name-{{ unique_meal_id }}">{{ tracked_meal.meal.name
+                                    }}</strong>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary me-1"
+                                    onclick="editTrackedMeal('{{ tracked_meal.id }}')" title="Edit Meal"
+                                    data-testid="edit-meal-{{ unique_meal_id }}">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger"
+                                    onclick="removeMeal('{{ tracked_meal.id }}')"
+                                    data-testid="delete-meal-{{ unique_meal_id }}">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </div>
                         </div>
-                        {% endfor %}
+
+                        <!-- Food Breakdown -->
+                        <div class="ms-3">
+                            {% set overrides = {} %}
+                            {% set all_override_ids = [] %}
+                            {% set deleted_food_ids = [] %}
+                            {% for tmf in tracked_meal.tracked_foods %}
+                            {% if not tmf.is_deleted %}
+                            {% set _ = overrides.update({tmf.food_id: tmf}) %}
+                            {% else %}
+                            {% set _ = deleted_food_ids.append(tmf.food_id) %}
+                            {% endif %}
+                            {% set _ = all_override_ids.append(tmf.food_id) %}
+                            {% endfor %}
+
+                            {% set meal_totals = {'carbs': 0, 'fiber': 0, 'fat': 0, 'protein': 0, 'calories': 0} %}
+                            {% set state = {'has_foods': False} %}
+
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped small mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 40%">Food</th>
+                                            <th class="text-end">Carbs</th>
+                                            <th class="text-end">Net Carbs</th>
+                                            <th class="text-end">Fat</th>
+                                            <th class="text-end">Protein</th>
+                                            <th class="text-end">Cals</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {# Display base meal foods, applying overrides #}
+                                        {% for meal_food in tracked_meal.meal.meal_foods %}
+                                        {% if meal_food.food_id not in deleted_food_ids and meal_food.food_id not in
+                                        overrides.keys() %}
+                                        {% set _ = state.update({'has_foods': True}) %}
+                                        {% set food = meal_food.food %}
+                                        {% set qty = meal_food.quantity %}
+                                        {% set mult = qty / food.serving_size if food.serving_size > 0 else 0 %}
+                                        {% set row_carbs = (food.carbs or 0) * mult %}
+                                        {% set row_fiber = (food.fiber or 0) * mult %}
+                                        {% set row_fat = (food.fat or 0) * mult %}
+                                        {% set row_protein = (food.protein or 0) * mult %}
+                                        {% set row_cals = (food.calories or 0) * mult %}
+
+                                        {# Accumulate Totals #}
+                                        {% set _ = meal_totals.update({'carbs': meal_totals.carbs + row_carbs}) %}
+                                        {% set _ = meal_totals.update({'fiber': meal_totals.fiber + row_fiber}) %}
+                                        {% set _ = meal_totals.update({'fat': meal_totals.fat + row_fat}) %}
+                                        {% set _ = meal_totals.update({'protein': meal_totals.protein + row_protein}) %}
+                                        {% set _ = meal_totals.update({'calories': meal_totals.calories + row_cals}) %}
+
+                                        {% set food_name_safe = food.name|slugify %}
+                                        <tr data-testid="food-row-{{ unique_meal_id }}-{{ food_name_safe }}">
+                                            <td>
+                                                {{ food.name }}
+                                                <span class="text-muted ms-1">({{ qty|round(1) }} {{ food.serving_unit
+                                                    }})</span>
+                                            </td>
+                                            <td class="text-end">{{ "%.1f"|format(row_carbs) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(row_carbs - row_fiber) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(row_fat) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(row_protein) }}g</td>
+                                            <td class="text-end fw-bold">{{ "%.0f"|format(row_cals) }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% endfor %}
+
+                                        {# Display overridden/new foods #}
+                                        {% for food_id, tmf in overrides.items() %}
+                                        {% set _ = state.update({'has_foods': True}) %}
+                                        {% set food = tmf.food %}
+                                        {% set qty = tmf.quantity %}
+                                        {# Overrides are always in grams #}
+                                        {% set mult = qty / food.serving_size if food.serving_size > 0 else 0 %}
+                                        {% set row_carbs = (food.carbs or 0) * mult %}
+                                        {% set row_fiber = (food.fiber or 0) * mult %}
+                                        {% set row_fat = (food.fat or 0) * mult %}
+                                        {% set row_protein = (food.protein or 0) * mult %}
+                                        {% set row_cals = (food.calories or 0) * mult %}
+
+                                        {# Accumulate Totals #}
+                                        {% set _ = meal_totals.update({'carbs': meal_totals.carbs + row_carbs}) %}
+                                        {% set _ = meal_totals.update({'fiber': meal_totals.fiber + row_fiber}) %}
+                                        {% set _ = meal_totals.update({'fat': meal_totals.fat + row_fat}) %}
+                                        {% set _ = meal_totals.update({'protein': meal_totals.protein + row_protein}) %}
+                                        {% set _ = meal_totals.update({'calories': meal_totals.calories + row_cals}) %}
+
+                                        {% set food_name_safe = food.name|slugify %}
+                                        <tr class="table-info"
+                                            data-testid="food-row-{{ unique_meal_id }}-{{ food_name_safe }}">
+                                            <td>
+                                                {{ food.name }} <i class="bi bi-pencil-fill x-small text-muted"
+                                                    title="Custom Quantity"></i>
+                                                <span class="text-muted ms-1">({{ qty|round(1) }} g)</span>
+                                            </td>
+                                            <td class="text-end">{{ "%.1f"|format(row_carbs) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(row_carbs - row_fiber) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(row_fat) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(row_protein) }}g</td>
+                                            <td class="text-end fw-bold">{{ "%.0f"|format(row_cals) }}</td>
+                                        </tr>
+                                        {% endfor %}
+
+                                        {% if not state.has_foods %}
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted">No foods in this meal</td>
+                                        </tr>
+                                        {% else %}
+                                        {# Summary Row #}
+                                        <tr class="table-secondary fw-bold">
+                                            <td>Total</td>
+                                            <td class="text-end">{{ "%.1f"|format(meal_totals.carbs) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(meal_totals.carbs - meal_totals.fiber)
+                                                }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(meal_totals.fat) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(meal_totals.protein) }}g</td>
+                                            <td class="text-end">{{ "%.0f"|format(meal_totals.calories) }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
                     {% else %}
-                        <p class="text-muted mb-0">No meals tracked</p>
+                    <p class="text-muted mb-0">No meals tracked</p>
                     {% endif %}
                 </div>
 
@@ -380,10 +461,10 @@
             const response = await fetch(`/tracker/get_tracked_meal_foods/${trackedMealId}`);
             const data = await response.json();
             console.log('Response from get_tracked_meal_foods:', data);
-            
+
             const container = document.getElementById('editMealFoodsList');
             container.innerHTML = '';
-            
+
             if (data.status === 'success') {
                 if (data.meal_foods.length === 0) {
                     container.innerHTML = '<em>No foods added yet</em>';
@@ -434,7 +515,7 @@
     async function saveTrackedMeal() {
         const trackedMealId = document.getElementById('editTrackedMealId').value;
         const inputs = document.querySelectorAll('#editMealFoodsList input[type="number"]');
-        
+
         const foods = [];
         inputs.forEach(input => {
             const foodData = {
@@ -453,7 +534,7 @@
         };
 
         console.log('Payload being sent to /tracker/update_tracked_meal_foods:', JSON.stringify(payload, null, 2));
-        
+
         try {
             const response = await fetch('/tracker/update_tracked_meal_foods', {
                 method: 'POST',
@@ -477,10 +558,10 @@
     async function saveAsNewMeal() {
         const mealName = prompt('Enter name for new meal:');
         if (!mealName) return;
-        
+
         const trackedMealId = document.getElementById('editTrackedMealId').value;
         const inputs = document.querySelectorAll('#editMealFoodsList input[type="number"]');
-        
+
         const foods = [];
         inputs.forEach(input => {
             foods.push({
@@ -488,7 +569,7 @@
                 quantity: parseFloat(input.value) // Quantity is now grams
             });
         });
-        
+
         try {
             const response = await fetch('/tracker/save_as_new_meal', {
                 method: 'POST',
@@ -499,9 +580,9 @@
                     foods: foods
                 })
             });
-            
+
             const result = await response.json();
-            
+
             if (result.status === 'success') {
                 bootstrap.Modal.getInstance(document.getElementById('editTrackedMealModal')).hide();
                 alert('New meal saved successfully!');
@@ -545,7 +626,7 @@
             alert('Error: ' + error.message);
         }
     }
-    
+
     // Reset page (clear all meals and foods)
     async function resetPage() {
         if (confirm('Are you sure you want to clear all meals and foods for this day? This action cannot be undone.')) {

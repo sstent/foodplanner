@@ -44,7 +44,10 @@ async def get_charts_data(
         day_totals = calculate_day_nutrition_tracked(tracked_meals, db)
         chart_data.append({
             "date": tracked_day.date.isoformat(),
-            "calories": round(day_totals.get("calories", 0), 2)
+            "calories": round(day_totals.get("calories", 0), 2),
+            "protein": round(day_totals.get("protein", 0), 2),
+            "fat": round(day_totals.get("fat", 0), 2),
+            "net_carbs": round(day_totals.get("net_carbs", 0), 2)
         })
     
     return chart_data

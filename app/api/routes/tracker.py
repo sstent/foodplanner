@@ -3,9 +3,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime, timedelta
 from typing import List, Optional, Union
+import logging
 
 # Import from the database module
-from app.database import get_db, Meal, Template, TemplateMeal, TrackedDay, TrackedMeal, calculate_meal_nutrition, MealFood, TrackedMealFood, Food, calculate_day_nutrition_tracked
+from app.database import get_db, Meal, Template, TemplateMeal, TrackedDay, TrackedMeal, calculate_meal_nutrition, MealFood, TrackedMealFood, Food, calculate_day_nutrition_tracked, Plan
 from main import templates
 
 router = APIRouter()
@@ -38,6 +39,29 @@ async def tracker_page(request: Request, person: str = "Sarah", date: str = None
             db.add(tracked_day)
             db.commit()
             db.refresh(tracked_day)
+            
+        # Check if we need to sync from Plan (if no tracked meals exist)
+        existing_meals_count = db.query(TrackedMeal).filter(
+            TrackedMeal.tracked_day_id == tracked_day.id
+        ).count()
+        
+        if existing_meals_count == 0:
+            # Look for planned meals
+            planned_meals = db.query(Plan).filter(
+                Plan.person == person,
+                Plan.date == current_date
+            ).all()
+            
+            if planned_meals:
+                logging.info(f"Syncing {len(planned_meals)} planned meals to tracker for {person} on {current_date}")
+                for plan in planned_meals:
+                    tracked_meal = TrackedMeal(
+                        tracked_day_id=tracked_day.id,
+                        meal_id=plan.meal_id,
+                        meal_time=plan.meal_time
+                    )
+                    db.add(tracked_meal)
+                db.commit()
         
         # Get tracked meals for this day with eager loading of meal foods
         tracked_meals = db.query(TrackedMeal).options(

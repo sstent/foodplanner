@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container mt-4 d-flex flex-column min-vh-100">
     <h2><i class="bi bi-graph-up"></i> Daily Calories Chart</h2>
-    
+
     <div class="row mb-4">
         <div class="col-md-6">
             <div class="card">
@@ -22,7 +22,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="row flex-grow-1">
         <div class="col-md-12 h-100">
             <div class="card h-100">
@@ -40,8 +40,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 <script>
     let chart;
+    const MACRO_KEYS = ['net_carbs', 'fat', 'protein'];
 
     function resizeChart() {
         const container = document.getElementById('chartContainer');
@@ -51,7 +53,12 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
+        // Register the plugin
+        if (typeof ChartDataLabels !== 'undefined') {
+            Chart.register(ChartDataLabels);
+        }
+
         const daysSelect = document.getElementById('daysSelect');
         const loadBtn = document.getElementById('loadChartBtn');
         const ctx = document.getElementById('caloriesChart').getContext('2d');
@@ -63,7 +70,7 @@
         // Default load for 7 days
         loadChart(7);
 
-        loadBtn.addEventListener('click', function() {
+        loadBtn.addEventListener('click', function () {
             const selectedDays = parseInt(daysSelect.value);
             loadChart(selectedDays);
         });
@@ -76,7 +83,14 @@
                     data.sort((a, b) => new Date(a.date) - new Date(b.date));
 
                     const labels = data.map(item => item.date);
-                    const calories = data.map(item => item.calories);
+
+                    // Calculate calories from macros
+                    // Protein: 4 cals/g
+                    // Fat: 9 cals/g
+                    // Net Carbs: 4 cals/g
+                    const proteinCals = data.map(item => item.protein * 4);
+                    const fatCals = data.map(item => item.fat * 9);
+                    const netCarbsCals = data.map(item => item.net_carbs * 4);
 
                     if (chart) {
                         chart.destroy();
@@ -86,17 +100,32 @@
                     resizeChart();
 
                     chart = new Chart(ctx, {
-                        type: 'line',
+                        type: 'bar', // Switch to bar chart
                         data: {
                             labels: labels,
-                            datasets: [{
-                                label: 'Calories',
-                                data: calories,
-                                borderColor: 'rgb(75, 192, 192)',
-                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                                tension: 0.1,
-                                fill: true
-                            }]
+                            datasets: [
+                                {
+                                    label: 'Net Carbs',
+                                    data: netCarbsCals,
+                                    backgroundColor: 'rgba(255, 193, 7, 0.8)', // Bootstrap warning (Yellow)
+                                    borderColor: '#ffc107',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: 'Fat',
+                                    data: fatCals,
+                                    backgroundColor: 'rgba(220, 53, 69, 0.8)', // Bootstrap danger (Red)
+                                    borderColor: '#dc3545',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: 'Protein',
+                                    data: proteinCals,
+                                    backgroundColor: 'rgba(25, 135, 84, 0.8)', // Bootstrap success (Green)
+                                    borderColor: '#198754',
+                                    borderWidth: 1
+                                }
+                            ]
                         },
                         options: {
                             responsive: true,
@@ -104,15 +133,67 @@
                             scales: {
                                 y: {
                                     beginAtZero: true,
+                                    stacked: true, // Enable stacking for Y axis
                                     title: {
                                         display: true,
                                         text: 'Calories'
                                     }
                                 },
                                 x: {
+                                    stacked: true, // Enable stacking for X axis
                                     title: {
                                         display: true,
                                         text: 'Date'
+                                    }
+                                }
+                            },
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            if (context.parsed.y !== null) {
+                                                const dayData = data[context.dataIndex];
+                                                const macroKey = MACRO_KEYS[context.datasetIndex];
+                                                const grams = dayData[macroKey];
+                                                label += Math.round(context.parsed.y) + ' cals (' + Math.round(grams) + 'g)';
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                },
+                                datalabels: {
+                                    color: 'white',
+                                    font: {
+                                        weight: 'bold',
+                                        size: 11
+                                    },
+                                    display: function (context) {
+                                        const dayData = data[context.dataIndex];
+                                        const pC = dayData.protein * 4;
+                                        const fC = dayData.fat * 9;
+                                        const ncC = dayData.net_carbs * 4;
+                                        const calcTotal = pC + fC + ncC;
+
+                                        const value = context.dataset.data[context.dataIndex];
+                                        return calcTotal > 0 && (value / calcTotal) > 0.05;
+                                    },
+                                    formatter: function (value, context) {
+                                        const dayData = data[context.dataIndex];
+                                        const pC = dayData.protein * 4;
+                                        const fC = dayData.fat * 9;
+                                        const ncC = dayData.net_carbs * 4;
+                                        const calcTotal = pC + fC + ncC;
+
+                                        const totalCals = calcTotal || 1;
+                                        const percent = Math.round((value / totalCals) * 100);
+                                        const macroKey = MACRO_KEYS[context.datasetIndex];
+                                        const grams = Math.round(dayData[macroKey]);
+
+                                        return grams + 'g\n' + percent + '%';
                                     }
                                 }
                             }
