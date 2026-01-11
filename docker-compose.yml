@@ -5,6 +5,10 @@ services:
       - "8999:8999"
     environment:
       - DATABASE_URL=sqlite:////app/data/meal_planner.db
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./alembic:/app/alembic
       - ./data:/app/data
+      - ./app:/app/app
+      - ./templates:/app/templates
+      - ./main.py:/app/main.py

@@ -180,10 +180,10 @@ async def get_meal_foods(meal_id: int, db: Session = Depends(get_db)):
 
 @router.post("/meals/{meal_id}/add_food")
 async def add_food_to_meal(meal_id: int, food_id: int = Form(...),
-                           grams: float = Form(...), db: Session = Depends(get_db)):
+                           quantity: float = Form(...), db: Session = Depends(get_db)):
     
     try:
-        meal_food = MealFood(meal_id=meal_id, food_id=food_id, quantity=grams)
+        meal_food = MealFood(meal_id=meal_id, food_id=food_id, quantity=quantity)
         db.add(meal_food)
         db.commit()
         return {"status": "success"}
@@ -210,14 +210,14 @@ async def remove_food_from_meal(meal_food_id: int, db: Session = Depends(get_db)
         return {"status": "error", "message": str(e)}
 
 @router.post("/meals/update_food_quantity")
-async def update_meal_food_quantity(meal_food_id: int = Form(...), grams: float = Form(...), db: Session = Depends(get_db)):
+async def update_meal_food_quantity(meal_food_id: int = Form(...), quantity: float = Form(...), db: Session = Depends(get_db)):
     """Update the quantity of a food in a meal"""
     try:
         meal_food = db.query(MealFood).filter(MealFood.id == meal_food_id).first()
         if not meal_food:
             return {"status": "error", "message": "Meal food not found"}
         
-        meal_food.quantity = grams
+        meal_food.quantity = quantity
         db.commit()
         return {"status": "success"}
     except ValueError as ve:

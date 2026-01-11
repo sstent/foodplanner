@@ -18,7 +18,7 @@ from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base
 from sqlalchemy.orm import joinedload
 from pydantic import BaseModel, ConfigDict
 
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import date, datetime
 import os
 import logging
@@ -173,7 +173,7 @@ class TrackedMealFood(Base):
 # Pydantic models
 class FoodCreate(BaseModel):
     name: str
-    serving_size: str
+    serving_size: Union[float, str]
     serving_unit: str
     calories: float
     protein: float
@@ -189,7 +189,7 @@ class FoodCreate(BaseModel):
 class FoodResponse(BaseModel):
     id: int
     name: str
-    serving_size: str
+    serving_size: Union[float, str]
     serving_unit: str
     calories: float
     protein: float

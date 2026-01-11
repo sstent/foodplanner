@@ -75,8 +75,8 @@ async def tracker_page(request: Request, person: str = "Sarah", date: str = None
         ).all()
         
         # Template will handle filtering of deleted foods
-        # Get all meals for dropdown
-        meals = db.query(Meal).all()
+        # Get all meals for dropdown (exclude snapshots)
+        meals = db.query(Meal).filter(Meal.meal_type != "tracked_snapshot").all()
         
         # Get all templates for template dropdown
         templates_list = db.query(Template).all()
@@ -138,10 +138,34 @@ async def tracker_add_meal(request: Request, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(tracked_day)
         
-        # Create tracked meal
+        # 1. Fetch the original meal
+        original_meal = db.query(Meal).filter(Meal.id == int(meal_id)).first()
+        if not original_meal:
+            return {"status": "error", "message": "Meal not found"}
+
+        # 2. Create a snapshot copy of the meal
+        snapshot_meal = Meal(
+            name=original_meal.name,
+            meal_type="tracked_snapshot",
+            meal_time=original_meal.meal_time
+        )
+        db.add(snapshot_meal)
+        db.flush() # get ID
+
+        # 3. Copy ingredients (MealFood)
+        meal_foods = db.query(MealFood).filter(MealFood.meal_id == original_meal.id).all()
+        for mf in meal_foods:
+            snapshot_food = MealFood(
+                meal_id=snapshot_meal.id,
+                food_id=mf.food_id,
+                quantity=mf.quantity
+            )
+            db.add(snapshot_food)
+        
+        # 4. Create tracked meal pointing to the SNAPSHOT
         tracked_meal = TrackedMeal(
             tracked_day_id=tracked_day.id,
-            meal_id=int(meal_id),
+            meal_id=snapshot_meal.id,
             meal_time=meal_time
         )
         db.add(tracked_meal)

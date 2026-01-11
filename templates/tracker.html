@@ -117,6 +117,7 @@
                                         <tr>
                                             <th style="width: 40%">Food</th>
                                             <th class="text-end">Carbs</th>
+                                            <th class="text-end">Fiber</th>
                                             <th class="text-end">Net Carbs</th>
                                             <th class="text-end">Fat</th>
                                             <th class="text-end">Protein</th>
@@ -153,6 +154,7 @@
                                                     }})</span>
                                             </td>
                                             <td class="text-end">{{ "%.1f"|format(row_carbs) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(row_fiber) }}g</td>
                                             <td class="text-end">{{ "%.1f"|format(row_carbs - row_fiber) }}g</td>
                                             <td class="text-end">{{ "%.1f"|format(row_fat) }}g</td>
                                             <td class="text-end">{{ "%.1f"|format(row_protein) }}g</td>
@@ -190,6 +192,7 @@
                                                 <span class="text-muted ms-1">({{ qty|round(1) }} g)</span>
                                             </td>
                                             <td class="text-end">{{ "%.1f"|format(row_carbs) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(row_fiber) }}g</td>
                                             <td class="text-end">{{ "%.1f"|format(row_carbs - row_fiber) }}g</td>
                                             <td class="text-end">{{ "%.1f"|format(row_fat) }}g</td>
                                             <td class="text-end">{{ "%.1f"|format(row_protein) }}g</td>
@@ -206,6 +209,7 @@
                                         <tr class="table-secondary fw-bold">
                                             <td>Total</td>
                                             <td class="text-end">{{ "%.1f"|format(meal_totals.carbs) }}g</td>
+                                            <td class="text-end">{{ "%.1f"|format(meal_totals.fiber) }}g</td>
                                             <td class="text-end">{{ "%.1f"|format(meal_totals.carbs - meal_totals.fiber)
                                                 }}g</td>
                                             <td class="text-end">{{ "%.1f"|format(meal_totals.fat) }}g</td>
@@ -231,58 +235,103 @@
 
     <!-- Right Column - Nutrition Totals -->
     <div class="col-md-4">
-        <div class="card sticky-top" style="top: 20px;">
-            <div class="card-header">
-                <h5 class="mb-0">Daily Totals</h5>
+        <div class="sticky-top" style="top: 20px;">
+            <!-- Daily Totals Card -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Daily Totals</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="border rounded p-2">
+                                <strong class="h4 text-primary">{{ "%.0f"|format(day_totals.calories) }}</strong>
+                                <div class="small text-muted">Calories</div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="border rounded p-2">
+                                <strong class="h4 text-success">{{ "%.1f"|format(day_totals.protein) }}g</strong>
+                                <div class="small text-muted">Protein ({{ day_totals.protein_pct }}%)</div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="border rounded p-2">
+                                <strong>{{ "%.1f"|format(day_totals.carbs) }}g</strong>
+                                <div class="small text-muted">Carbs ({{ day_totals.carbs_pct }}%)</div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="border rounded p-2">
+                                <strong class="h4 text-danger">{{ "%.1f"|format(day_totals.fat) }}g</strong>
+                                <div class="small text-muted">Fat ({{ day_totals.fat_pct }}%)</div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="border rounded p-2">
+                                <strong>{{ "%.1f"|format(day_totals.fiber) }}g</strong>
+                                <div class="small text-muted">Fiber</div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="border rounded p-2">
+                                <strong class="h4 text-warning">{{ "%.1f"|format(day_totals.net_carbs) }}g</strong>
+                                <div class="small text-muted">Net Carbs</div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="border rounded p-2">
+                                <strong>{{ "%.0f"|format(day_totals.sugar) }}g</strong>
+                                <div class="small text-muted">Sugar</div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="border rounded p-2">
+                                <strong>{{ "%.0f"|format(day_totals.sodium) }}mg</strong>
+                                <div class="small text-muted">Sodium</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-6 mb-3">
-                        <div class="border rounded p-2">
-                            <strong class="h4 text-primary">{{ "%.0f"|format(day_totals.calories) }}</strong>
-                            <div class="small text-muted">Calories</div>
+
+            <!-- Macro Balance Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Macro Balance</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-success fw-bold">Protein</span>
+                            <span>{{ day_totals.protein_pct }}%</span>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar bg-success" role="progressbar"
+                                style="width: {{ day_totals.protein_pct }}%"
+                                aria-valuenow="{{ day_totals.protein_pct }}" aria-valuemin="0" aria-valuemax="100">
+                            </div>
                         </div>
                     </div>
-                    <div class="col-6 mb-3">
-                        <div class="border rounded p-2">
-                            <strong class="h4 text-success">{{ "%.1f"|format(day_totals.protein) }}g</strong>
-                            <div class="small text-muted">Protein ({{ day_totals.protein_pct }}%)</div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="fw-bold" style="color: #0d6efd;">Carbs</span>
+                            <span>{{ day_totals.carbs_pct }}%</span>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar" role="progressbar" style="width: {{ day_totals.carbs_pct }}%"
+                                aria-valuenow="{{ day_totals.carbs_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
                     </div>
-                    <div class="col-6 mb-3">
-                        <div class="border rounded p-2">
-                            <strong>{{ "%.1f"|format(day_totals.carbs) }}g</strong>
-                            <div class="small text-muted">Carbs ({{ day_totals.carbs_pct }}%)</div>
+                    <div class="mb-0">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-danger fw-bold">Fat</span>
+                            <span>{{ day_totals.fat_pct }}%</span>
                         </div>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <div class="border rounded p-2">
-                            <strong class="h4 text-danger">{{ "%.1f"|format(day_totals.fat) }}g</strong>
-                            <div class="small text-muted">Fat ({{ day_totals.fat_pct }}%)</div>
-                        </div>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <div class="border rounded p-2">
-                            <strong>{{ "%.1f"|format(day_totals.fiber) }}g</strong>
-                            <div class="small text-muted">Fiber</div>
-                        </div>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <div class="border rounded p-2">
-                            <strong class="h4 text-warning">{{ "%.1f"|format(day_totals.net_carbs) }}g</strong>
-                            <div class="small text-muted">Net Carbs</div>
-                        </div>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <div class="border rounded p-2">
-                            <strong>{{ "%.0f"|format(day_totals.sugar) }}g</strong>
-                            <div class="small text-muted">Sugar</div>
-                        </div>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <div class="border rounded p-2">
-                            <strong>{{ "%.0f"|format(day_totals.sodium) }}mg</strong>
-                            <div class="small text-muted">Sodium</div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar bg-danger" role="progressbar"
+                                style="width: {{ day_totals.fat_pct }}%" aria-valuenow="{{ day_totals.fat_pct }}"
+                                aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
                     </div>
                 </div>
