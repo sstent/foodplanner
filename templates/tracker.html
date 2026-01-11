@@ -243,50 +243,61 @@
                 </div>
                 <div class="card-body">
                     <div class="row text-center">
-                        <div class="col-6 mb-3">
-                            <div class="border rounded p-2">
+                        <!-- Top Row: Calories & Net Carbs -->
+                        <div class="col-6 mb-2">
+                            <div class="border rounded p-1">
                                 <strong class="h4 text-primary">{{ "%.0f"|format(day_totals.calories) }}</strong>
                                 <div class="small text-muted">Calories</div>
                             </div>
                         </div>
-                        <div class="col-6 mb-3">
-                            <div class="border rounded p-2">
-                                <strong class="h4 text-success">{{ "%.1f"|format(day_totals.protein) }}g</strong>
-                                <div class="small text-muted">Protein ({{ day_totals.protein_pct }}%)</div>
-                            </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="border rounded p-2">
-                                <strong>{{ "%.1f"|format(day_totals.carbs) }}g</strong>
-                                <div class="small text-muted">Carbs ({{ day_totals.carbs_pct }}%)</div>
-                            </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="border rounded p-2">
-                                <strong class="h4 text-danger">{{ "%.1f"|format(day_totals.fat) }}g</strong>
-                                <div class="small text-muted">Fat ({{ day_totals.fat_pct }}%)</div>
-                            </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="border rounded p-2">
-                                <strong>{{ "%.1f"|format(day_totals.fiber) }}g</strong>
-                                <div class="small text-muted">Fiber</div>
-                            </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="border rounded p-2">
+                        <div class="col-6 mb-2">
+                            <div class="border rounded p-1">
                                 <strong class="h4 text-warning">{{ "%.1f"|format(day_totals.net_carbs) }}g</strong>
                                 <div class="small text-muted">Net Carbs</div>
                             </div>
                         </div>
-                        <div class="col-6 mb-3">
-                            <div class="border rounded p-2">
+
+                        <!-- Second Row: Macros -->
+                        <div class="col-4 mb-2">
+                            <div class="border rounded p-1">
+                                <strong class="h4 d-block text-primary mb-0">{{ "%.1f"|format(day_totals.carbs)
+                                    }}g</strong>
+                                <div class="small text-muted lh-1">Carbs</div>
+                                <div class="small text-muted lh-1">{{ day_totals.carbs_pct }}%</div>
+                            </div>
+                        </div>
+                        <div class="col-4 mb-2">
+                            <div class="border rounded p-1">
+                                <strong class="h4 d-block text-danger mb-0">{{ "%.1f"|format(day_totals.fat)
+                                    }}g</strong>
+                                <div class="small text-muted lh-1">Fat</div>
+                                <div class="small text-muted lh-1">{{ day_totals.fat_pct }}%</div>
+                            </div>
+                        </div>
+                        <div class="col-4 mb-2">
+                            <div class="border rounded p-1">
+                                <strong class="h4 d-block text-success mb-0">{{ "%.1f"|format(day_totals.protein)
+                                    }}g</strong>
+                                <div class="small text-muted lh-1">Protein</div>
+                                <div class="small text-muted lh-1">{{ day_totals.protein_pct }}%</div>
+                            </div>
+                        </div>
+
+                        <!-- Third Row: Micros & Sugar -->
+                        <div class="col-4 mb-2">
+                            <div class="border rounded p-1">
                                 <strong>{{ "%.0f"|format(day_totals.sugar) }}g</strong>
                                 <div class="small text-muted">Sugar</div>
                             </div>
                         </div>
-                        <div class="col-6 mb-3">
-                            <div class="border rounded p-2">
+                        <div class="col-4 mb-2">
+                            <div class="border rounded p-1">
+                                <strong>{{ "%.1f"|format(day_totals.fiber) }}g</strong>
+                                <div class="small text-muted">Fiber</div>
+                            </div>
+                        </div>
+                        <div class="col-4 mb-2">
+                            <div class="border rounded p-1">
                                 <strong>{{ "%.0f"|format(day_totals.sodium) }}mg</strong>
                                 <div class="small text-muted">Sodium</div>
                             </div>
@@ -301,38 +312,33 @@
                     <h5 class="mb-0">Macro Balance</h5>
                 </div>
                 <div class="card-body">
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between small mb-1">
-                            <span class="text-success fw-bold">Protein</span>
-                            <span>{{ day_totals.protein_pct }}%</span>
-                        </div>
-                        <div class="progress" style="height: 10px;">
-                            <div class="progress-bar bg-success" role="progressbar"
-                                style="width: {{ day_totals.protein_pct }}%"
-                                aria-valuenow="{{ day_totals.protein_pct }}" aria-valuemin="0" aria-valuemax="100">
-                            </div>
+                    <!-- Labels Row -->
+                    <div class="d-flex w-100 mb-1 small fw-bold">
+                        <div class="text-center" style="width: {{ day_totals.carbs_pct }}%; color: #0d6efd;">Carbs</div>
+                        <div class="text-center text-danger" style="width: {{ day_totals.fat_pct }}%;">Fat</div>
+                        <div class="text-center text-success" style="width: {{ day_totals.protein_pct }}%;">Protein
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between small mb-1">
-                            <span class="fw-bold" style="color: #0d6efd;">Carbs</span>
-                            <span>{{ day_totals.carbs_pct }}%</span>
-                        </div>
-                        <div class="progress" style="height: 10px;">
-                            <div class="progress-bar" role="progressbar" style="width: {{ day_totals.carbs_pct }}%"
-                                aria-valuenow="{{ day_totals.carbs_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
+
+                    <!-- Stacked Progress Bar -->
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar" role="progressbar" style="width: {{ day_totals.carbs_pct }}%"
+                            aria-valuenow="{{ day_totals.carbs_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="progress-bar bg-danger" role="progressbar" style="width: {{ day_totals.fat_pct }}%"
+                            aria-valuenow="{{ day_totals.fat_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="progress-bar bg-success" role="progressbar"
+                            style="width: {{ day_totals.protein_pct }}%" aria-valuenow="{{ day_totals.protein_pct }}"
+                            aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
-                    <div class="mb-0">
-                        <div class="d-flex justify-content-between small mb-1">
-                            <span class="text-danger fw-bold">Fat</span>
-                            <span>{{ day_totals.fat_pct }}%</span>
+
+                    <!-- Values Row -->
+                    <div class="d-flex w-100 mt-1 small text-muted">
+                        <div class="text-center" style="width: {{ day_totals.carbs_pct }}%;">{{ day_totals.carbs_pct }}%
                         </div>
-                        <div class="progress" style="height: 10px;">
-                            <div class="progress-bar bg-danger" role="progressbar"
-                                style="width: {{ day_totals.fat_pct }}%" aria-valuenow="{{ day_totals.fat_pct }}"
-                                aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="text-center" style="width: {{ day_totals.fat_pct }}%;">{{ day_totals.fat_pct }}%
                         </div>
+                        <div class="text-center" style="width: {{ day_totals.protein_pct }}%;">{{ day_totals.protein_pct
+                            }}%</div>
                     </div>
                 </div>
             </div>
