@@ -11,6 +11,7 @@ from app.api.routes import (
     templates,
     tracker,
     weekly_menu,
+    fitbit,
 )
 
 api_router = APIRouter()
@@ -20,6 +21,7 @@ api_router.include_router(meals.router, tags=["meals"])
 api_router.include_router(templates.router, tags=["templates"])
 api_router.include_router(charts.router, tags=["charts"])
 api_router.include_router(admin.router, tags=["admin"])
+api_router.include_router(fitbit.router, tags=["fitbit"])
 api_router.include_router(weekly_menu.router, tags=["weekly_menu"])
 api_router.include_router(plans.router, tags=["plans"])
 api_router.include_router(export.router, tags=["export"])

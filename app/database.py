@@ -170,6 +170,26 @@ class TrackedMealFood(Base):
     tracked_meal = relationship("TrackedMeal", back_populates="tracked_foods")
     food = relationship("Food")
 
+class FitbitConfig(Base):
+    __tablename__ = "fitbit_config"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(String)
+    client_secret = Column(String)
+    redirect_uri = Column(String, default="http://localhost:8080/fitbit-callback")
+    access_token = Column(String, nullable=True)
+    refresh_token = Column(String, nullable=True)
+    expires_at = Column(Float, nullable=True)  # Timestamp
+
+class WeightLog(Base):
+    __tablename__ = "weight_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, index=True)
+    weight = Column(Float)
+    source = Column(String, default="fitbit")
+    fitbit_log_id = Column(String, unique=True, index=True)  # To prevent duplicates
+
 # Pydantic models
 class FoodCreate(BaseModel):
     name: str

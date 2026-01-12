@@ -1,0 +1,179 @@
+{% extends "admin/index.html" %}
+
+{% block admin_content %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Fitbit Connection</h5>
+        {% if is_connected %}
+        <span class="badge bg-success">Connected</span>
+        {% else %}
+        <span class="badge bg-secondary">Disconnected</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+
+        <!-- Configuration Form -->
+        <form action="/admin/fitbit/config" method="post" class="mb-4">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Client ID</label>
+                    <input type="text" class="form-control" name="client_id" value="{{ config.client_id or '' }}"
+                        required>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Client Secret</label>
+                    <input type="text" class="form-control" name="client_secret"
+                        value="{{ config.client_secret or '' }}" required>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Redirect URI</label>
+                    <input type="text" class="form-control" name="redirect_uri"
+                        value="{{ config.redirect_uri or 'http://localhost:8080/fitbit-callback' }}" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-outline-primary btn-sm">Update Configuration</button>
+        </form>
+
+        <hr>
+
+        {% if not is_connected %}
+        <div class="alert alert-info">
+            <strong>Connect to Fitbit:</strong>
+            <ol>
+                <li>Click "Get Authorization URL" below.</li>
+                <li>Visit the URL in your browser and authorize the app.</li>
+                <li>You will be redirected to a URL (likely failing to load). Copy the entire URL.</li>
+                <li>Paste it in the box below and click "Complete Connection".</li>
+            </ol>
+        </div>
+
+        <div class="mb-3">
+            <button id="get-auth-url-btn" class="btn btn-primary">Get Authorization URL</button>
+            <div id="auth-url-container" class="mt-2" style="display:none;">
+                <textarea class="form-control" rows="2" readonly id="auth-url-display"></textarea>
+                <a href="#" target="_blank" id="auth-link" class="btn btn-sm btn-link">Open Link</a>
+            </div>
+        </div>
+
+        <form action="/admin/fitbit/auth/exchange" method="post">
+            <div class="input-group">
+                <input type="text" class="form-control" name="code_input"
+                    placeholder="Paste full redirected URL or code here..." required>
+                <button class="btn btn-success" type="submit">Complete Connection</button>
+            </div>
+        </form>
+
+        {% else %}
+
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-primary sync-btn" data-scope="30d">
+                <i class="bi bi-arrow-repeat"></i> Sync Last 30 Days
+            </button>
+            <button class="btn btn-secondary sync-btn" data-scope="all">
+                <i class="bi bi-clock-history"></i> Sync All History
+            </button>
+            <span id="sync-status" class="text-muted"></span>
+        </div>
+
+        {% endif %}
+
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Recent Weight Logs</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Weight (kg)</th>
+                    <th>Source</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ log.date }}</td>
+                    <td>{{ log.weight }}</td>
+                    <td>{{ log.source }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" class="text-center text-muted">No logs found. Sync to import data.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Auth URL handler
+        const authBtn = document.getElementById('get-auth-url-btn');
+        if (authBtn) {
+            authBtn.addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/admin/fitbit/auth_url');
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        const container = document.getElementById('auth-url-container');
+                        const display = document.getElementById('auth-url-display');
+                        const link = document.getElementById('auth-link');
+
+                        display.value = data.url;
+                        link.href = data.url;
+                        container.style.display = 'block';
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                } catch (e) {
+                    alert('Request failed: ' + e);
+                }
+            });
+        }
+
+        // Sync handler
+        const syncBtns = document.querySelectorAll('.sync-btn');
+        syncBtns.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const scope = btn.dataset.scope;
+                const statusFn = document.getElementById('sync-status');
+
+                // Disable all sync buttons
+                syncBtns.forEach(b => b.disabled = true);
+
+                statusFn.textContent = scope === 'all' ? 'Syncing history (this may take a while)...' : 'Syncing...';
+                statusFn.className = 'text-muted';
+
+                try {
+                    const formData = new FormData();
+                    formData.append('scope', scope);
+
+                    const response = await fetch('/admin/fitbit/sync', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    if (data.status === 'success' || data.status === 'warning') {
+                        statusFn.textContent = data.message;
+                        statusFn.className = data.status === 'warning' ? 'text-warning' : 'text-success';
+                        setTimeout(() => location.reload(), 2000); // Reload to show data
+                    } else {
+                        statusFn.textContent = 'Error: ' + data.message;
+                        statusFn.className = 'text-danger';
+                    }
+                } catch (e) {
+                    statusFn.textContent = 'Failed: ' + e;
+                    statusFn.className = 'text-danger';
+                } finally {
+                    syncBtns.forEach(b => b.disabled = false);
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

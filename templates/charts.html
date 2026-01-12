@@ -100,30 +100,82 @@
                     resizeChart();
 
                     chart = new Chart(ctx, {
-                        type: 'bar', // Switch to bar chart
+                        type: 'bar',
                         data: {
                             labels: labels,
                             datasets: [
+                                {
+                                    type: 'line',
+                                    label: 'Weight (lbs)',
+                                    data: data.map(item => item.weight_lbs),
+                                    borderColor: '#0d6efd', // Bootstrap primary (Blue)
+                                    backgroundColor: '#0d6efd',
+                                    borderWidth: 2,
+                                    pointRadius: function (context) {
+                                        const index = context.dataIndex;
+                                        const item = data[index]; // Access data array from outer scope
+
+                                        // Show dot if it's a real weight measurement
+                                        if (item.weight_is_real) return 4;
+
+                                        // "Or the first point if no datapoints in the view"
+                                        // Check if ANY point in the view is real
+                                        const anyReal = data.some(d => d.weight_is_real);
+                                        if (!anyReal) {
+                                            // Make sure we only show ONE dot (the first one / oldest date)
+                                            // Data is sorted by date ascending in frontend (index 0 is oldest)
+                                            if (index === 0 && item.weight_lbs !== null) return 4;
+                                        }
+
+                                        return 0; // Hide dot for inferred points
+                                    },
+                                    yAxisID: 'y1',
+                                    datalabels: {
+                                        display: true,
+                                        align: 'top',
+                                        formatter: function (value, context) {
+                                            // Only show label if radius > 0
+                                            const index = context.dataIndex;
+                                            const item = data[index];
+
+                                            // Same logic as pointRadius
+                                            let show = false;
+                                            if (item.weight_is_real) show = true;
+                                            else {
+                                                const anyReal = data.some(d => d.weight_is_real);
+                                                if (!anyReal && index === 0 && item.weight_lbs !== null) show = true;
+                                            }
+
+                                            return show ? (value ? value + ' lbs' : '') : '';
+                                        },
+                                        color: '#0d6efd',
+                                        font: { weight: 'bold' }
+                                    },
+                                    spanGaps: true
+                                },
                                 {
                                     label: 'Net Carbs',
                                     data: netCarbsCals,
                                     backgroundColor: 'rgba(255, 193, 7, 0.8)', // Bootstrap warning (Yellow)
                                     borderColor: '#ffc107',
-                                    borderWidth: 1
+                                    borderWidth: 1,
+                                    yAxisID: 'y'
                                 },
                                 {
                                     label: 'Fat',
                                     data: fatCals,
                                     backgroundColor: 'rgba(220, 53, 69, 0.8)', // Bootstrap danger (Red)
                                     borderColor: '#dc3545',
-                                    borderWidth: 1
+                                    borderWidth: 1,
+                                    yAxisID: 'y'
                                 },
                                 {
                                     label: 'Protein',
                                     data: proteinCals,
                                     backgroundColor: 'rgba(25, 135, 84, 0.8)', // Bootstrap success (Green)
                                     borderColor: '#198754',
-                                    borderWidth: 1
+                                    borderWidth: 1,
+                                    yAxisID: 'y'
                                 }
                             ]
                         },
@@ -133,14 +185,26 @@
                             scales: {
                                 y: {
                                     beginAtZero: true,
-                                    stacked: true, // Enable stacking for Y axis
+                                    stacked: true,
                                     title: {
                                         display: true,
                                         text: 'Calories'
                                     }
                                 },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    title: {
+                                        display: true,
+                                        text: 'Weight (lbs)'
+                                    },
+                                    grid: {
+                                        drawOnChartArea: false // only want the grid lines for one axis to show up
+                                    }
+                                },
                                 x: {
-                                    stacked: true, // Enable stacking for X axis
+                                    stacked: true,
                                     title: {
                                         display: true,
                                         text: 'Date'
@@ -156,8 +220,11 @@
                                                 label += ': ';
                                             }
                                             if (context.parsed.y !== null) {
+                                                if (context.dataset.type === 'line') {
+                                                    return label + context.parsed.y + ' lbs';
+                                                }
                                                 const dayData = data[context.dataIndex];
-                                                const macroKey = MACRO_KEYS[context.datasetIndex];
+                                                const macroKey = MACRO_KEYS[context.datasetIndex - 1]; // Offset by 1 due to weight dataset
                                                 const grams = dayData[macroKey];
                                                 label += Math.round(context.parsed.y) + ' cals (' + Math.round(grams) + 'g)';
                                             }
@@ -172,6 +239,8 @@
                                         size: 11
                                     },
                                     display: function (context) {
+                                        if (context.dataset.type === 'line') return false; // Handled separately
+
                                         const dayData = data[context.dataIndex];
                                         const pC = dayData.protein * 4;
                                         const fC = dayData.fat * 9;
@@ -182,6 +251,8 @@
                                         return calcTotal > 0 && (value / calcTotal) > 0.05;
                                     },
                                     formatter: function (value, context) {
+                                        if (context.dataset.type === 'line') return '';
+
                                         const dayData = data[context.dataIndex];
                                         const pC = dayData.protein * 4;
                                         const fC = dayData.fat * 9;
@@ -190,7 +261,7 @@
 
                                         const totalCals = calcTotal || 1;
                                         const percent = Math.round((value / totalCals) * 100);
-                                        const macroKey = MACRO_KEYS[context.datasetIndex];
+                                        const macroKey = MACRO_KEYS[context.datasetIndex - 1]; // Offset by 1
                                         const grams = Math.round(dayData[macroKey]);
 
                                         return grams + 'g\n' + percent + '%';
