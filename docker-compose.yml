@@ -4,11 +4,13 @@ services:
     ports:
       - "8999:8999"
     environment:
-      - DATABASE_URL=sqlite:////app/data/meal_planner.db
+      #- DATABASE_URL=sqlite:////app/data/meal_planner.db
+      - DATABASE_URL=postgresql://postgres:postgres@master.postgres.service.dc1.consul/meal_planner
       - PYTHONUNBUFFERED=1
     volumes:
       - ./alembic:/app/alembic
       - ./data:/app/data
+      - ./backups:/app/backups
       - ./app:/app/app
       - ./templates:/app/templates
       - ./main.py:/app/main.py

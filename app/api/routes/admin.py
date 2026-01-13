@@ -188,5 +188,44 @@ async def restore_backup(request: Request, backup_file: str = Form(...)):
         pass
 
     # Redirect back to the backups page
+    # Redirect back to the backups page
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/admin/backups", status_code=303)
+
+@router.get("/admin/config-status", response_class=HTMLResponse)
+async def admin_config_status_page(request: Request):
+    """Display current system configuration and database status."""
+    from urllib.parse import urlparse
+    
+    # Analyze DATABASE_URL securely
+    db_url = DATABASE_URL
+    masked_url = db_url
+    db_host = "Unknown"
+    db_type = "Unknown"
+
+    try:
+        # Simple parsing logic to avoid exposing credentials if urlparse fails or acts unexpectedly
+        if "sqlite" in db_url:
+            db_type = "SQLite"
+            db_host = db_url.replace("sqlite:///", "")
+            masked_url = "sqlite:///" + db_host
+        elif "postgresql" in db_url:
+            db_type = "PostgreSQL"
+            parsed = urlparse(db_url)
+            db_host = parsed.hostname
+            # Mask password
+            if parsed.password:
+                masked_url = db_url.replace(parsed.password, "******")
+    except Exception as e:
+        logging.error(f"Error parsing database URL: {e}")
+        masked_url = "Error parsing URL"
+    
+    config_data = {
+        "database_url": db_url, 
+        "database_url_masked": masked_url,
+        "database_type": db_type,
+        "database_host": db_host,
+        "debug": True 
+    }
+
+    return templates.TemplateResponse(request, "admin/config.html", {"request": request, "config": config_data})
