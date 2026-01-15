@@ -33,7 +33,7 @@ job "foodplanner" {
       driver = "docker"
 
       config {
-        image = "ghcr.io/sstent/foodplanner:main"
+        image = "ghcr.io/sstent/foodplanner:${var.container_version}"
         ports = ["http"]
       }
       env {
