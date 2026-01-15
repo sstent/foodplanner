@@ -46,6 +46,7 @@ async def lifespan(app: FastAPI):
     # Schedule the backup job - temporarily disabled for debugging
     scheduler = BackgroundScheduler()
     scheduler.add_job(scheduled_backup, 'cron', hour=0)
+    scheduler.add_job(scheduled_fitbit_sync, 'interval', hours=1)
     scheduler.start()
     logging.info("Scheduled backup job started.")
     yield
@@ -151,6 +152,19 @@ def scheduled_backup():
     
     backup_path = os.path.join(backup_dir, f"meal_planner_{timestamp}.db")
     backup_database(db_path, backup_path)
+
+def scheduled_fitbit_sync():
+    """Sync Fitbit weight data."""
+    logging.info("DEBUG: Starting scheduled Fitbit sync...")
+    db = SessionLocal()
+    from app.services.fitbit_service import sync_fitbit_weight
+    try:
+        result = sync_fitbit_weight(db, scope="30d")
+        logging.info(f"Scheduled Fitbit result: {result}")
+    except Exception as e:
+        logging.error(f"Scheduled Fitbit sync failed: {e}")
+    finally:
+        db.close()
 
 
 def test_sqlite_connection(db_path):

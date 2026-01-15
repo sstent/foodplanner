@@ -312,6 +312,7 @@
                     <h5 class="mb-0">Macro Balance</h5>
                 </div>
                 <div class="card-body">
+                    {% if day_totals.calories > 0 %}
                     <!-- Labels Row -->
                     <div class="d-flex w-100 mb-1 small fw-bold">
                         <div class="text-center" style="width: {{ day_totals.carbs_pct }}%; color: #0d6efd;">Carbs</div>
@@ -340,6 +341,11 @@
                         <div class="text-center" style="width: {{ day_totals.protein_pct }}%;">{{ day_totals.protein_pct
                             }}%</div>
                     </div>
+                    {% else %}
+                    <div class="text-center text-muted my-3">
+                        <small>No meals tracked yet</small>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
