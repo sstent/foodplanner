@@ -1,3 +1,7 @@
+variable "container_version" {
+  default = "latest"
+}
+
 job "foodplanner" {
   datacenters = ["dc1"]
 
