@@ -1,0 +1,56 @@
+name: Deploy to Nomad
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Image"]  # Must match your build workflow name exactly
+    types:
+      - completed
+  workflow_dispatch:  # Allows manual triggering for testing
+    inputs:
+      container_sha:
+        description: 'Container SHA to deploy (leave empty for latest commit)'
+        required: false
+        type: string
+
+jobs:
+  nomad:
+    runs-on: ubuntu-latest
+    name: Deploy to Nomad
+    # Only run if the build workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      # 1. Checkout Code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      # 2. Install Nomad CLI
+      - name: Setup Nomad CLI
+        uses: hashicorp/setup-nomad@main
+        with:
+          version: '1.10.0' # Use your desired version or remove for 'latest'
+
+      # 3. Determine container version to deploy
+      - name: Set Container Version
+        id: container_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.container_sha }}" ]; then
+            echo "sha=${{ inputs.container_sha }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      # 4. Deploy the Nomad Job
+      - name: Deploy Nomad Job
+        id: deploy
+        env:
+          # REQUIRED: Set the Nomad server address
+          NOMAD_ADDR: http://nomad.service.dc1.consul:4646
+        run: |
+          echo "Deploying container version: ${{ steps.container_version.outputs.sha }}"
+          nomad status
+          nomad job run \
+            -var="container_version=${{ steps.container_version.outputs.sha }}" \
+            foodplanner.nomad
