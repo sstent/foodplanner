@@ -7,7 +7,7 @@ This plan follows the Test-Driven Development (TDD) process as outlined in `cond
     - [ ] Define a new test in `tests/calcium_display.spec.js` that navigates to the tracker and expects a "Calcium" label and a numeric value in the Daily Totals section.
     - [ ] Execute the test and confirm it fails (Red Phase).
 
-## Phase 2: Implementation (Green Phase)
+## Phase 2: Implementation (Green Phase) [checkpoint: 7718a7f]
 - [x] Task: Update tracker template to include Calcium
     - [ ] Modify `templates/tracker.html` to add a fourth column to the third row of the "Daily Totals" card.
     - [ ] Update existing `col-4` classes in that row to `col-3` to accommodate the new column.
