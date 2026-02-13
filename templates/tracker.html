@@ -284,22 +284,28 @@
                         </div>
 
                         <!-- Third Row: Micros & Sugar -->
-                        <div class="col-4 mb-2">
+                        <div class="col-3 mb-2">
                             <div class="border rounded p-1">
                                 <strong>{{ "%.0f"|format(day_totals.sugar) }}g</strong>
                                 <div class="small text-muted">Sugar</div>
                             </div>
                         </div>
-                        <div class="col-4 mb-2">
+                        <div class="col-3 mb-2">
                             <div class="border rounded p-1">
                                 <strong>{{ "%.1f"|format(day_totals.fiber) }}g</strong>
                                 <div class="small text-muted">Fiber</div>
                             </div>
                         </div>
-                        <div class="col-4 mb-2">
+                        <div class="col-3 mb-2">
                             <div class="border rounded p-1">
                                 <strong>{{ "%.0f"|format(day_totals.sodium) }}mg</strong>
                                 <div class="small text-muted">Sodium</div>
+                            </div>
+                        </div>
+                        <div class="col-3 mb-2">
+                            <div class="border rounded p-1">
+                                <strong data-testid="daily-calcium-value">{{ "%.0f"|format(day_totals.calcium) }}mg</strong>
+                                <div class="small text-muted">Calcium</div>
                             </div>
                         </div>
                     </div>
