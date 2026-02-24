@@ -148,8 +148,9 @@ class TrackedMeal(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tracked_day_id = Column(Integer, ForeignKey("tracked_days.id"))
-    meal_id = Column(Integer, ForeignKey("meals.id"))
+    meal_id = Column(Integer, ForeignKey("meals.id"), nullable=True)
     meal_time = Column(String)  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
+    name = Column(String, nullable=True) # For single food items or custom names
 
     tracked_day = relationship("TrackedDay", back_populates="tracked_meals")
     meal = relationship("Meal")
