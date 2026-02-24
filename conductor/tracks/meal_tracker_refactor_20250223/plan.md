@@ -8,7 +8,7 @@ This plan outlines the steps for refactoring the meal tracking system to decoupl
 - [x] Task: Create and run an Alembic migration for the schema changes.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Preparation & Schema Updates' (Protocol in workflow.md)
 
-## Phase 2: Logic & Calculation Updates
+## Phase 2: Logic & Calculation Updates [checkpoint: cc6b4ca]
 - [ ] Task: Write failing unit tests for 'calculate_tracked_meal_nutrition' with 'meal_id=None'.
 - [ ] Task: Implement support for 'meal_id=None' in 'calculate_tracked_meal_nutrition' within 'app/database.py'.
 - [ ] Task: Write failing unit tests for the refactored 'tracker_add_food' endpoint.
