@@ -51,6 +51,6 @@ jobs:
         run: |
           echo "Deploying container version: ${{ steps.container_version.outputs.sha }}"
           nomad status
-          nomad job run 
-            -var="container_version=${{ steps.container_version.outputs.sha }}" 
+          nomad job run \
+            -var="container_version=${{ steps.container_version.outputs.sha }}" \
             foodplanner-dev.nomad

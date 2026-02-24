@@ -148,8 +148,9 @@ class TrackedMeal(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tracked_day_id = Column(Integer, ForeignKey("tracked_days.id"))
-    meal_id = Column(Integer, ForeignKey("meals.id"))
+    meal_id = Column(Integer, ForeignKey("meals.id"), nullable=True)
     meal_time = Column(String)  # Breakfast, Lunch, Dinner, Snack 1, Snack 2, Beverage 1, Beverage 2
+    name = Column(String, nullable=True) # For single food items or custom names
 
     tracked_day = relationship("TrackedDay", back_populates="tracked_meals")
     meal = relationship("Meal")
@@ -427,9 +428,11 @@ def calculate_tracked_meal_nutrition(tracked_meal, db: Session):
         'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
     }
     
-    # 1. Get base foods from the meal
+    # 1. Get base foods from the meal (if it exists)
     # access via relationship, assume eager loading or lazy loading
-    base_foods = {mf.food_id: mf for mf in tracked_meal.meal.meal_foods}
+    base_foods = {}
+    if tracked_meal.meal:
+        base_foods = {mf.food_id: mf for mf in tracked_meal.meal.meal_foods}
     
     # 2. Get tracked foods (overrides, deletions, additions)
     tracked_foods = tracked_meal.tracked_foods

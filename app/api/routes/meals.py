@@ -15,7 +15,10 @@ router = APIRouter()
 @router.get("/meals", response_class=HTMLResponse)
 async def meals_page(request: Request, db: Session = Depends(get_db)):
     from sqlalchemy.orm import joinedload
-    meals = db.query(Meal).options(joinedload(Meal.meal_foods).joinedload(MealFood.food)).all()
+    # Filter out single food entries and snapshots
+    meals = db.query(Meal).filter(
+        Meal.meal_type.notin_(["single_food", "tracked_snapshot"])
+    ).options(joinedload(Meal.meal_foods).joinedload(MealFood.food)).all()
     foods = db.query(Food).all()
     return templates.TemplateResponse("meals.html",
                                     {"request": request, "meals": meals, "foods": foods})
