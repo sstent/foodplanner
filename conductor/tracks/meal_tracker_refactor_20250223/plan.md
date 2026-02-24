@@ -22,7 +22,7 @@ This plan outlines the steps for refactoring the meal tracking system to decoupl
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: UI & Cookbook Refinement' (Protocol in workflow.md)
 
 ## Phase 4: Database Migration & Cleanup
-- [ ] Task: Create a Python migration script for cleaning up existing 'single_food' entries.
-- [ ] Task: Run the migration script on the development PostgreSQL database.
-- [ ] Task: Verify the database state and ensure no orphans remain.
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Database Migration & Cleanup' (Protocol in workflow.md)
+- [x] Task: Create a Python migration script for cleaning up existing 'single_food' entries.
+- [x] Task: Run the migration script on the development PostgreSQL database.
+- [x] Task: Verify the database state and ensure no orphans remain.
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Database Migration & Cleanup' (Protocol in workflow.md)
