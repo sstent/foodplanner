@@ -140,10 +140,13 @@ def test_tracker_add_food_grams_input(client, session, sample_food_100g):
     assert response.json()["status"] == "success"
 
     # Verify the tracked meal food quantity
-    tracked_meal = session.query(Meal).filter(Meal.name == sample_food_100g.name).first()
+    tracked_meal = session.query(TrackedMeal).filter(TrackedMeal.name == sample_food_100g.name).first()
     assert tracked_meal is not None
-    meal_food = session.query(MealFood).filter(MealFood.meal_id == tracked_meal.id).first()
-    assert meal_food.quantity == grams
+    assert tracked_meal.meal_id is None
+    
+    tmf = session.query(TrackedMealFood).filter(TrackedMealFood.tracked_meal_id == tracked_meal.id).first()
+    assert tmf is not None
+    assert tmf.quantity == grams
 
 def test_update_tracked_meal_foods_grams_input(client, session, sample_food_100g, sample_food_50g):
     """Test updating tracked meal foods with grams input"""

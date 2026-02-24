@@ -428,9 +428,11 @@ def calculate_tracked_meal_nutrition(tracked_meal, db: Session):
         'fiber': 0, 'sugar': 0, 'sodium': 0, 'calcium': 0
     }
     
-    # 1. Get base foods from the meal
+    # 1. Get base foods from the meal (if it exists)
     # access via relationship, assume eager loading or lazy loading
-    base_foods = {mf.food_id: mf for mf in tracked_meal.meal.meal_foods}
+    base_foods = {}
+    if tracked_meal.meal:
+        base_foods = {mf.food_id: mf for mf in tracked_meal.meal.meal_foods}
     
     # 2. Get tracked foods (overrides, deletions, additions)
     tracked_foods = tracked_meal.tracked_foods

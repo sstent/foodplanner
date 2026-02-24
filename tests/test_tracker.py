@@ -384,12 +384,13 @@ class TestTrackerAddFood:
         assert len(tracked_meals) == 1
         
         tracked_meal = tracked_meals[0]
-        assert tracked_meal.meal.name == sample_food.name # The meal name should be the food name
+        assert tracked_meal.name == sample_food.name # The meal name should be the food name
+        assert tracked_meal.meal_id is None
 
         # Verify the food is in the tracked meal's foods
-        assert len(tracked_meal.meal.meal_foods) == 1
-        assert tracked_meal.meal.meal_foods[0].food_id == sample_food.id
-        assert tracked_meal.meal.meal_foods[0].quantity == 100.0
+        assert len(tracked_meal.tracked_foods) == 1
+        assert tracked_meal.tracked_foods[0].food_id == sample_food.id
+        assert tracked_meal.tracked_foods[0].quantity == 100.0
 
 
     def test_add_food_to_tracker_with_meal_time(self, client, sample_food, db_session):
@@ -418,11 +419,12 @@ class TestTrackerAddFood:
         assert len(tracked_meals) == 1
         
         tracked_meal = tracked_meals[0]
-        assert tracked_meal.meal.name == sample_food.name
+        assert tracked_meal.name == sample_food.name
+        assert tracked_meal.meal_id is None
 
-        assert len(tracked_meal.meal.meal_foods) == 1
-        assert tracked_meal.meal.meal_foods[0].food_id == sample_food.id
-        assert tracked_meal.meal.meal_foods[0].quantity == 150.0
+        assert len(tracked_meal.tracked_foods) == 1
+        assert tracked_meal.tracked_foods[0].food_id == sample_food.id
+        assert tracked_meal.tracked_foods[0].quantity == 150.0
 
     def test_add_food_quantity_is_correctly_converted_to_servings(self, client, db_session):
         """
@@ -464,12 +466,13 @@ class TestTrackerAddFood:
         assert len(tracked_meals) == 1
         
         tracked_meal = tracked_meals[0]
-        assert tracked_meal.meal.name == food.name
+        assert tracked_meal.name == food.name
+        assert tracked_meal.meal_id is None
 
-        # Verify the food is in the tracked meal's foods and quantity is in servings
-        assert len(tracked_meal.meal.meal_foods) == 1
-        assert tracked_meal.meal.meal_foods[0].food_id == food.id
-        assert tracked_meal.meal.meal_foods[0].quantity == grams_to_add
+        # Verify the food is in the tracked meal's foods
+        assert len(tracked_meal.tracked_foods) == 1
+        assert tracked_meal.tracked_foods[0].food_id == food.id
+        assert tracked_meal.tracked_foods[0].quantity == grams_to_add
 
         # Verify nutrition calculation
         day_nutrition = calculate_day_nutrition_tracked([tracked_meal], db_session)

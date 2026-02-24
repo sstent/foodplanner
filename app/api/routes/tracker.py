@@ -746,23 +746,25 @@ async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)
         # Store grams directly
         quantity = grams
 
-        # Create a new Meal for this single food entry
-        # This allows it to be treated like any other meal in the tracker view
-        new_meal = Meal(name=food_item.name, meal_type="single_food", meal_time=meal_time)
-        db.add(new_meal)
-        db.flush() # Flush to get the new meal ID
-
-        # Link the food to the new meal
-        meal_food = MealFood(meal_id=new_meal.id, food_id=food_id, quantity=grams)
-        db.add(meal_food)
-        
-        # Create tracked meal entry
+        # Create tracked meal entry without a parent Meal template
         tracked_meal = TrackedMeal(
             tracked_day_id=tracked_day.id,
-            meal_id=new_meal.id,
-            meal_time=meal_time
+            meal_id=None,
+            meal_time=meal_time,
+            name=food_item.name
         )
         db.add(tracked_meal)
+        db.flush() # Flush to get the tracked_meal ID
+        
+        # Link the food directly to the tracked meal via TrackedMealFood
+        new_entry = TrackedMealFood(
+            tracked_meal_id=tracked_meal.id,
+            food_id=food_id,
+            quantity=grams,
+            is_override=False,
+            is_deleted=False
+        )
+        db.add(new_entry)
         
         # Mark day as modified
         tracked_day.is_modified = True

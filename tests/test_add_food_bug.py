@@ -98,20 +98,9 @@ def test_add_food_quantity_saved_correctly(test_client: TestClient, test_engine)
         query_session = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)()
         
         try:
-            # Find the created Meal
-            created_meal = query_session.query(Meal).order_by(Meal.id.desc()).first()
-            assert created_meal is not None
-            assert created_meal.name == "Test Food"
-            assert created_meal.meal_type == "single_food"
-
-            # Find the MealFood
-            meal_food = query_session.query(MealFood).filter(MealFood.meal_id == created_meal.id).first()
-            assert meal_food is not None
-            assert meal_food.food_id == food.id
-
-            # This assertion fails because the backend used data.get("grams", 1.0), so quantity=1.0 instead of 50.0
-            # After the fix changing to data.get("quantity", 1.0), it will pass
-            assert meal_food.quantity == 50.0, f"Expected quantity 50.0, but got {meal_food.quantity}"
+            # Verify NO new Meal was created
+            meals = query_session.query(Meal).all()
+            assert len(meals) == 0
 
             # Also verify TrackedDay and TrackedMeal were created
             tracked_day = query_session.query(TrackedDay).filter(
@@ -123,8 +112,16 @@ def test_add_food_quantity_saved_correctly(test_client: TestClient, test_engine)
 
             tracked_meal = query_session.query(TrackedMeal).filter(TrackedMeal.tracked_day_id == tracked_day.id).first()
             assert tracked_meal is not None
-            assert tracked_meal.meal_id == created_meal.id
+            assert tracked_meal.meal_id is None
+            assert tracked_meal.name == "Test Food"
             assert tracked_meal.meal_time == "Snack 1"
+
+            # Find the TrackedMealFood
+            from app.database import TrackedMealFood
+            tmf = query_session.query(TrackedMealFood).filter(TrackedMealFood.tracked_meal_id == tracked_meal.id).first()
+            assert tmf is not None
+            assert tmf.food_id == food.id
+            assert tmf.quantity == 50.0
             
         finally:
             query_session.close()
