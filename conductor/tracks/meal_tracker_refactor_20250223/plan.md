@@ -15,7 +15,7 @@ This plan outlines the steps for refactoring the meal tracking system to decoupl
 - [ ] Task: Refactor the 'tracker_add_food' route in 'app/api/routes/tracker.py' to use the new 'TrackedMeal' structure.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Logic & Calculation Updates' (Protocol in workflow.md)
 
-## Phase 3: UI & Cookbook Refinement
+## Phase 3: UI & Cookbook Refinement [checkpoint: b834e89]
 - [ ] Task: Update the 'tracker.html' template to display 'TrackedMeal.name' for template-less logs.
 - [ ] Task: Update the Meals page in 'app/api/routes/meals.py' to filter out 'single_food' and 'snapshot' types.
 - [ ] Task: Write failing E2E tests for the new tracking workflow.
