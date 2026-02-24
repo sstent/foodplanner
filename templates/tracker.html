@@ -70,15 +70,15 @@
                     {% for tracked_meal in meals_for_time %}
                     {# 1. Create stable slugs #}
                     {% set meal_time_slug = meal_time|slugify %}
-                    {% set meal_name_safe = tracked_meal.meal.name|slugify %}
+                    {% set display_meal_name = (tracked_meal.name or tracked_meal.meal.name) if (tracked_meal.name or tracked_meal.meal) else "Unnamed Meal" %}
+                    {% set meal_name_safe = display_meal_name|slugify %}
 
                     {# 2. Construct the core Unique Meal ID for non-ambiguous locating #}
                     {% set unique_meal_id = meal_time_slug + '-' + meal_name_safe + '-' + loop.index|string %}
                     <div class="mb-3 p-3 bg-light rounded" data-testid="meal-card-{{ unique_meal_id }}">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <div>
-                                <strong data-testid="meal-name-{{ unique_meal_id }}">{{ tracked_meal.meal.name
-                                    }}</strong>
+                                <strong data-testid="meal-name-{{ unique_meal_id }}">{{ display_meal_name }}</strong>
                             </div>
                             <div>
                                 <button class="btn btn-sm btn-outline-secondary me-1"
@@ -126,6 +126,7 @@
                                     </thead>
                                     <tbody>
                                         {# Display base meal foods, applying overrides #}
+                                        {% if tracked_meal.meal %}
                                         {% for meal_food in tracked_meal.meal.meal_foods %}
                                         {% if meal_food.food_id not in deleted_food_ids and meal_food.food_id not in
                                         overrides.keys() %}
@@ -162,6 +163,7 @@
                                         </tr>
                                         {% endif %}
                                         {% endfor %}
+                                        {% endif %}
 
                                         {# Display overridden/new foods #}
                                         {% for food_id, tmf in overrides.items() %}
