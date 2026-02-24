@@ -2,7 +2,7 @@
 
 This plan outlines the steps for refactoring the meal tracking system to decouple "Journal Logs" from "Cookbook Recipes," resolving database pollution and improving system structure.
 
-## Phase 1: Preparation & Schema Updates
+## Phase 1: Preparation & Schema Updates [checkpoint: 326a82e]
 - [x] Task: Create a new branch for the refactoring track.
 - [x] Task: Add the 'name' column to the 'TrackedMeal' table and make 'meal_id' nullable in 'app/database.py'.
 - [x] Task: Create and run an Alembic migration for the schema changes.
