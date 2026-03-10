@@ -9,5 +9,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Add real-time search and alphabetical sorting to the Add Meal and Add Food modals on the tracker page.**
+- [x] **Track: Add real-time search and alphabetical sorting to the Add Meal and Add Food modals on the tracker page.**
 *Link: [./tracks/meal_food_search_20260310/](./tracks/meal_food_search_20260310/)*

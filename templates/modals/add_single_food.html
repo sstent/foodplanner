@@ -12,10 +12,11 @@
                     <input type="hidden" name="date" value="{{ current_date.isoformat() }}">
                     <div class="mb-3">
                         <label class="form-label">Select Food</label>
-                        <select class="form-control" name="food_id" required onchange="updateServingSizeNote(this)">
+                        <input type="text" class="form-control mb-2" id="foodSearchInput" placeholder="Search foods by name or brand..." data-testid="food-search-input">
+                        <select class="form-control" name="food_id" id="foodSelect" required onchange="updateServingSizeNote(this)" size="10">
                             <option value="">Choose food...</option>
                             {% for food in foods %}
-                            <option value="{{ food.id }}" data-serving-size="{{ food.serving_size }}">{{ food.name }}</option>
+                            <option value="{{ food.id }}" data-serving-size="{{ food.serving_size }}" data-brand="{{ food.brand }}" data-testid="food-option">{{ food.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -43,6 +44,36 @@
             servingSizeNote.textContent = '';
         }
     }
+
+    document.getElementById('foodSearchInput').addEventListener('input', function() {
+        const searchText = this.value.toLowerCase();
+        const select = document.getElementById('foodSelect');
+        const options = select.options;
+
+        for (let i = 0; i < options.length; i++) {
+            const option = options[i];
+            if (option.value === "") continue; // Skip "Choose food..."
+            
+            const text = option.text.toLowerCase();
+            const brand = (option.getAttribute('data-brand') || "").toLowerCase();
+            
+            if (text.includes(searchText) || brand.includes(searchText)) {
+                option.style.display = "";
+            } else {
+                option.style.display = "none";
+            }
+        }
+    });
+
+    // Reset search when modal is shown
+    document.getElementById('addSingleFoodModal').addEventListener('show.bs.modal', function () {
+        document.getElementById('foodSearchInput').value = '';
+        const options = document.getElementById('foodSelect').options;
+        for (let i = 0; i < options.length; i++) {
+            options[i].style.display = "";
+        }
+        document.getElementById('servingSizeNote').textContent = '';
+    });
 </script>
         </div>
     </div>
