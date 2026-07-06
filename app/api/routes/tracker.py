@@ -77,12 +77,15 @@ async def tracker_page(request: Request, person: str = "Sarah", date: str = None
         # Template will handle filtering of deleted foods
         # Get all meals for dropdown (exclude snapshots)
         meals = db.query(Meal).filter(Meal.meal_type != "tracked_snapshot").all()
+        meals.sort(key=lambda x: x.name.lower())
         
         # Get all templates for template dropdown
         templates_list = db.query(Template).all()
+        templates_list.sort(key=lambda x: x.name.lower())
 
         # Get all foods for dropdown
         foods = db.query(Food).all()
+        foods.sort(key=lambda x: x.name.lower())
         
         # Calculate day totals
         day_totals = calculate_day_nutrition_tracked(tracked_meals, db)

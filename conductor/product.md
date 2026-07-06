@@ -19,6 +19,7 @@ A performance-oriented meal planning application designed for health-conscious h
 - **Detailed Daily Planner:** A granular view of each day to visualize meal distribution and ensure macro balance across the day.
 - **Meals Library:** A centralized repository to create and save custom meals from individual food components.
 - **Template System:** Save and apply successful daily or weekly structures to future plans to minimize repetitive data entry.
+- **Smart Searching & Sorting:** Real-time, case-insensitive searching and alphabetical sorting in food and meal selection modals for low-friction data entry.
 - **Open Food Facts Integration:** Rapidly expand the local food database by importing data directly from the Open Food Facts API.
 
 ## Technical Philosophy

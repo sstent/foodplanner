@@ -13,10 +13,11 @@
                     <input type="hidden" name="date" value="{{ current_date.isoformat() }}">
                     <div class="mb-3">
                         <label class="form-label">Select Meal</label>
-                        <select class="form-control" name="meal_id" required>
+                        <input type="text" class="form-control mb-2" id="mealSearchInput" placeholder="Search meals..." data-testid="meal-search-input">
+                        <select class="form-control" name="meal_id" id="mealSelect" required size="10">
                             <option value="">Choose meal...</option>
                             {% for meal in meals %}
-                            <option value="{{ meal.id }}">{{ meal.name }}</option>
+                            <option value="{{ meal.id }}" data-testid="meal-option">{{ meal.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -29,3 +30,32 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.getElementById('mealSearchInput').addEventListener('input', function() {
+        const searchText = this.value.toLowerCase();
+        const select = document.getElementById('mealSelect');
+        const options = select.options;
+
+        for (let i = 0; i < options.length; i++) {
+            const option = options[i];
+            if (option.value === "") continue; // Skip "Choose meal..."
+            
+            const text = option.text.toLowerCase();
+            if (text.includes(searchText)) {
+                option.style.display = "";
+            } else {
+                option.style.display = "none";
+            }
+        }
+    });
+
+    // Reset search when modal is shown
+    document.getElementById('addMealModal').addEventListener('show.bs.modal', function () {
+        document.getElementById('mealSearchInput').value = '';
+        const options = document.getElementById('mealSelect').options;
+        for (let i = 0; i < options.length; i++) {
+            options[i].style.display = "";
+        }
+    });
+</script>
