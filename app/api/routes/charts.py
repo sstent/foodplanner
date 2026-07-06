@@ -8,7 +8,9 @@ from app.database import get_db, TrackedDay, TrackedMeal, calculate_day_nutritio
 router = APIRouter(tags=["charts"])
 
 @router.get("/charts", response_class=HTMLResponse)
-async def charts_page(request: Request, person: str = "Sarah", db: Session = Depends(get_db)):
+async def charts_page(request: Request, person: str = None, db: Session = Depends(get_db)):
+    if not person:
+        person = request.cookies.get("selectedPerson", "Sarah")
     """Render the charts page"""
     from main import templates
     return templates.TemplateResponse("charts.html", {

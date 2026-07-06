@@ -13,7 +13,9 @@ router = APIRouter()
 
 # Tracker tab - Main page
 @router.get("/tracker", response_class=HTMLResponse)
-async def tracker_page(request: Request, person: str = "Sarah", date: str = None, db: Session = Depends(get_db)):
+async def tracker_page(request: Request, person: str = None, date: str = None, db: Session = Depends(get_db)):
+    if not person:
+        person = request.cookies.get("selectedPerson", "Sarah")
     try:
         from datetime import datetime, timedelta
         

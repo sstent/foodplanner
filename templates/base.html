@@ -114,16 +114,21 @@
     <script>
         function switchPerson() {
             const person = document.getElementById('personSelect').value;
+            document.cookie = `selectedPerson=${person}; path=/; max-age=31536000`;
             localStorage.setItem('selectedPerson', person);
-            const currentUrl = new URL(window.location);
-            currentUrl.searchParams.set('person', person);
-            window.location.href = currentUrl.toString();
+            window.location.reload();
         }
 
         // Set active tab based on current URL
         document.addEventListener('DOMContentLoaded', function() {
-            // Set person selection from localStorage if available
-            const savedPerson = localStorage.getItem('selectedPerson');
+            // Set person selection from cookie or localStorage
+            const getCookie = (name) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            };
+            const savedPerson = getCookie('selectedPerson') || localStorage.getItem('selectedPerson') || 'Sarah';
             if (savedPerson) {
                 const personSelect = document.getElementById('personSelect');
                 if (personSelect) {

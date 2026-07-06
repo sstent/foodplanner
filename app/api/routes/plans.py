@@ -14,7 +14,9 @@ router = APIRouter()
 
 # Plan tab
 @router.get("/plan", response_class=HTMLResponse)
-async def plan_page(request: Request, person: str = "Sarah", week_start_date: str = None, db: Session = Depends(get_db)):
+async def plan_page(request: Request, person: str = None, week_start_date: str = None, db: Session = Depends(get_db)):
+    if not person:
+        person = request.cookies.get("selectedPerson", "Sarah")
     from datetime import datetime, timedelta
 
     # If no week_start_date provided, use current week starting from Monday
@@ -181,7 +183,9 @@ async def remove_from_plan(plan_id: int, db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 @router.get("/detailed", response_class=HTMLResponse, name="detailed")
-async def detailed(request: Request, person: str = "Sarah", plan_date: str = None, template_id: int = None, db: Session = Depends(get_db)):
+async def detailed(request: Request, person: str = None, plan_date: str = None, template_id: int = None, db: Session = Depends(get_db)):
+    if not person:
+        person = request.cookies.get("selectedPerson", "Sarah")
     from datetime import datetime, date
     logging.info(f"DEBUG: Detailed page requested with url: {request.url.path}, query_params: {request.query_params}")
     logging.info(f"DEBUG: Detailed page requested with person={person}, plan_date={plan_date}, template_id={template_id}")
