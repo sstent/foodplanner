@@ -369,6 +369,7 @@
 {% include 'modals/apply_template.html' %}
 {% include 'modals/edit_tracked_meal.html' %}
 {% include 'modals/add_single_food.html' %}
+{% include 'modals/save_time_block.html' %}
 
 <script>
     // Date navigation
@@ -628,9 +629,48 @@
     }
 
     // Save an entire time block as a new meal
-    async function saveTimeBlockAsMeal(dateStr, mealTime) {
-        const mealName = prompt(`Enter name for new meal to save all ${mealTime} items:`);
-        if (!mealName) return;
+    function saveTimeBlockAsMeal(dateStr, mealTime) {
+        document.getElementById('saveTimeBlockDate').value = dateStr;
+        document.getElementById('saveTimeBlockMealTime').value = mealTime;
+        document.getElementById('saveTimeBlockDisplay').textContent = mealTime;
+        document.getElementById('saveTimeBlockMealName').value = '';
+
+        // Extract ingredients from the DOM
+        const container = document.getElementById(`meals-${mealTime.toLowerCase().replace(/ /g, '-')}`);
+        const list = document.getElementById('saveTimeBlockIngredientsList');
+        list.innerHTML = '';
+        
+        if (container) {
+            // Find all tables and their tbody rows
+            const rows = container.querySelectorAll('tbody tr');
+            let found = false;
+            rows.forEach(row => {
+                const foodCell = row.cells[0];
+                if (foodCell && foodCell.textContent.trim()) {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item py-1 px-2';
+                    li.textContent = foodCell.textContent.trim();
+                    list.appendChild(li);
+                    found = true;
+                }
+            });
+            if (!found) {
+                list.innerHTML = '<li class="list-group-item py-1 px-2 text-muted">No ingredients found.</li>';
+            }
+        }
+
+        new bootstrap.Modal(document.getElementById('saveTimeBlockModal')).show();
+    }
+
+    async function submitSaveTimeBlock() {
+        const dateStr = document.getElementById('saveTimeBlockDate').value;
+        const mealTime = document.getElementById('saveTimeBlockMealTime').value;
+        const mealName = document.getElementById('saveTimeBlockMealName').value;
+
+        if (!mealName) {
+            alert("Please enter a meal name.");
+            return;
+        }
 
         try {
             const response = await fetch('/tracker/save_time_block_as_meal', {
@@ -646,8 +686,8 @@
             const result = await response.json();
 
             if (result.status === 'success') {
+                bootstrap.Modal.getInstance(document.getElementById('saveTimeBlockModal')).hide();
                 alert('New meal saved successfully! It is now available to be added to future days.');
-                // Optional: reload to show updated state, but not strictly necessary here
             } else {
                 alert('Error: ' + result.message);
             }
