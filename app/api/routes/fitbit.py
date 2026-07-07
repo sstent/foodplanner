@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 import requests
@@ -22,7 +22,7 @@ router = APIRouter()
 # --- Routes ---
 
 @router.get("/admin/fitbit", response_class=HTMLResponse)
-async def fitbit_page(request: Request, db: Session = Depends(get_db)):
+async def fitbit_page(request: Request, db: Session = Depends(get_db), person: str = Cookie(default="Sarah")):
     config = get_config(db)
     # Mask secret
     masked_secret = "*" * 8 if config.client_secret else ""
@@ -36,7 +36,8 @@ async def fitbit_page(request: Request, db: Session = Depends(get_db)):
         "config": config,
         "masked_secret": masked_secret,
         "is_connected": is_connected,
-        "logs": logs
+        "logs": logs,
+        "person": person
     })
 
 @router.post("/admin/fitbit/config")
@@ -122,14 +123,16 @@ async def exchange_code(
                 "request": request,
                 "error_title": "Auth Failed",
                 "error_message": f"Fitbit Error: {response.text}",
-                "error_details": ""
+                "error_details": "",
+                "person": person
             })
     except Exception as e:
         return templates.TemplateResponse("error.html", {
             "request": request,
             "error_title": "Auth Error",
             "error_message": str(e),
-            "error_details": ""
+            "error_details": "",
+            "person": person
         })
 
 @router.post("/admin/fitbit/sync")

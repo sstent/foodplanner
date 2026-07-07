@@ -17,7 +17,8 @@ class TestPlansRoutes:
     def test_get_plan_page_with_date(self, client):
         """Test GET /plan page with specific date"""
         test_date = date.today().isoformat()
-        response = client.get(f"/plan?person=Stuart&week_start_date={test_date}")
+        client.cookies = {"person": "Stuart"}
+        response = client.get(f"/plan?week_start_date={test_date}")
         assert response.status_code == 200
     
     def test_add_to_plan(self, client, sample_meal):
@@ -78,8 +79,8 @@ class TestPlansRoutes:
     def test_update_day_plan(self, client, sample_meal):
         """Test POST /plan/update_day"""
         test_date = date.today().isoformat()
+        client.cookies = {"person": "Stuart"}
         response = client.post("/plan/update_day", data={
-            "person": "Stuart",
             "date": test_date,
             "meal_ids": f"{sample_meal.id}"
         })

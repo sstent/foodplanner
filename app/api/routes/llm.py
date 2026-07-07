@@ -6,7 +6,7 @@ from logging.config import fileConfig
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form, Cookie
 from fastapi.responses import HTMLResponse
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -19,8 +19,8 @@ from app.models.llm_config import LLMConfig
 router = APIRouter()
 
 @router.get("/llm", response_class=HTMLResponse, include_in_schema=False)
-async def llm_food_extractor_page(request: Request):
-    return templates.TemplateResponse("llm_food_extractor.html", {"request": request})
+async def llm_food_extractor_page(request: Request, person: str = Cookie(default="Sarah")):
+    return templates.TemplateResponse("llm_food_extractor.html", {"request": request, "person": person})
 
 class FoodItem(BaseModel):
     name: Optional[str] = Field(None, description="Name of the food item")

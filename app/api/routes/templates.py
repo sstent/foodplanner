@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, File, UploadFile, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 import csv
@@ -12,9 +12,9 @@ from main import templates
 router = APIRouter()
 
 @router.get("/templates", response_class=HTMLResponse)
-async def templates_page(request: Request, db: Session = Depends(get_db)):
+async def templates_page(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     meals = db.query(Meal).all()
-    return templates.TemplateResponse(request, "templates.html", {"meals": meals})
+    return templates.TemplateResponse(request, "templates.html", {"meals": meals, "person": person})
 
 @router.get("/api/templates", response_model=List[TemplateDetail])
 async def get_templates_api(db: Session = Depends(get_db)):
@@ -245,11 +245,10 @@ async def update_template(template_id: int, request: Request, db: Session = Depe
         return {"status": "error", "message": str(e)}
 
 @router.post("/templates/{template_id}/use")
-async def use_template(template_id: int, request: Request, db: Session = Depends(get_db)):
+async def use_template(template_id: int, request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     """Apply a template to a specific date for a person."""
     try:
         form_data = await request.form()
-        person = form_data.get("person")
         date_str = form_data.get("start_date") # Renamed from start_day to start_date
         
         if not person or not date_str:

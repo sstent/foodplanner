@@ -114,35 +114,14 @@
     <script>
         function switchPerson() {
             const person = document.getElementById('personSelect').value;
-            document.cookie = `selectedPerson=${person}; path=/; max-age=31536000`;
-            localStorage.setItem('selectedPerson', person);
-            
+            document.cookie = `person=${person}; path=/; max-age=31536000`;
             const currentUrl = new URL(window.location);
-            if (currentUrl.searchParams.has('person')) {
-                currentUrl.searchParams.delete('person');
-                window.location.href = currentUrl.toString();
-            } else {
-                window.location.reload();
-            }
+            currentUrl.searchParams.delete('person');
+            window.location.href = currentUrl.toString();
         }
 
         // Set active tab based on current URL
         document.addEventListener('DOMContentLoaded', function() {
-            // Set person selection from cookie or localStorage
-            const getCookie = (name) => {
-                const value = `; ${document.cookie}`;
-                const parts = value.split(`; ${name}=`);
-                if (parts.length === 2) return parts.pop().split(';').shift();
-                return null;
-            };
-            const savedPerson = getCookie('selectedPerson') || localStorage.getItem('selectedPerson') || 'Sarah';
-            if (savedPerson) {
-                const personSelect = document.getElementById('personSelect');
-                if (personSelect) {
-                    personSelect.value = savedPerson;
-                }
-            }
-
             const currentPath = window.location.pathname;
             const tabs = document.querySelectorAll('.nav-link');
 

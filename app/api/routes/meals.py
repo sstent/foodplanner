@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import Cookie
 from sqlalchemy.orm import Session
 import csv
 import logging
@@ -13,7 +14,7 @@ router = APIRouter()
 
 # Meals tab
 @router.get("/meals", response_class=HTMLResponse)
-async def meals_page(request: Request, db: Session = Depends(get_db)):
+async def meals_page(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     from sqlalchemy.orm import joinedload
     # Filter out single food entries and snapshots
     meals = db.query(Meal).filter(
@@ -21,7 +22,7 @@ async def meals_page(request: Request, db: Session = Depends(get_db)):
     ).options(joinedload(Meal.meal_foods).joinedload(MealFood.food)).all()
     foods = db.query(Food).all()
     return templates.TemplateResponse("meals.html",
-                                    {"request": request, "meals": meals, "foods": foods})
+                                    {"request": request, "meals": meals, "foods": foods, "person": person})
 
 @router.post("/meals/upload")
 async def bulk_upload_meals(file: UploadFile = File(...), db: Session = Depends(get_db)):
