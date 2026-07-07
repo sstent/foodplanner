@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 import os
@@ -82,15 +82,15 @@ def backup_database(source_db_path, backup_db_path):
 
 # Admin Section
 @router.get("/admin", response_class=HTMLResponse)
-async def admin_page(request: Request):
-    return templates.TemplateResponse(request, "admin/index.html", {"request": request})
+async def admin_page(request: Request, person: str = Cookie(default="Sarah")):
+    return templates.TemplateResponse(request, "admin/index.html", {"request": request, "person": person})
 
 @router.get("/admin/imports", response_class=HTMLResponse)
-async def admin_imports_page(request: Request):
-    return templates.TemplateResponse(request, "admin/imports.html", {"request": request})
+async def admin_imports_page(request: Request, person: str = Cookie(default="Sarah")):
+    return templates.TemplateResponse(request, "admin/imports.html", {"request": request, "person": person})
 
 @router.get("/admin/llm_config", response_class=HTMLResponse)
-async def admin_llm_config_page(request: Request, db: Session = Depends(get_db)):
+async def admin_llm_config_page(request: Request, db: Session = Depends(get_db), person: str = Cookie(default="Sarah")):
     logging.info("DEBUG: Starting llm_config route")
     try:
         llm_config = db.query(LLMConfig).first()
@@ -108,7 +108,11 @@ async def admin_llm_config_page(request: Request, db: Session = Depends(get_db))
         response = templates.TemplateResponse(
             request,
             "admin/llm_config.html",
-            {"request": request, "llm_config": llm_config}
+            {
+                "request": request, 
+                "llm_config": llm_config,
+                "person": person
+            }
         )
         logging.info("DEBUG: Template rendered successfully")
         return response
@@ -140,7 +144,7 @@ async def update_llm_config(
     return RedirectResponse(url="/admin/llm_config", status_code=303)
 
 @router.get("/admin/backups", response_class=HTMLResponse)
-async def admin_backups_page(request: Request):
+async def admin_backups_page(request: Request, person: str = Cookie(default="Sarah")):
     BACKUP_DIR = "./backups"
     backups = []
     if os.path.exists(BACKUP_DIR):
@@ -148,7 +152,7 @@ async def admin_backups_page(request: Request):
             [f for f in os.listdir(BACKUP_DIR) if f.endswith(".db")],
             reverse=True
         )
-    return templates.TemplateResponse(request, "admin/backups.html", {"backups": backups})
+    return templates.TemplateResponse(request, "admin/backups.html", {"backups": backups, "person": person})
 
 @router.post("/admin/backups/create", response_class=HTMLResponse)
 async def create_backup(request: Request, db: Session = Depends(get_db)):
@@ -193,7 +197,7 @@ async def restore_backup(request: Request, backup_file: str = Form(...)):
     return RedirectResponse(url="/admin/backups", status_code=303)
 
 @router.get("/admin/config-status", response_class=HTMLResponse)
-async def admin_config_status_page(request: Request):
+async def admin_config_status_page(request: Request, person: str = Cookie(default="Sarah")):
     """Display current system configuration and database status."""
     from urllib.parse import urlparse
     
@@ -228,4 +232,4 @@ async def admin_config_status_page(request: Request):
         "debug": True 
     }
 
-    return templates.TemplateResponse(request, "admin/config.html", {"request": request, "config": config_data})
+    return templates.TemplateResponse(request, "admin/config.html", {"request": request, "config": config_data, "person": person})

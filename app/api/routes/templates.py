@@ -12,9 +12,9 @@ from main import templates
 router = APIRouter()
 
 @router.get("/templates", response_class=HTMLResponse)
-async def templates_page(request: Request, db: Session = Depends(get_db)):
+async def templates_page(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     meals = db.query(Meal).all()
-    return templates.TemplateResponse(request, "templates.html", {"meals": meals})
+    return templates.TemplateResponse(request, "templates.html", {"meals": meals, "person": person})
 
 @router.get("/api/templates", response_model=List[TemplateDetail])
 async def get_templates_api(db: Session = Depends(get_db)):

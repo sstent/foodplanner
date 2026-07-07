@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import Cookie
 from sqlalchemy.orm import Session
 import csv
 import logging
@@ -21,9 +22,9 @@ router = APIRouter()
 
 # Foods tab
 @router.get("/foods", response_class=HTMLResponse)
-async def foods_page(request: Request, db: Session = Depends(get_db)):
+async def foods_page(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     foods = db.query(Food).all()
-    return templates.TemplateResponse(request, "foods.html", {"foods": foods})
+    return templates.TemplateResponse(request, "foods.html", {"foods": foods, "person": person})
 
 @router.post("/foods/upload")
 async def bulk_upload_foods(file: UploadFile = File(...), db: Session = Depends(get_db)):
