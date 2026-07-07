@@ -55,6 +55,10 @@
                         data-testid="add-food-{{ meal_time|slugify }}">
                         <i class="bi bi-plus-circle"></i> Add Food
                     </button>
+                    <button class="btn btn-sm btn-outline-primary ms-1" onclick="saveTimeBlockAsMeal('{{ current_date.isoformat() }}', '{{ meal_time }}')"
+                        data-testid="save-block-{{ meal_time|slugify }}">
+                        <i class="bi bi-save"></i> Save Block as Meal
+                    </button>
                 </div>
             </div>
             <div class="card-body">
@@ -623,7 +627,36 @@
         }
     }
 
-    // Save as new meal
+    // Save an entire time block as a new meal
+    async function saveTimeBlockAsMeal(dateStr, mealTime) {
+        const mealName = prompt(`Enter name for new meal to save all ${mealTime} items:`);
+        if (!mealName) return;
+
+        try {
+            const response = await fetch('/tracker/save_time_block_as_meal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date: dateStr,
+                    meal_time: mealTime,
+                    new_meal_name: mealName
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                alert('New meal saved successfully! It is now available to be added to future days.');
+                // Optional: reload to show updated state, but not strictly necessary here
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    // Save as new meal (from edit modal)
     async function saveAsNewMeal() {
         const mealName = prompt('Enter name for new meal:');
         if (!mealName) return;
