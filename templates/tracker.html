@@ -55,6 +55,10 @@
                         data-testid="add-food-{{ meal_time|slugify }}">
                         <i class="bi bi-plus-circle"></i> Add Food
                     </button>
+                    <button class="btn btn-sm btn-outline-primary ms-1" onclick="saveTimeBlockAsMeal('{{ current_date.isoformat() }}', '{{ meal_time }}')"
+                        data-testid="save-block-{{ meal_time|slugify }}">
+                        <i class="bi bi-save"></i> Save Block as Meal
+                    </button>
                 </div>
             </div>
             <div class="card-body">
@@ -365,6 +369,7 @@
 {% include 'modals/apply_template.html' %}
 {% include 'modals/edit_tracked_meal.html' %}
 {% include 'modals/add_single_food.html' %}
+{% include 'modals/save_time_block.html' %}
 
 <script>
     // Date navigation
@@ -547,7 +552,7 @@
                             <div class="input-group w-50">
                                 <input type="number" step="0.01" class="form-control form-control-sm" value="${food.quantity.toFixed(2)}" data-food-id="${food.food_id}" data-item-id="${food.id}" data-is-custom="${food.is_custom}" data-testid="food-quantity-${food.food_id}">
                                 <span class="input-group-text">g</span>
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.food_id}, ${food.id}, ${food.is_custom})" data-testid="delete-food-${food.food_id}">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(this, ${food.food_id}, ${food.id}, ${food.is_custom})" data-testid="delete-food-${food.food_id}">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -565,9 +570,9 @@
         }
     }
 
-    function removeFoodFromTrackedMeal(foodId, itemId, isCustom) {
+    function removeFoodFromTrackedMeal(buttonElem, foodId, itemId, isCustom) {
         // Find the button that was clicked
-        const button = event.target.closest('button');
+        const button = buttonElem.closest('button');
         if (button) {
             // Find the parent div and remove it
             const foodDiv = button.closest('.d-flex');
@@ -623,7 +628,104 @@
         }
     }
 
-    // Save as new meal
+    // Save an entire time block as a new meal
+    async function saveTimeBlockAsMeal(dateStr, mealTime) {
+        document.getElementById('saveTimeBlockDate').value = dateStr;
+        document.getElementById('saveTimeBlockMealTime').value = mealTime;
+        document.getElementById('saveTimeBlockDisplay').textContent = mealTime;
+        document.getElementById('saveTimeBlockMealName').value = '';
+
+        const listContainer = document.getElementById('saveTimeBlockIngredientsList');
+        listContainer.innerHTML = '<div class="text-center my-3"><div class="spinner-border text-primary" role="status"></div></div>';
+        
+        new bootstrap.Modal(document.getElementById('saveTimeBlockModal')).show();
+
+        try {
+            const response = await fetch(`/tracker/time_block_foods?date=${encodeURIComponent(dateStr)}&meal_time=${encodeURIComponent(mealTime)}`);
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                listContainer.innerHTML = '';
+                if (result.foods.length === 0) {
+                    listContainer.innerHTML = '<div class="alert alert-warning">No active foods found for this time block.</div>';
+                    return;
+                }
+
+                result.foods.forEach(food => {
+                    const row = document.createElement('div');
+                    row.className = 'd-flex align-items-center mb-2';
+                    row.innerHTML = `
+                        <div class="flex-grow-1 text-truncate pe-2">
+                            ${food.name}
+                        </div>
+                        <div class="input-group input-group-sm" style="width: 150px;">
+                            <input type="number" class="form-control text-end save-time-block-qty" 
+                                data-food-id="${food.food_id}" value="${food.quantity}" min="0" step="0.1">
+                            <span class="input-group-text">${food.serving_unit || 'g'}</span>
+                        </div>
+                    `;
+                    listContainer.appendChild(row);
+                });
+            } else {
+                listContainer.innerHTML = `<div class="alert alert-danger">Error: ${result.message}</div>`;
+            }
+        } catch (error) {
+            listContainer.innerHTML = `<div class="alert alert-danger">Error fetching foods: ${error.message}</div>`;
+        }
+    }
+
+    async function submitSaveTimeBlock() {
+        const dateStr = document.getElementById('saveTimeBlockDate').value;
+        const mealTime = document.getElementById('saveTimeBlockMealTime').value;
+        const mealName = document.getElementById('saveTimeBlockMealName').value;
+
+        if (!mealName) {
+            alert("Please enter a meal name.");
+            return;
+        }
+
+        const foods = [];
+        document.querySelectorAll('.save-time-block-qty').forEach(input => {
+            const qty = parseFloat(input.value);
+            if (qty > 0) {
+                foods.push({
+                    food_id: parseInt(input.getAttribute('data-food-id')),
+                    quantity: qty
+                });
+            }
+        });
+
+        if (foods.length === 0) {
+            alert("Please include at least one food with a quantity greater than 0.");
+            return;
+        }
+
+        try {
+            const response = await fetch('/tracker/save_time_block_as_meal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date: dateStr,
+                    meal_time: mealTime,
+                    new_meal_name: mealName,
+                    foods: foods
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                bootstrap.Modal.getInstance(document.getElementById('saveTimeBlockModal')).hide();
+                alert('New meal saved successfully! It is now available to be added to future days.');
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    // Save as new meal (from edit modal)
     async function saveAsNewMeal() {
         const mealName = prompt('Enter name for new meal:');
         if (!mealName) return;
