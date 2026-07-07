@@ -653,67 +653,82 @@ async def update_tracked_meal_foods(data: dict = Body(...), db: Session = Depend
         db.rollback()
         return {"status": "error", "message": str(e)}
 
-@router.post("/tracker/save_time_block_as_meal")
-async def save_time_block_as_meal(data: dict = Body(...), person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
-    """Save an entire time block (e.g. Lunch) as a new reusable meal"""
+@router.get("/tracker/time_block_foods")
+async def get_time_block_foods(date: str, meal_time: str, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
+    """Get the resolved list of foods and quantities for a given time block."""
     try:
-        date_str = data.get("date")
-        meal_time = data.get("meal_time")
-        new_meal_name = data.get("new_meal_name")
-
-        if not all([date_str, meal_time, new_meal_name]):
-            raise HTTPException(status_code=400, detail="Missing required parameters")
-
-        current_date = datetime.fromisoformat(date_str).date()
-
+        current_date = datetime.fromisoformat(date).date()
         tracked_day = db.query(TrackedDay).filter(
-            TrackedDay.person == person,
-            TrackedDay.date == current_date
+            TrackedDay.person == person, TrackedDay.date == current_date
         ).first()
 
         if not tracked_day:
-            raise HTTPException(status_code=404, detail="Tracked day not found")
+            return {"status": "success", "foods": []}
 
         tracked_meals = db.query(TrackedMeal).options(
-            joinedload(TrackedMeal.meal).joinedload(Meal.meal_foods),
-            joinedload(TrackedMeal.tracked_foods)
+            joinedload(TrackedMeal.meal).joinedload(Meal.meal_foods).joinedload(MealFood.food),
+            joinedload(TrackedMeal.tracked_foods).joinedload(TrackedMealFood.food)
         ).filter(
             TrackedMeal.tracked_day_id == tracked_day.id,
             TrackedMeal.meal_time == meal_time
         ).all()
 
-        if not tracked_meals:
-            raise HTTPException(status_code=400, detail=f"No foods found for {meal_time}")
-
-        # Combine all effective foods
         combined_foods = {}
 
         for t_meal in tracked_meals:
             base_foods = {}
             if t_meal.meal:
                 for mf in t_meal.meal.meal_foods:
-                    base_foods[mf.food_id] = mf.quantity
+                    base_foods[mf.food_id] = {
+                        "food_id": mf.food_id,
+                        "name": mf.food.name,
+                        "quantity": mf.quantity,
+                        "serving_unit": mf.food.serving_unit
+                    }
             
             for tmf in t_meal.tracked_foods:
                 if tmf.is_deleted:
                     base_foods.pop(tmf.food_id, None)
                 else:
-                    base_foods[tmf.food_id] = tmf.quantity
+                    base_foods[tmf.food_id] = {
+                        "food_id": tmf.food_id,
+                        "name": tmf.food.name,
+                        "quantity": tmf.quantity,
+                        "serving_unit": tmf.food.serving_unit
+                    }
             
-            for food_id, qty in base_foods.items():
-                combined_foods[food_id] = combined_foods.get(food_id, 0.0) + qty
+            for food_id, data in base_foods.items():
+                if food_id in combined_foods:
+                    combined_foods[food_id]["quantity"] += data["quantity"]
+                else:
+                    combined_foods[food_id] = data
 
-        if not combined_foods:
-            raise HTTPException(status_code=400, detail=f"No active foods found for {meal_time} to save")
+        return {"status": "success", "foods": list(combined_foods.values())}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.post("/tracker/save_time_block_as_meal")
+async def save_time_block_as_meal(data: dict = Body(...), db: Session = Depends(get_db)):
+    """Save an entire time block (e.g. Lunch) as a new reusable meal"""
+    try:
+        new_meal_name = data.get("new_meal_name")
+        foods = data.get("foods", [])
+
+        if not new_meal_name:
+            raise HTTPException(status_code=400, detail="Missing new meal name")
+
+        if not foods:
+            raise HTTPException(status_code=400, detail="No active foods provided to save")
 
         # Create the new meal
+        meal_time = data.get("meal_time", "custom")
         new_meal = Meal(name=new_meal_name, meal_type="custom", meal_time=meal_time)
         db.add(new_meal)
         db.flush()
 
         # Add foods to the new meal
-        for food_id, qty in combined_foods.items():
-            db.add(MealFood(meal_id=new_meal.id, food_id=food_id, quantity=qty))
+        for food_data in foods:
+            db.add(MealFood(meal_id=new_meal.id, food_id=food_data["food_id"], quantity=food_data["quantity"]))
 
         db.commit()
         return {"status": "success", "message": "Meal saved successfully"}
