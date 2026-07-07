@@ -15,10 +15,11 @@
                             <input type="hidden" id="tracked_meal_id_for_food" name="tracked_meal_id">
                             <div class="mb-3">
                                 <label class="form-label">Select Food</label>
-                                <select class="form-control" id="foodSelectTrackedMeal" name="food_id" required>
+                                <input type="text" class="form-control mb-2" id="foodSearchInputEditTracked" placeholder="Search foods by name or brand...">
+                                <select class="form-control" id="foodSelectTrackedMeal" name="food_id" required size="5">
                                     <option value="">Choose food...</option>
                                     {% for food in foods %}
-                                    <option value="{{ food.id }}">{{ food.name }}</option>
+                                    <option value="{{ food.id }}" data-brand="{{ food.brand }}">{{ food.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -85,4 +86,30 @@
         foodSelect.value = '';
         quantityInput.value = '100'; // Reset to default
     }
+
+    document.getElementById('foodSearchInputEditTracked').addEventListener('input', function() {
+        const searchText = this.value.toLowerCase();
+        const select = document.getElementById('foodSelectTrackedMeal');
+        const options = select.options;
+        
+        let hasVisibleOptions = false;
+        
+        for (let i = 1; i < options.length; i++) { // Skip the first "Choose food..." option
+            const option = options[i];
+            const text = option.text.toLowerCase();
+            const brand = (option.getAttribute('data-brand') || '').toLowerCase();
+            
+            if (text.includes(searchText) || brand.includes(searchText)) {
+                option.style.display = '';
+                hasVisibleOptions = true;
+            } else {
+                option.style.display = 'none';
+            }
+        }
+        
+        // Reset selection if the currently selected item is hidden
+        if (select.selectedIndex > 0 && select.options[select.selectedIndex].style.display === 'none') {
+            select.selectedIndex = 0;
+        }
+    });
 </script>
