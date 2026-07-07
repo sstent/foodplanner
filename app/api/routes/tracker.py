@@ -13,7 +13,7 @@ router = APIRouter()
 
 # Tracker tab - Main page
 @router.get("/tracker", response_class=HTMLResponse)
-async def tracker_page(request: Request, person: str = "Sarah", date: str = None, db: Session = Depends(get_db)):
+async def tracker_page(request: Request, person: str = Cookie(default="Sarah"), date: str = None, db: Session = Depends(get_db)):
     try:
         from datetime import datetime, timedelta
         
