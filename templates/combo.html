@@ -63,7 +63,14 @@
             const person = document.getElementById('personSelect').value;
             document.cookie = `selectedPerson=${person}; path=/; max-age=31536000`;
             localStorage.setItem('selectedPerson', person);
-            window.location.reload();
+            
+            const currentUrl = new URL(window.location);
+            if (currentUrl.searchParams.has('person')) {
+                currentUrl.searchParams.delete('person');
+                window.location.href = currentUrl.toString();
+            } else {
+                window.location.reload();
+            }
         }
     </script>
 </body>
