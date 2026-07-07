@@ -552,7 +552,7 @@
                             <div class="input-group w-50">
                                 <input type="number" step="0.01" class="form-control form-control-sm" value="${food.quantity.toFixed(2)}" data-food-id="${food.food_id}" data-item-id="${food.id}" data-is-custom="${food.is_custom}" data-testid="food-quantity-${food.food_id}">
                                 <span class="input-group-text">g</span>
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${food.food_id}, ${food.id}, ${food.is_custom})" data-testid="delete-food-${food.food_id}">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(this, ${food.food_id}, ${food.id}, ${food.is_custom})" data-testid="delete-food-${food.food_id}">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -570,9 +570,9 @@
         }
     }
 
-    function removeFoodFromTrackedMeal(foodId, itemId, isCustom) {
+    function removeFoodFromTrackedMeal(buttonElem, foodId, itemId, isCustom) {
         // Find the button that was clicked
-        const button = event.target.closest('button');
+        const button = buttonElem.closest('button');
         if (button) {
             // Find the parent div and remove it
             const foodDiv = button.closest('.d-flex');

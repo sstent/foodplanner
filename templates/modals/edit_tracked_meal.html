@@ -75,7 +75,7 @@
             <div class="input-group w-50">
                 <input type="number" step="0.01" class="form-control form-control-sm" value="${parseFloat(quantity).toFixed(2)}" data-food-id="${foodId}" data-item-id="0" data-is-custom="true" data-testid="food-quantity-${foodId}">
                 <span class="input-group-text">g</span>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(${foodId}, true)" data-testid="delete-food-${foodId}">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFoodFromTrackedMeal(this, ${foodId}, 0, true)" data-testid="delete-food-${foodId}">
                     <i class="bi bi-trash"></i>
                 </button>
             </div>
