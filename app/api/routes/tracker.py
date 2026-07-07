@@ -110,7 +110,8 @@ async def tracker_page(request: Request, person: str = Cookie(default="Sarah"), 
             "request": request,
             "error_title": "Error Loading Tracker",
             "error_message": f"An error occurred while loading the tracker page: {str(e)}",
-            "error_details": f"Person: {person}, Date: {date}"
+            "error_details": f"Person: {person}, Date: {date}",
+            "person": person
         }, status_code=500)
 
 # Tracker API Routes

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, Cookie
+from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, Cookie, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime, timedelta
@@ -13,7 +13,7 @@ router = APIRouter()
 
 #Weekly Menu tab
 @router.get("/weeklymenu", response_class=HTMLResponse)
-async def weekly_menu_page(request: Request, db: Session = Depends(get_db)):
+async def weekly_menu_page(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     weekly_menus = db.query(WeeklyMenu).all()
     templates_list = db.query(Template).all()
     
@@ -38,7 +38,8 @@ async def weekly_menu_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("weeklymenu.html", {
         "request": request,
         "weekly_menus": weekly_menus_data,
-        "templates": templates_list
+        "templates": templates_list,
+        "person": person
     })
 
 @router.get("/api/weeklymenus", response_model=List[WeeklyMenuDetail])
