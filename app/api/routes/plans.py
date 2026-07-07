@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from datetime import date, datetime, timedelta
@@ -14,7 +14,7 @@ router = APIRouter()
 
 # Plan tab
 @router.get("/plan", response_class=HTMLResponse)
-async def plan_page(request: Request, person: str = "Sarah", week_start_date: str = None, db: Session = Depends(get_db)):
+async def plan_page(request: Request, person: str = Cookie(default="Sarah"), week_start_date: str = None, db: Session = Depends(get_db)):
     from datetime import datetime, timedelta
 
     # If no week_start_date provided, use current week starting from Monday
@@ -71,7 +71,7 @@ async def plan_page(request: Request, person: str = "Sarah", week_start_date: st
     })
 
 @router.post("/plan/add")
-async def add_to_plan(request: Request, person: str = Form(None),
+async def add_to_plan(request: Request, person: str = Cookie(default="Sarah"),
                       plan_date: str = Form(None), meal_id: str = Form(None),
                       meal_time: str = Form(None), db: Session = Depends(get_db)):
 
@@ -113,8 +113,8 @@ async def add_to_plan(request: Request, person: str = Form(None),
         db.rollback()
         return {"status": "error", "message": str(e)}
 
-@router.get("/plan/{person}/{date}")
-async def get_day_plan(person: str, date: str, db: Session = Depends(get_db)):
+@router.get("/plan/day/{date}")
+async def get_day_plan(date: str, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     """Get all meals for a specific date"""
     try:
         from datetime import datetime
@@ -139,7 +139,7 @@ async def get_day_plan(person: str, date: str, db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 @router.post("/plan/update_day")
-async def update_day_plan(request: Request, person: str = Form(...),
+async def update_day_plan(request: Request, person: str = Cookie(default="Sarah"),
                           date: str = Form(...), meal_ids: str = Form(...),
                           db: Session = Depends(get_db)):
     """Replace all meals for a specific date"""
@@ -181,7 +181,7 @@ async def remove_from_plan(plan_id: int, db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 @router.get("/detailed", response_class=HTMLResponse, name="detailed")
-async def detailed(request: Request, person: str = "Sarah", plan_date: str = None, template_id: int = None, db: Session = Depends(get_db)):
+async def detailed(request: Request, person: str = Cookie(default="Sarah"), plan_date: str = None, template_id: int = None, db: Session = Depends(get_db)):
     from datetime import datetime, date
     logging.info(f"DEBUG: Detailed page requested with url: {request.url.path}, query_params: {request.query_params}")
     logging.info(f"DEBUG: Detailed page requested with person={person}, plan_date={plan_date}, template_id={template_id}")

@@ -114,9 +114,9 @@
     <script>
         function switchPerson() {
             const person = document.getElementById('personSelect').value;
-            localStorage.setItem('selectedPerson', person);
+            document.cookie = `person=${person}; path=/; max-age=31536000`;
             const currentUrl = new URL(window.location);
-            currentUrl.searchParams.set('person', person);
+            currentUrl.searchParams.delete('person');
             window.location.href = currentUrl.toString();
         }
 

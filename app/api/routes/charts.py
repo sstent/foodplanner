@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Cookie
 from starlette.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
@@ -8,7 +8,7 @@ from app.database import get_db, TrackedDay, TrackedMeal, calculate_day_nutritio
 router = APIRouter(tags=["charts"])
 
 @router.get("/charts", response_class=HTMLResponse)
-async def charts_page(request: Request, person: str = "Sarah", db: Session = Depends(get_db)):
+async def charts_page(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     """Render the charts page"""
     from main import templates
     return templates.TemplateResponse("charts.html", {
@@ -18,7 +18,7 @@ async def charts_page(request: Request, person: str = "Sarah", db: Session = Dep
 
 @router.get("/api/charts", response_model=List[dict])
 async def get_charts_data(
-    person: str = Query(..., description="Person name (e.g., Sarah)"),
+    person: str = Cookie(default="Sarah"),
     days: int = Query(7, description="Number of past days to fetch data for", ge=1, le=30),
     db: Session = Depends(get_db)
 ):

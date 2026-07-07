@@ -5,7 +5,6 @@
        <h4 class="mb-0">{{ title }}</h4>
         <div id="daySelector">
             <form action="{{ url_for('detailed') }}" method="get" class="d-flex">
-                <input type="hidden" name="person" value="{{ person }}">
                 <input type="date" class="form-control me-2" name="plan_date" value="{{ plan_date.isoformat() if plan_date else '' }}" onchange="this.form.submit()" required>
                 <button class="btn btn-primary" type="submit">
                     <i class="bi bi-search"></i> View Day

@@ -21,7 +21,8 @@ class TestTrackerRoutes:
     def test_get_tracker_page_with_date(self, client):
         """Test GET /tracker page with specific date"""
         test_date = date.today().isoformat()
-        response = client.get(f"/tracker?person=Stuart&date={test_date}")
+        client.cookies = {"person": "Stuart"}
+        response = client.get(f"/tracker?date={test_date}")
         assert response.status_code == 200
     
     def test_tracker_add_meal(self, client, sample_meal):

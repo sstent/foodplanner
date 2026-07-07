@@ -96,7 +96,6 @@
             <div class="modal-body">
                 <form id="quickAddMealForm">
                     <input type="hidden" id="quickAddPlanDay" name="plan_date">
-                    <input type="hidden" name="person" value="{{ person }}">
                     <div class="mb-3">
                         <label class="form-label">Select Meal</label>
                         <select class="form-control" name="meal_id" required>
@@ -146,7 +145,6 @@
                         
                         <h6><i class="bi bi-plus-circle"></i> Add Meal</h6>
                         <form id="addMealToDayForm">
-                            <input type="hidden" id="editDayPerson" name="person">
                             <input type="hidden" id="editDayValue" name="plan_date">
                             <div class="mb-3">
                                 <select class="form-control" id="mealSelectForDay" name="meal_id" required>
@@ -261,7 +259,7 @@ async function editDay(date, person) {
 // Load current meals for the date
 async function loadCurrentDayMeals(person, date) {
     try {
-        const response = await fetch(`/plan/${person}/${date}`);
+        const response = await fetch(`/plan/day/${date}`);
         const data = await response.json(); // Now data contains both meals and day_totals
         const meals = data.meals;
         const dayTotals = data.day_totals;

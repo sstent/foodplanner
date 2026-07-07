@@ -352,7 +352,6 @@ function addFoodToMeal() {
             <div class="modal-body">
                 <form id="addMealForm">
                     <input type="hidden" id="planDate" name="plan_date">
-                    <input type="hidden" name="person" value="{{ person }}">
                     <div class="mb-3">
                         <label class="form-label">Select Meal</label>
                         <select class="form-control" name="meal_id" required>
@@ -415,7 +414,6 @@ function submitMealToPlan() {
     <div class="col-md-6">
         <h3>Detailed View for {{ person }}</h3>
         <form method="get">
-            <input type="hidden" name="person" value="{{ person }}">
             <div class="input-group mb-3">
                 <input type="date" class="form-control" name="plan_date" value="{{ selected_date }}">
                 <button class="btn btn-primary" type="submit">View Date</button>

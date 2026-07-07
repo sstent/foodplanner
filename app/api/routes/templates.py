@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, File, UploadFile, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 import csv
@@ -245,11 +245,10 @@ async def update_template(template_id: int, request: Request, db: Session = Depe
         return {"status": "error", "message": str(e)}
 
 @router.post("/templates/{template_id}/use")
-async def use_template(template_id: int, request: Request, db: Session = Depends(get_db)):
+async def use_template(template_id: int, request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     """Apply a template to a specific date for a person."""
     try:
         form_data = await request.form()
-        person = form_data.get("person")
         date_str = form_data.get("start_date") # Renamed from start_day to start_date
         
         if not person or not date_str:

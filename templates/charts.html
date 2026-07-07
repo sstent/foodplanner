@@ -76,7 +76,7 @@
         });
 
         function loadChart(days) {
-            fetch(`/api/charts?person={{ person }}&days=${days}`)
+            fetch(`/api/charts?days=${days}`)
                 .then(response => response.json())
                 .then(data => {
                     // Sort data by date ascending for chart

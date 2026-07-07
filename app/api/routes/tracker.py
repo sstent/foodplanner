@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime, timedelta
@@ -115,11 +115,10 @@ async def tracker_page(request: Request, person: str = "Sarah", date: str = None
 
 # Tracker API Routes
 @router.post("/tracker/add_meal")
-async def tracker_add_meal(request: Request, db: Session = Depends(get_db)):
+async def tracker_add_meal(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     """Add a meal to the tracker"""
     try:
         form_data = await request.form()
-        person = form_data.get("person")
         date_str = form_data.get("date")
         meal_id = form_data.get("meal_id")
         meal_time = form_data.get("meal_time")
@@ -207,11 +206,10 @@ async def tracker_remove_meal(tracked_meal_id: int, db: Session = Depends(get_db
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/save_template")
-async def tracker_save_template(request: Request, db: Session = Depends(get_db)):
+async def tracker_save_template(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     """save current day's meals as a new template"""
     try:
         form_data = await request.form()
-        person = form_data.get("person")
         date_str = form_data.get("date")
         template_name = form_data.get("template_name")
 
@@ -262,11 +260,10 @@ async def tracker_save_template(request: Request, db: Session = Depends(get_db))
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/apply_template")
-async def tracker_apply_template(request: Request, db: Session = Depends(get_db)):
+async def tracker_apply_template(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     """Apply a template to the current day"""
     try:
         form_data = await request.form()
-        person = form_data.get("person")
         date_str = form_data.get("date")
         template_id = form_data.get("template_id")
         
@@ -373,11 +370,10 @@ async def update_tracked_food(request: Request, data: dict = Body(...), db: Sess
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/clear_page")
-async def tracker_clear_page(request: Request, db: Session = Depends(get_db)):
+async def tracker_clear_page(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     """Clear all meals and foods from the tracker page for a given day"""
     try:
         form_data = await request.form()
-        person = form_data.get("person")
         date_str = form_data.get("date")
         
         # Parse date
@@ -417,11 +413,10 @@ async def tracker_clear_page(request: Request, db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/reset_to_plan")
-async def tracker_reset_to_plan(request: Request, db: Session = Depends(get_db)):
+async def tracker_reset_to_plan(request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     """Reset tracked day back to original plan"""
     try:
         form_data = await request.form()
-        person = form_data.get("person")
         date_str = form_data.get("date")
         
         
@@ -716,10 +711,9 @@ async def save_as_new_meal(data: dict = Body(...), db: Session = Depends(get_db)
         return {"status": "error", "message": str(e)}
 
 @router.post("/tracker/add_food")
-async def tracker_add_food(data: dict = Body(...), db: Session = Depends(get_db)):
+async def tracker_add_food(person: str = Cookie(default="Sarah"), data: dict = Body(...), db: Session = Depends(get_db)):
     """Add a single food item to the tracker"""
     try:
-        person = data.get("person")
         date_str = data.get("date")
         food_id = data.get("food_id")
         grams = float(data.get("quantity", 1.0))

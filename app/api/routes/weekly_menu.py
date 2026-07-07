@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, Form, Body, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime, timedelta
@@ -132,12 +132,11 @@ async def create_weekly_menu(request: Request, db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 @router.post("/weeklymenu/{weekly_menu_id}/apply")
-async def apply_weekly_menu(weekly_menu_id: int, request: Request, db: Session = Depends(get_db)):
+async def apply_weekly_menu(weekly_menu_id: int, request: Request, person: str = Cookie(default="Sarah"), db: Session = Depends(get_db)):
     """Apply a weekly menu to a person's plan for a specific week."""
     try:
         from datetime import datetime, timedelta
         form_data = await request.form()
-        person = form_data.get("person")
         week_start_date_str = form_data.get("week_start_date")
         confirm_overwrite = form_data.get("confirm_overwrite") == "true"
 
