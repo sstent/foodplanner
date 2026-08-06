@@ -459,17 +459,18 @@ async def get_tracked_meal_foods(tracked_meal_id: int, db: Session = Depends(get
         if not tracked_meal:
             raise HTTPException(status_code=404, detail="Tracked meal not found")
 
-        # Load the associated Meal and its foods
-        meal = db.query(Meal).options(joinedload(Meal.meal_foods).joinedload(MealFood.food)).filter(Meal.id == tracked_meal.meal_id).first()
-        if not meal:
-            raise HTTPException(status_code=404, detail="Associated meal not found")
+        # Load the associated Meal and its foods (if a parent Meal template exists)
+        base_foods = {}
+        if tracked_meal.meal_id is not None:
+            meal = db.query(Meal).options(joinedload(Meal.meal_foods).joinedload(MealFood.food)).filter(Meal.id == tracked_meal.meal_id).first()
+            if meal:
+                base_foods = {mf.food_id: mf for mf in meal.meal_foods}
 
         # Load custom tracked foods for this tracked meal
         tracked_foods = db.query(TrackedMealFood).options(joinedload(TrackedMealFood.food)).filter(TrackedMealFood.tracked_meal_id == tracked_meal_id).all()
 
         # New override-based logic
         meal_foods_data = []
-        base_foods = {mf.food_id: mf for mf in meal.meal_foods}
         overrides = {tf.food_id: tf for tf in tracked_foods}
 
         # 1. Handle base meal foods, applying overrides where they exist
