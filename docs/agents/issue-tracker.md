@@ -1,30 +1,69 @@
-# Issue tracker: Local Markdown
+# Issue Tracker: SilverBullet
 
-Issues and specs for this repo live as markdown files in `.scratch/`.
+Issues, specs, and Wayfinder tickets for this repo live centrally in your SilverBullet knowledge base. To prevent clutter, active tasks are separated from long-term project architecture.
 
-## Conventions
+## CLI Tool Reference
 
-- One feature per directory: `.scratch/<feature-slug>/`
-- The spec is `.scratch/<feature-slug>/spec.md`
-- Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` — never a single combined tickets file
-- Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
-- Comments and conversation history append to the bottom of the file under a `## Comments` heading
+All interactions with SilverBullet MUST be executed via the `sb.py` skill helper. Run these from the repository root:
 
-## When a skill says "publish to the issue tracker"
+```bash
+# Read a page
+python skills/silverbullet/scripts/sb.py read "<path>"
 
-Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).
+# Write / update a page
+python skills/silverbullet/scripts/sb.py write "<path>" --content "<markdown>"
 
-## When a skill says "fetch the relevant ticket"
+# Search
+python skills/silverbullet/scripts/sb.py search "<query>" --content
 
-Read the file at the referenced path. The user will normally pass the path or the issue number directly.
+# Delete a page
+python skills/silverbullet/scripts/sb.py delete "<path>"
+```
 
-## Wayfinding operations
+## Conventions & Paths
 
-Used by `/wayfinder`. The **map** is a file with one **child** file per ticket.
+- **Active Tasks**: `AntiGrav/Tasks/foodplanner/YYYY-MM-DD-<slug>.md` or `AntiGrav/Tasks/foodplanner/NN-<slug>.md`
+- **Project Architecture / Maps**: `AntiGrav/Projects/foodplanner/<Document>.md`
+- **Archived Tasks**: `AntiGrav/Archive/Tasks/foodplanner/YYYY-MM-DD-<slug>.md`
 
-- **Map**: `.scratch/<effort>/map.md` — the Notes / Decisions-so-far / Fog body.
-- **Child ticket**: `.scratch/<effort>/issues/NN-<slug>.md`, numbered from `01`, with the question in the body. A `Type:` line records the ticket type (`research`/`prototype`/`grilling`/`task`); a `Status:` line records `claimed`/`resolved`.
-- **Blocking**: a `Blocked by: NN, NN` line near the top. A ticket is unblocked when every file it lists is `resolved`.
-- **Frontier**: scan `.scratch/<effort>/issues/` for files that are open, unblocked, and unclaimed; first by number wins.
-- **Claim**: set `Status: claimed` and save before any work.
-- **Resolve**: append the answer under an `## Answer` heading, set `Status: resolved`, then append a context pointer (gist + link) to the map's Decisions-so-far in `map.md`.
+## Frontmatter Schema
+
+Every ticket MUST include this exact YAML block. Use `parent` to link tickets back to their originating spec or Wayfinder map.
+
+```yaml
+---
+title: "<Ticket Title>"
+repo: "foodplanner"
+parent: "[[AntiGrav/Projects/foodplanner/Wayfinder]]"
+status: open | ready-for-agent | claimed | resolved
+type: task | research | bug | spike
+tags: [task, foodplanner]
+blockedBy: []
+created: YYYY-MM-DD
+author: "agent:antigravity"
+---
+```
+
+## Skill Operations
+
+### 1. Publishing to the Tracker (e.g., `/to-tickets`, `/to-spec`)
+
+1. Determine the repo name (from the git remote or root folder name).
+2. Generate the ticket markdown, strictly adhering to the frontmatter schema above. Ensure `parent` links to the correct spec document if applicable.
+3. Call `sb.py write` targeting `AntiGrav/Tasks/foodplanner/`.
+
+### 2. Fetching & Reading Tickets
+
+1. If the exact path is unknown, call `sb.py search` first to locate it.
+2. Call `sb.py read` targeting the retrieved path.
+
+### 3. Wayfinder Operations (`/wayfinder`)
+
+- **Map Page**: `AntiGrav/Projects/foodplanner/Wayfinder.md`
+- **Child Tickets**: `AntiGrav/Tasks/foodplanner/NN-<slug>.md`
+- **Claiming a Ticket**: Read the ticket, update frontmatter to `status: claimed`, overwrite via `sb.py write`.
+- **Resolving a Ticket**:
+  1. Append a `## Answer` or `## Resolution` section to the ticket body.
+  2. Update frontmatter to `status: resolved`.
+  3. Update `AntiGrav/Projects/foodplanner/Wayfinder.md` to reflect completion and link to the ticket.
+- **Archive (Optional Cleanup)**: If instructed to archive, write the ticket to `AntiGrav/Archive/Tasks/foodplanner/<ticket_name>.md`, then `sb.py delete` the original to prevent directory bloat.

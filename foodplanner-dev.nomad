@@ -2,6 +2,10 @@ variable "container_version" {
   default = "dev"
 }
 
+variable "registry" {
+  default = "ghcr.io"
+}
+
 job "foodplanner-dev" {
   datacenters = ["dc1"]
 
@@ -33,7 +37,7 @@ job "foodplanner-dev" {
       driver = "docker"
 
       config {
-        image = "ghcr.io/sstent/foodplanner:${var.container_version}"
+        image = "${var.registry}/sstent/foodplanner:${var.container_version}"
         ports = ["http"]
       }
       env {

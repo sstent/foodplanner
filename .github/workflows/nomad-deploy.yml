@@ -42,7 +42,17 @@ jobs:
             echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
 
-      # 4. Deploy the Nomad Job
+      # 4. Set registry URL
+      - name: Set registry URL
+        id: registry
+        run: |
+          if [ "${{ github.server_url }}" = "https://github.com" ]; then
+            echo "url=ghcr.io" >> $GITHUB_OUTPUT
+          else
+            echo "url=${{ github.server_url }}" | sed 's|https://||' >> $GITHUB_OUTPUT
+          fi
+
+      # 5. Deploy the Nomad Job
       - name: Deploy Nomad Job
         id: deploy
         env:
@@ -52,5 +62,6 @@ jobs:
           echo "Deploying container version: ${{ steps.container_version.outputs.sha }}"
           nomad status
           nomad job run \
+            -var="registry=${{ steps.registry.outputs.url }}" \
             -var="container_version=${{ steps.container_version.outputs.sha }}" \
             foodplanner.nomad

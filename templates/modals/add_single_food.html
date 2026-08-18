@@ -36,11 +36,14 @@
         const selectedOption = selectElement.options[selectElement.selectedIndex];
         const servingSize = selectedOption.getAttribute('data-serving-size');
         const servingSizeNote = document.getElementById('servingSizeNote');
+        const qtyInput = document.querySelector('#addSingleFoodForm input[name="quantity"]');
         
-        if (servingSize) {
+        if (servingSize && servingSize !== 'None' && servingSize !== '0') {
             servingSizeNote.textContent = `(Serving size: ${servingSize}g)`;
+            qtyInput.value = servingSize;
         } else {
             servingSizeNote.textContent = '';
+            qtyInput.value = '1.0';
         }
     }
 

@@ -8,7 +8,7 @@ This is a Meal Planner application built with FastAPI, SQLAlchemy, and Jinja2.
 
 ### Issue tracker
 
-Issues live as markdown files under `.scratch/<feature>/` in this repo. See `docs/agents/issue-tracker.md`.
+SilverBullet knowledge base under `AntiGrav/Tasks/foodplanner/`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
